@@ -1,0 +1,16 @@
+# Autostart mit systemd (Linux). Kopieren nach /etc/systemd/system/einsatzplaner.service.
+# Danach: systemctl daemon-reload && systemctl enable --now einsatzplaner
+[Unit]
+Description=Einsatzplaner der Verkehrskadetten
+After=network-online.target mariadb.service mysql.service
+
+[Service]
+Type=simple
+User=einsatzplaner
+ExecStart=/opt/einsatzplaner/start.sh
+ExecStop=/opt/einsatzplaner/stop.sh
+KillMode=mixed
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target

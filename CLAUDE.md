@@ -134,3 +134,18 @@ Diese Liste ergänze ich beim Bauen. Jede Annahme aus Teil B des Konzepts steht 
 - 18.11.2026: Commits gehen direkt auf `main`.
 - 18.11.2026: Die Installation auf dem Server bleibt einfach: Node.js, Datenbank, `.env`, ein Startskript. Keine weiteren Werkzeuge.
 - 18.11.2026: Das Tool läuft auf Windows 11 und später auch auf Linux. Es gibt `start.cmd`/`stop.cmd` für Windows und `start.sh`/`stop.sh` für Linux.
+- 18.11.2026: `LISTEN_HOST` steuert die Adresse, auf der der Server lauscht. Standard `127.0.0.1`.
+- 18.11.2026: Die Tabelle `job_lauf` hält fest, wann ein täglicher Job gelaufen ist. So läuft jeder Job einmal pro Tag, auch nach einem Neustart.
+- 18.11.2026: `mail_queue.naechster_versuch`: Ein Fehler beim Versand führt zu einem neuen Versuch später, nicht sofort.
+- 18.11.2026: Einträge mit «abgemeldet» erhalten keine Warnungen.
+- 18.11.2026: Formular: Ein zweiter unbekannter Eintrag mit gleichem Namen und gleicher Mail in derselben Schicht ergänzt die Bemerkung des ersten. Es entsteht kein zweiter Eintrag.
+- 18.11.2026: Rückmeldungen: «An» = angemeldet + bestätigt. «Offen» = passende Person ohne Eintrag oder mit «Nachricht gesendet».
+- 18.11.2026: Beim Löschen der Personendaten leert das Tool im Statusprotokoll auch die Werte der Aktionen `bemerkung` und `zugeordnet`.
+- 18.11.2026: Die letzte Schicht eines Einsatzes lässt sich nicht löschen. Der Admin löscht dann den Einsatz.
+- 18.11.2026: Ein ungültiges Geburtsdatum im Import ergibt einen Hinweis in der Vorschau und ein leeres Feld.
+- 18.11.2026: «Offen – nicht gefragt» auf der Personenseite zeigt auch unpublizierte Schichten. Die Aufgebotsstelle darf dort eintragen.
+- 18.11.2026: Wiederherstellen über `node dist/src/wiederherstellen.js <datei> --bestaetigt`. Ohne `--bestaetigt` ändert das Skript nichts. Vorher sichert es den aktuellen Stand.
+- 18.11.2026: Stoppen über die Stopp-Datei `stop.flag` (Variable `STOP_DATEI`). Grund: Ein Prozess unter `SYSTEM` ohne Konsole erhält kein Signal. Erst nach 20 Sekunden beendet `stop.cmd` den Node-Prozess auf dem Port.
+- 18.11.2026: `start.cmd` und `stop.cmd` liegen im Repo unter `betrieb/windows/` und werden nach `C:\einsatzplaner\` kopiert. Grund: Ein Update ändert `app`, ein laufendes Batch-Skript darf sich nicht ändern.
+- 18.11.2026: Die Aufgabe in der Aufgabenplanung entsteht mit `aufgabe-einrichten.ps1`. `schtasks` allein kann das Zeitlimit nicht ausschalten.
+- 18.11.2026: Die Log-Datei heisst `logs\einsatzplaner-JJJJ-MM-TT.log`. Das Datum ist der Tag des Starts von Node.

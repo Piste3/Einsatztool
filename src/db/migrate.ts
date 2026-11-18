@@ -1,0 +1,44 @@
+// Legt das Schema an und führt Migrationen aus. Wiederholte Starts ändern nichts (22.3.2).
+import { readFileSync } from 'node:fs';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { alle, schreibe, type Db } from './db.js';
+import { seed } from './seed.js';
+
+const ordner = dirname(fileURLToPath(import.meta.url));
+
+/** Teilt eine SQL-Datei in einzelne Anweisungen. Eine Anweisung endet mit «;» am Zeilenende. */
+export function teileSql(text: string): string[] {
+  const ohneKommentare = text
+    .split(/\r?\n/)
+    .filter((z) => !z.trim().startsWith('--'))
+    .join('\n');
+  return ohneKommentare
+    .split(/;\s*(?:\n|$)/)
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
+}
+
+/** Migrationen in Reihenfolge. Version 1 ist das Grundschema. */
+const migrationen: { version: number; anweisungen: () => string[] }[] = [
+  { version: 1, anweisungen: () => teileSql(readFileSync(join(ordner, 'schema.sql'), 'utf8')) },
+];
+
+export async function migriere(db: Db): Promise<number> {
+  await schreibe(
+    db,
+    'CREATE TABLE IF NOT EXISTS schema_version (version INT NOT NULL) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin',
+  );
+  const zeilen = await alle<{ version: number }>(db, 'SELECT version FROM schema_version');
+  let version = zeilen.length ? Number(zeilen[0].version) : 0;
+  if (!zeilen.length) await schreibe(db, 'INSERT INTO schema_version (version) VALUES (0)');
+  for (const m of migrationen) {
+    if (m.version <= version) continue;
+    // DDL-Anweisungen schliessen in MySQL jede Transaktion. Darum laufen sie einzeln.
+    for (const sql of m.anweisungen()) await schreibe(db, sql);
+    await schreibe(db, 'UPDATE schema_version SET version = ?', [m.version]);
+    version = m.version;
+  }
+  await seed(db);
+  return version;
+}
