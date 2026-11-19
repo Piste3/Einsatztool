@@ -156,3 +156,4 @@ Diese Liste ergänze ich beim Bauen. Jede Annahme aus Teil B des Konzepts steht 
 - 19.11.2026: Seiten Einsatz, Schicht, Anrufliste und Bearbeiten fragen alle 15 Sekunden `/stand/einsatz/<id>` ab. Bei einer Änderung erscheint ein Hinweis mit «Neu laden». Das Tool lädt nicht von selbst neu. Die Abfrage verlängert die Sitzung nicht.
 - 19.11.2026: `transaktion()` wiederholt einen Vorgang bei Deadlock oder Sperr-Wartezeit (höchstens 4 Versuche). Gleichzeitiges Anlegen desselben Eintrags führt zu einer Wiederholung statt zu einem Fehler.
 - 19.11.2026: Verbindungspool 20 Verbindungen. Ein täglicher Job läuft nie zweimal gleichzeitig (Sperre im Speicher).
+- 19.11.2026: Das Update ruft `npm ci --include=dev` auf. Grund: `start.cmd` setzt `NODE_ENV=production`. Ohne `--include=dev` fehlt TypeScript (`tsc`) beim Bauen.

@@ -10,6 +10,13 @@ import { log } from '../log.js';
 export const NEUSTART_CODE = 75;
 const BEHALTEN = 5;
 
+/**
+ * Argumente für npm ci. start.cmd setzt NODE_ENV=production. Dann lässt npm ci die
+ * devDependencies weg, also auch TypeScript (tsc). Zum Bauen braucht das Tool sie aber.
+ * Darum installiert «--include=dev» sie immer.
+ */
+export const NPM_CI_ARGS = ['ci', '--include=dev', '--no-audit', '--no-fund'];
+
 export interface Schritt {
   text: string;
   ok: boolean | null;
@@ -190,12 +197,12 @@ export class Updater {
       this.ende('fehler');
       return;
     }
-    const ok = (await this.schritt('Pakete installieren (npm ci)', 'npm', ['ci', '--no-audit', '--no-fund'])).ok &&
+    const ok = (await this.schritt('Pakete installieren (npm ci)', 'npm', NPM_CI_ARGS)).ok &&
       (await this.schritt('Bauen (npm run build)', 'npm', ['run', 'build'])).ok;
     if (!ok) {
       // Ein Fehler nach dem Holen setzt den Code auf den alten Commit zurück.
       await this.schritt('Alten Stand wiederherstellen', 'git', ['reset', '--hard', alterCommit]);
-      await this.schritt('Pakete des alten Stands installieren', 'npm', ['ci', '--no-audit', '--no-fund']);
+      await this.schritt('Pakete des alten Stands installieren', 'npm', NPM_CI_ARGS);
       await this.schritt('Alten Stand bauen', 'npm', ['run', 'build']);
       this.ende('fehler');
       return;

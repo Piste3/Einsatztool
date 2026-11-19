@@ -139,7 +139,7 @@ MariaDB startet jetzt automatisch, auch nach jedem Neustart von Windows.
    ```
 3. Installiere die Pakete:
    ```powershell
-   npm ci
+   npm ci --include=dev
    ```
    Das dauert etwa eine Minute. Am Ende steht z. B. `added 120 packages`. Warnungen («npm warn») sind kein Problem.
 4. Baue das Tool:
@@ -612,7 +612,7 @@ Cannot find module 'C:\…\app\dist\src\server.js'
 ```
 
 Ursache: Der Code liegt nicht im Unterordner `app`, oder `npm run build` fehlt.
-Lösung: Prüfe, dass der Ordner `app` direkt neben `start.cmd` liegt. Starte im Ordner `app` `npm ci` und `npm run build`.
+Lösung: Prüfe, dass der Ordner `app` direkt neben `start.cmd` liegt. Starte im Ordner `app` `npm ci --include=dev` und `npm run build`.
 
 ### Das Fenster von `start.cmd` bleibt leer
 
@@ -710,7 +710,7 @@ Unter Linux gelten dieselben Schritte. Der Standard-Hauptordner ist `/opt/einsat
    H=/opt/einsatzplaner
    sudo mkdir -p $H && sudo chown "$USER" $H
    git clone https://github.com/Piste3/Einsatztool.git $H/app
-   cd $H/app && npm ci && npm run build
+   cd $H/app && npm ci --include=dev && npm run build
    ```
 3. Leg Datenbank und Benutzer an. Starte zuerst den Client mit `sudo mariadb`. Die Eingabezeile zeigt `MariaDB [(none)]>`.
    Gib dann die SQL-Befehle aus [Schritt 6.4](#schritt-6-datenbank-und-datenbank-benutzer-anlegen) ein. Verlass den Client mit `exit`.
