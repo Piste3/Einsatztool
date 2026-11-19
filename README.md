@@ -747,8 +747,25 @@ Die Fehler aus [Häufige Fehler](#häufige-fehler) gelten auch unter Linux. Die 
 
 Alle Werte stehen in `.env.example` mit einer kurzen Erklärung. Das Tool liest die Datei aus `ENV_FILE` beim Start.
 `start.cmd` und `start.sh` setzen `ENV_FILE` auf `einsatzplaner.env` im Hauptordner.
-Umgebungsvariablen haben Vorrang vor der Datei. Server-Einstellungen gibt es nur in dieser Datei, nicht im Browser.
+Umgebungsvariablen haben Vorrang vor der Datei.
 Nach jeder Änderung an der Datei startest du den Einsatzplaner neu.
+
+### Konfiguration im Browser (Admin › Konfiguration)
+
+Ein Admin sieht und ändert alle Werte der Datei auch im Browser, unter Admin › Konfiguration.
+
+- Die Seite schreibt direkt in `einsatzplaner.env`. Es gibt keine zweite Quelle.
+- Den alten Stand legt das Tool als `einsatzplaner.env.vorher` daneben.
+- Änderungen wirken erst nach einem Neustart. Der Knopf «Neu starten» beendet Node mit Code 75. `start.cmd` startet Node nach 3 Sekunden neu.
+- Passwörter und Schlüssel zeigt die Seite nie an. Ein leeres Feld lässt den Wert unverändert.
+- Neue Datenbank-Werte prüft das Tool vor dem Speichern. Ist die Datenbank nicht erreichbar, speichert es nur mit dem Häkchen «Trotzdem speichern».
+- Der Knopf «Testmail senden» prüft die gespeicherten SMTP-Werte.
+- Das Protokoll zeigt, wer wann welchen Wert geändert hat. Geheimnisse stehen dort nur als «(gesetzt)» oder «(leer)».
+- Ein Wert aus einer echten Umgebungsvariablen ist gesperrt. Die Seite zeigt ihn nur an.
+
+Ein falscher Wert bei Port, Adresse, Datenbank oder Entra kann den Zugang sperren.
+Dann öffnest du `einsatzplaner.env` auf dem Server mit Notepad und korrigierst den Wert.
+Die Datei `einsatzplaner.env.vorher` enthält den Stand vor der letzten Änderung.
 
 Wichtig:
 

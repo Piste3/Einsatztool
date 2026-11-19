@@ -25,6 +25,8 @@ import { registrierePersonen } from './routes-personen.js';
 import { registriereAdmin } from './routes-admin.js';
 import { registriereStand, STAND_PFAD } from './routes-stand.js';
 import type { Updater } from '../jobs/update.js';
+import { registriereKonfiguration } from './routes-konfiguration.js';
+import type { Quelle } from '../domain/konfiguration.js';
 
 const ordner = dirname(fileURLToPath(import.meta.url));
 
@@ -36,6 +38,10 @@ export interface Abhaengigkeiten {
   /** Bestätigungen jetzt senden. */
   bestaetigungenJetzt: () => Promise<{ ok: boolean; meldung: string }>;
   updater: Updater | null;
+  /** Datei und Startwerte für Admin › Konfiguration. Ohne Angabe: ENV_FILE und process.env. */
+  konfigQuelle?: Quelle;
+  /** Beendet den Server mit Exit-Code 75. Das Startskript startet ihn neu. */
+  neustart?: () => void;
 }
 
 export const SITZUNG_DAUER_MS = 8 * 60 * 60 * 1000;
@@ -234,6 +240,7 @@ export function erstelleApp(deps: Abhaengigkeiten): express.Express {
   registriereAnmeldungen(app, deps);
   registrierePersonen(app, deps);
   registriereAdmin(app, deps);
+  registriereKonfiguration(app, deps);
   registriereStand(app, deps);
 
   app.use((req, res) => {

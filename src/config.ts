@@ -44,9 +44,18 @@ export function leseEnvDatei(text: string): Record<string, string> {
   return werte;
 }
 
+/** Pfad der Konfigurationsdatei (ENV_FILE, Standard: .env im aktuellen Ordner). */
+export function envDateiPfad(env: NodeJS.ProcessEnv = process.env): string {
+  return resolve(env.ENV_FILE || '.env');
+}
+
+/** Schlüssel, die vor dem Laden der Datei schon als Umgebungsvariable gesetzt waren. Sie haben Vorrang. */
+export const ausUmgebung = new Set<string>();
+
 /** Lädt die Datei ENV_FILE (Standard: .env im aktuellen Ordner) in process.env. Bestehende Variablen bleiben. */
 export function ladeEnvDatei(): void {
-  const pfad = resolve(process.env.ENV_FILE || '.env');
+  for (const k of Object.keys(process.env)) ausUmgebung.add(k);
+  const pfad = envDateiPfad();
   if (!existsSync(pfad)) return;
   const werte = leseEnvDatei(readFileSync(pfad, 'utf8'));
   for (const [k, v] of Object.entries(werte)) {

@@ -6,7 +6,7 @@ import { symbol, type SymbolName } from './symbole.js';
 
 export type Bereich =
   | 'start' | 'einsaetze' | 'rueckmeldungen' | 'personen' | 'unbekannt' | 'archiv'
-  | 'import' | 'export' | 'benutzer' | 'einstellungen' | 'update';
+  | 'import' | 'export' | 'benutzer' | 'einstellungen' | 'konfiguration' | 'update';
 
 /** Ändert sich bei jedem Start. So lädt der Browser nach einem Update das neue CSS und Skript. */
 const VERSION = Date.now().toString(36);
@@ -70,6 +70,7 @@ ${kopfDaten(`${titel} · Einsatzplaner`)}
     ${link('export', aktiv, '/admin/export', 'Export', 'export')}
     ${link('benutzer', aktiv, '/admin/benutzer', 'Benutzer', 'benutzer')}
     ${link('einstellungen', aktiv, '/admin/einstellungen', 'Einstellungen', 'zahnrad')}
+    ${link('konfiguration', aktiv, '/admin/konfiguration', 'Konfiguration', 'datei')}
     ${link('update', aktiv, '/admin/update', 'Update', 'update')}
   </ul>`)}
   <div class="leiste-fuss">
