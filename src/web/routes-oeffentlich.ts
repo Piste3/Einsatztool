@@ -87,7 +87,7 @@ ${schichten.length === 0
           ${s.bemerkung_extern ? html`<span class="bemerkung">${mehrzeilig(s.bemerkung_extern)}</span>` : ''}
         </span>
       </label>`)}
-      <div class="feld einsatz-bemerkung"><label for="bemerkung_${liste[0].einsatz_id}">Bemerkung zu ${liste[0].einsatz_name}</label><textarea id="bemerkung_${liste[0].einsatz_id}" name="bemerkung_${liste[0].einsatz_id}" maxlength="2000" rows="2">${werte.bemerkungen?.[String(liste[0].einsatz_id)] ?? ''}</textarea><small>Freiwillig. Zum Beispiel: später da, früher weg, Fragen.</small></div>
+      <div class="feld einsatz-bemerkung"><label for="bemerkung_${liste[0].einsatz_id}">Bemerkungen</label><textarea id="bemerkung_${liste[0].einsatz_id}" name="bemerkung_${liste[0].einsatz_id}" maxlength="2000" rows="2">${werte.bemerkungen?.[String(liste[0].einsatz_id)] ?? ''}</textarea></div>
     </div>`)}
   </fieldset>
   <button type="submit" class="knopf haupt">Anmelden</button>
