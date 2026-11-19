@@ -4,16 +4,17 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { leseEnvDatei } from '../src/config.js';
-import { erstelleQuelle, formatiereWert, setzeInEnvText } from '../src/domain/konfiguration.js';
+import { leseEnvDatei, leseKonfiguration } from '../src/config.js';
+import { aenderungMailText, aenderungMailto } from '../src/domain/personen.js';
+import { erstelleQuelle, formatiereWert, setzeInEnvText, zeilen as konfigZeilen } from '../src/domain/konfiguration.js';
 import { neueDatenbank, zeilen } from './hilfe.js';
 import { anmelden, starteApp } from './web-hilfe.js';
 
 test('T27a Schreiben behält Kommentare und Zeilenenden, Werte lesen sich gleich zurück', () => {
   const alt = '# Kommentar\r\nPORT=3010\r\n# SMTP_HOST=alt\r\nSMTP_HOST=\r\n';
-  const neu = setzeInEnvText(alt, { PORT: '3020', SMTP_HOST: 'smtp.office365.com', MAIL_ROMAN: 'roman@kkb.ch' });
+  const neu = setzeInEnvText(alt, { PORT: '3020', SMTP_HOST: 'smtp.office365.com', MAIL_INFORMATIK: 'informatik@kkb.ch' });
   assert.match(neu, /^# Kommentar\r\nPORT=3020\r\n# SMTP_HOST=alt\r\nSMTP_HOST=smtp\.office365\.com\r\n/);
-  assert.ok(neu.endsWith('MAIL_ROMAN=roman@kkb.ch\r\n'));
+  assert.ok(neu.endsWith('MAIL_INFORMATIK=informatik@kkb.ch\r\n'));
   assert.ok(!/[^\r]\n/.test(neu), 'nur CRLF');
   for (const w of ['"a"', ' x ', "a'", '"b', 'C:\\einsatzplaner\\data', 'a=b#c']) {
     assert.equal(leseEnvDatei(`K=${formatiereWert(w)}`).K, w, w);
@@ -96,4 +97,27 @@ test('T27b Admin ändert Werte, Geheimnisse bleiben verborgen, Protokoll, Konfli
     await app.stopp();
     await t.ende();
   }
+});
+
+test('T27c Alter Name MAIL_ROMAN gilt weiter und erhält beim Speichern den neuen Namen', () => {
+  assert.equal(leseKonfiguration({ MAIL_ROMAN: 'alt@kkb.ch' }).mailInformatik, 'alt@kkb.ch');
+  assert.equal(leseKonfiguration({ MAIL_ROMAN: 'alt@kkb.ch', MAIL_INFORMATIK: 'neu@kkb.ch' }).mailInformatik, 'neu@kkb.ch');
+  const ordner = mkdtempSync(join(tmpdir(), 'ep-konfig-'));
+  const pfad = join(ordner, 'einsatzplaner.env');
+  writeFileSync(pfad, 'MAIL_ROMAN=alt@kkb.ch\n');
+  const q = erstelleQuelle(pfad, { MAIL_ROMAN: 'alt@kkb.ch' }, new Set());
+  const z = konfigZeilen(q).zeilen.find((x) => x.d.schluessel === 'MAIL_INFORMATIK')!;
+  assert.equal(z.wert, 'alt@kkb.ch');
+  assert.equal(z.neustartNoetig, false);
+  assert.equal(setzeInEnvText('MAIL_ROMAN=alt@kkb.ch\n', { MAIL_INFORMATIK: 'neu@kkb.ch' }), 'MAIL_INFORMATIK=neu@kkb.ch\n');
+});
+
+test('T27d «Änderung melden»: allgemeine Vorlage an die Informatik', () => {
+  const m = aenderungMailText(42, 'Eva Müller');
+  assert.equal(m.betreff, 'Änderung Personendaten: Eva Müller (Clubdesk-ID 42)');
+  for (const teil of ['Clubdesk-ID: 42', 'Name: Eva Müller', 'Was ändern: ', 'Alt: ', 'Neu: ', 'Bemerkung: ']) assert.ok(m.text.includes(teil), teil);
+  assert.doesNotMatch(m.text, /Roman/);
+  const link = aenderungMailto('informatik@kkb.ch', 42, 'Eva Müller');
+  assert.ok(link.startsWith('mailto:informatik@kkb.ch?subject='));
+  assert.equal(decodeURIComponent(link.split('&body=')[1]), m.text);
 });

@@ -760,6 +760,7 @@ Ein Admin sieht und ändert alle Werte der Datei auch im Browser, unter Admin �
 - Passwörter und Schlüssel zeigt die Seite nie an. Ein leeres Feld lässt den Wert unverändert.
 - Neue Datenbank-Werte prüft das Tool vor dem Speichern. Ist die Datenbank nicht erreichbar, speichert es nur mit dem Häkchen «Trotzdem speichern».
 - Der Knopf «Testmail senden» prüft die gespeicherten SMTP-Werte.
+- `MAIL_INFORMATIK` ist die Adresse der Informatik. Der Knopf «Änderung melden» auf der Personenseite öffnet eine Mail an diese Adresse. Die Mail ist eine Vorlage: Du trägst jede Änderung direkt ein. Der alte Name `MAIL_ROMAN` gilt weiter.
 - Das Protokoll zeigt, wer wann welchen Wert geändert hat. Geheimnisse stehen dort nur als «(gesetzt)» oder «(leer)».
 - Ein Wert aus einer echten Umgebungsvariablen ist gesperrt. Die Seite zeigt ihn nur an.
 

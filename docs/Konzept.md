@@ -243,8 +243,8 @@ Entschieden: Das Tool versendet einmal täglich eine gesammelte Mail ohne Link.
        zuerst, dass die Aufgebotsstelle die Person aus den Einsätzen austrägt.
    7. Bei einer Person ohne künftige Einsätze löscht das Tool nach Rückfrage die
        Personendaten. Die ID und ihre vergangenen Einsätze bleiben im Archiv.
-   8. Ändert sich ein Wert (Telefon, Essenseinschränkung), geht die Änderung an Roman in
-       Clubdesk. Das Tool erzeugt dafür eine vorbereitete Mail mit der Clubdesk-ID im Text.
+   8. Ändert sich ein Wert (Telefon, Essenseinschränkung), geht die Änderung an die Informatik
+       (Clubdesk). Das Tool erzeugt dafür eine vorbereitete Mail mit der Clubdesk-ID im Text.
 
 Offen: Die Änderung dauert bis zum nächsten Import (bis zu zwei Wochen). Entschieden:
 Das Tool löscht die Personendaten nach Rückfrage und behält die ID.
@@ -448,8 +448,8 @@ Alle Werte kommen aus Umgebungsvariablen. .env.example nennt alle.
 
    MAIL_FROM                                         Aufgebotsadresse als Absender
 
-   MAIL_ROMAN                                        Adresse für Änderungswünsche an
-                                                     Clubdesk
+   MAIL_INFORMATIK                                   Adresse der Informatik für Änderungswünsche
+                                                     an Clubdesk (alter Name: MAIL_ROMAN)
 
    CLUBDESK_ICAL_URL                                 Adresse des iCal-Feeds von Clubdesk
 
@@ -914,9 +914,10 @@ Admin). Jede Schreib-Route prüft ein CSRF-Token.
 14.4 Personen-Ansicht
        Lesend. Das Tool zeigt Personendaten und die Anmeldungen der Person (kommend
        und vergangen).
-       Der Knopf „Änderung melden“ öffnet einen mailto: -Link an MAIL_ROMAN . Betreff:
-       „Änderung Personendaten“. Text: Clubdesk-ID, Name und eine Zeile „Bitte ändern: …“
-       (Annahme).
+       Der Knopf „Änderung melden“ öffnet einen mailto: -Link an MAIL_INFORMATIK (die Informatik).
+       Betreff: „Änderung Personendaten: Name (Clubdesk-ID n)“. Text: allgemeine Vorlage mit
+       Clubdesk-ID, Name und leeren Zeilen „Was ändern“, „Alt“, „Neu“, „Weitere Änderungen“,
+       „Bemerkung“ (Entscheid Yann 19.11.2026).
 14.5 Einstellungen: Ränge
 Die Seite „Einstellungen“ (Route /admin/raenge , nur Admin) pflegt die Ränge. Es gibt
 keine fest eingebauten Ränge.

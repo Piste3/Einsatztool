@@ -70,7 +70,7 @@ Sprache mit Yann: Deutsch nach ASD-STE100. Aktiv, höchstens 25 Wörter pro Satz
 - Auch die Dankesseite des Formulars darf im iframe von Clubdesk erscheinen.
 - Cookie `Secure` nur, wenn `BASE_URL` mit `https://` beginnt.
 - Test-Login `DEV_LOGIN=1` nur für lokale Tests: nur ohne `ENTRA_TENANT_ID`, nur mit `NODE_ENV=development`. Der Server lauscht dann nur auf `127.0.0.1`. Nie auf dem Server setzen.
-- «Änderung melden» öffnet einen `mailto:`-Link an `MAIL_ROMAN` mit Clubdesk-ID, Name und «Bitte ändern: …».
+- «Änderung melden» öffnet einen `mailto:`-Link an die Informatik (`MAIL_INFORMATIK`). Die Mail ist eine allgemeine Vorlage: Clubdesk-ID, Name und leere Zeilen «Was ändern», «Alt», «Neu», «Weitere Änderungen», «Bemerkung».
 - Archiv-Zahl: Summe der Teilnehmenden über alle Schichten.
 - Kopieren: Die Vorgabe für den Namen erhöht die erste Jahreszahl um eins. Startdatum = derselbe Tag im nächsten Jahr.
 - Aufgebot für unbekannte bestätigte Einträge: Brief mit dem Hinweis «Adresse fehlt». Gelöschte Personen erhalten keinen Brief. Fehlt die Einsatzleitung, steht das in den Lücken (`W_EINSATZLEITUNG`).
@@ -131,7 +131,7 @@ Seit 19.11.2026 (Entscheid Yann): Aussehen und Bedienung folgen dem Handbuch des
 Diese Liste ergänze ich beim Bauen. Jede Annahme aus Teil B des Konzepts steht hier.
 
 - Eine neue zusätzliche Schicht hat `publiziert = 0` (13.2).
-- «Änderung melden»: Betreff «Änderung Personendaten» (14.4).
+- «Änderung melden»: Betreff «Änderung Personendaten: Name (Clubdesk-ID n)» (14.4).
 - Formular-Essenseinschränkungen gehen in die Bemerkung (15.2).
 - Spätere Änderungen nach dem Versand lösen keine neue Mail aus (18.2).
 - Der iCal-Abgleich vergleicht nur Titel und Zeiten (17.4).
@@ -178,3 +178,4 @@ Diese Liste ergänze ich beim Bauen. Jede Annahme aus Teil B des Konzepts steht 
 - 19.11.2026: Werte aus echten Umgebungsvariablen sind auf der Seite gesperrt. `NODE_ENV` und `DEV_LOGIN` erscheinen nicht auf der Seite.
 - 19.11.2026: Neue Datenbank-Werte prüft das Tool vor dem Speichern. Ohne Verbindung speichert es nur mit «Trotzdem speichern» (Warnen statt verbieten).
 - 19.11.2026: Konfliktschutz über eine Prüfsumme der Datei. Ein Formular mit altem Stand speichert nichts.
+- 19.11.2026: `MAIL_ROMAN` heisst neu `MAIL_INFORMATIK` (Wunsch Yann: Die Adresse gehört der Informatik, nicht einer Person). Der alte Name gilt beim Lesen weiter. Beim Speichern über Admin › Konfiguration erhält die Zeile den neuen Namen.

@@ -2,7 +2,7 @@
 import type { Express } from 'express';
 import type { Abhaengigkeiten } from './app.js';
 import { nurAufgebot } from './app.js';
-import { alterHeute, ladePerson, personenListe, telefonText } from '../domain/personen.js';
+import { aenderungMailto, alterHeute, ladePerson, personenListe, telefonText } from '../domain/personen.js';
 import { personUebersicht, rueckmeldungen, type RueckmeldungOptionen } from '../domain/listen.js';
 import { verlauf } from '../domain/anmeldung.js';
 import { STATUS_TEXT, KANAL_TEXT, id as leseId, type Kanal } from '../domain/eingabe.js';
@@ -44,10 +44,8 @@ ${seitenKopf({ titel: 'Personen', angaben: [`${liste.length} Personen`, 'Die Dat
     const logs = await verlauf(db, [...u.kommend, ...u.vergangen].map((e) => e.id));
     const name = `${p.vorname ?? ''} ${p.nachname ?? ''}`.trim() || `Gelöschte Person ${p.clubdesk_id}`;
     const hier = aktuellerPfad(req);
-    // Regel 14.4 (Annahme): mailto an MAIL_ROMAN mit Clubdesk-ID, Name und «Bitte ändern: …».
-    const mailto = konfig.mailRoman
-      ? `mailto:${konfig.mailRoman}?subject=${encodeURIComponent('Änderung Personendaten')}&body=${encodeURIComponent(`Clubdesk-ID: ${p.clubdesk_id}\nName: ${name}\nBitte ändern: …`)}`
-      : null;
+    // Regel 14.4: mailto an die Informatik (MAIL_INFORMATIK) mit einer allgemeinen Vorlage.
+    const mailto = konfig.mailInformatik ? aenderungMailto(konfig.mailInformatik, p.clubdesk_id, name) : null;
     const gruppe = (titel: string, liste: typeof u.kommend) => liste.length
       ? html`<h3>${titel} (${liste.length})</h3><ul class="liste">${liste.map((e) => html`<li>
           <a href="/schichten/${e.schicht_id}">${e.einsatz}${e.einsatz === e.schicht ? '' : ` – ${e.schicht}`}</a> · ${zeitraum(e.start_zeit, e.end_zeit)} · ${statusText(e.status)}${e.rolle ? ` · ${e.rolle}` : ''}
@@ -59,7 +57,7 @@ ${seitenKopf({
   pfad: [{ text: 'Personen', href: '/personen' }, { text: name }],
   titel: html`${p.rang_name ? html`<span class="rang">${p.rang_name}</span> ` : ''}${name}`,
   angaben: [`Clubdesk-ID ${p.clubdesk_id}`],
-  aktionen: mailto ? html`<a class="knopf" href="${mailto}">Änderung melden</a>` : html`<span class="unter">MAIL_ROMAN fehlt in der Konfiguration.</span>`,
+  aktionen: mailto ? html`<a class="knopf" href="${mailto}">Änderung melden</a>` : html`<span class="unter">MAIL_INFORMATIK fehlt in der Konfiguration.</span>`,
 })}
 ${p.geloescht_am ? html`<p class="meldung hinweis">Die Personendaten sind gelöscht (${datumZeit(p.geloescht_am)}). Die ID bleibt.</p>` : ''}
 <div class="zwei-spalten">

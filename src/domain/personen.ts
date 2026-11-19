@@ -113,3 +113,36 @@ export function idAusAuswahl(wert: unknown): number | null {
   const m = /\((\d+)\)\s*$/.exec(wert.trim()) ?? /^(\d+)$/.exec(wert.trim());
   return m ? Number(m[1]) : null;
 }
+
+/**
+ * «Änderung melden» (14.4): mailto-Link an die Informatik mit einer allgemeinen Vorlage.
+ * Die Aufgebotsstelle trägt jede Änderung direkt in die Mail ein. Das Tool ändert keine Personendaten.
+ */
+export function aenderungMailText(clubdeskId: number, name: string): { betreff: string; text: string } {
+  return {
+    betreff: `Änderung Personendaten: ${name} (Clubdesk-ID ${clubdeskId})`,
+    text: [
+      'Hallo Informatik',
+      '',
+      'Bitte ändert in Clubdesk folgende Angaben:',
+      '',
+      `Clubdesk-ID: ${clubdeskId}`,
+      `Name: ${name}`,
+      '',
+      'Was ändern: ',
+      'Alt: ',
+      'Neu: ',
+      '',
+      'Weitere Änderungen: ',
+      '',
+      'Bemerkung: ',
+      '',
+      'Danke',
+    ].join('\r\n'),
+  };
+}
+
+export function aenderungMailto(an: string, clubdeskId: number, name: string): string {
+  const m = aenderungMailText(clubdeskId, name);
+  return `mailto:${an}?subject=${encodeURIComponent(m.betreff)}&body=${encodeURIComponent(m.text)}`;
+}

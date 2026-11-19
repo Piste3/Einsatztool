@@ -14,7 +14,8 @@ export interface Konfiguration {
   entra: { tenantId: string; clientId: string; clientSecret: string };
   smtp: { host: string; port: number; user: string; pass: string };
   mailFrom: string;
-  mailRoman: string;
+  /** Adresse der Informatik für «Änderung melden». */
+  mailInformatik: string;
   bestaetigungStunde: number;
   exportStunde: number;
   clubdeskIcalUrl: string;
@@ -105,7 +106,8 @@ export function leseKonfiguration(env: NodeJS.ProcessEnv = process.env): Konfigu
       pass: env.SMTP_PASS || '',
     },
     mailFrom: env.MAIL_FROM || 'aufgebot@kkb.ch',
-    mailRoman: env.MAIL_ROMAN || '',
+    // MAIL_ROMAN ist der alte Name. Bestehende Dateien gelten weiter.
+    mailInformatik: env.MAIL_INFORMATIK || env.MAIL_ROMAN || '',
     bestaetigungStunde: zahl(env.BESTAETIGUNG_STUNDE, 18),
     exportStunde: zahl(env.EXPORT_HOUR, 2),
     clubdeskIcalUrl: env.CLUBDESK_ICAL_URL || '',

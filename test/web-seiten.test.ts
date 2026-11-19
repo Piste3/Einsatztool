@@ -9,7 +9,7 @@ import { erstelleFormularToken } from '../src/domain/formular.js';
 
 test('Alle Seiten antworten ohne Fehler', async () => {
   const t = await neueDatenbank();
-  const app = await starteApp(t.db, { MAIL_ROMAN: 'roman@kkb.ch' });
+  const app = await starteApp(t.db, { MAIL_INFORMATIK: 'informatik@kkb.ch' });
   try {
     const r = await rang(t.db, 'Kpl', 1);
     await person(t.db, 1, { vorname: 'Eva', nachname: 'Müller', rang_id: r, telefon: '079 111 22 33', email: 'eva@web.kkb.ch' });

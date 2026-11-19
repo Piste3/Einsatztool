@@ -49,7 +49,7 @@ export const DEFINITIONEN: Definition[] = [
   { schluessel: 'SMTP_USER', gruppe: 'Mail', titel: 'SMTP-Benutzer', hilfe: '', art: 'text', standard: '' },
   { schluessel: 'SMTP_PASS', gruppe: 'Mail', titel: 'SMTP-Passwort', hilfe: '', art: 'geheim', standard: '' },
   { schluessel: 'MAIL_FROM', gruppe: 'Mail', titel: 'Aufgebotsadresse', hilfe: 'Absender und Reply-To aller Mails.', art: 'mail', standard: 'aufgebot@kkb.ch', pflicht: true },
-  { schluessel: 'MAIL_ROMAN', gruppe: 'Mail', titel: 'Adresse für Änderungswünsche', hilfe: 'Empfänger von «Änderung melden» (Clubdesk-Pflege).', art: 'mail', standard: '' },
+  { schluessel: 'MAIL_INFORMATIK', gruppe: 'Mail', titel: 'Adresse der Informatik', hilfe: 'Empfänger von «Änderung melden» auf der Personenseite. Die Informatik pflegt die Personendaten in Clubdesk.', art: 'mail', standard: '' },
   { schluessel: 'BESTAETIGUNG_STUNDE', gruppe: 'Mail', titel: 'Stunde der Bestätigungsmail', hilfe: 'Lokale Zeit, 0 bis 23.', art: 'stunde', standard: '18', pflicht: true },
 
   { schluessel: 'CLUBDESK_ICAL_URL', gruppe: 'Clubdesk', titel: 'Adresse des iCal-Feeds', hilfe: 'Aus Clubdesk › Kalender › Abonnieren.', art: 'url', standard: '' },
@@ -66,6 +66,18 @@ export const DEFINITIONEN: Definition[] = [
 
 const PER_SCHLUESSEL = new Map(DEFINITIONEN.map((d) => [d.schluessel, d]));
 
+/** Alte Namen von Schlüsseln. Das Tool liest sie weiter und schreibt beim Speichern den neuen Namen. */
+export const ALTE_NAMEN: Record<string, string> = { MAIL_ROMAN: 'MAIL_INFORMATIK' };
+
+/** Übernimmt Werte unter alten Namen, wenn der neue Name fehlt. */
+function mitNeuenNamen<T extends Record<string, string | undefined>>(werte: T): T {
+  const r: Record<string, string | undefined> = { ...werte };
+  for (const [alt, neu] of Object.entries(ALTE_NAMEN)) {
+    if (r[neu] === undefined && r[alt] !== undefined) r[neu] = r[alt];
+  }
+  return r as T;
+}
+
 /** Woher die Seite liest und was beim Start galt. */
 export interface Quelle {
   /** Pfad der Datei einsatzplaner.env. */
@@ -78,8 +90,10 @@ export interface Quelle {
 
 export function erstelleQuelle(pfad: string, env: NodeJS.ProcessEnv, umgebung: Set<string>): Quelle {
   const laufend: Record<string, string> = {};
-  for (const d of DEFINITIONEN) laufend[d.schluessel] = env[d.schluessel] ?? '';
-  return { pfad, umgebung: new Set([...umgebung].filter((k) => PER_SCHLUESSEL.has(k))), laufend };
+  const e = mitNeuenNamen(env);
+  for (const d of DEFINITIONEN) laufend[d.schluessel] = e[d.schluessel] ?? '';
+  const u = new Set([...umgebung].map((k) => ALTE_NAMEN[k] ?? k).filter((k) => PER_SCHLUESSEL.has(k)));
+  return { pfad, umgebung: u, laufend };
 }
 
 export interface Stand {
@@ -95,7 +109,7 @@ export function versionVon(text: string): string {
 
 export function leseStand(pfad: string): Stand {
   const text = existsSync(pfad) ? readFileSync(pfad, 'utf8') : '';
-  return { text, werte: leseEnvDatei(text), version: versionVon(text) };
+  return { text, werte: mitNeuenNamen(leseEnvDatei(text)), version: versionVon(text) };
 }
 
 /** Schreibt einen Wert so, dass leseEnvDatei genau diesen Wert zurückliest. */
@@ -119,7 +133,9 @@ export function setzeInEnvText(text: string, werte: Record<string, string>): str
     if (!z || z.startsWith('#')) continue;
     const gleich = z.indexOf('=');
     if (gleich < 1) continue;
-    const k = z.slice(0, gleich).trim();
+    const roh = z.slice(0, gleich).trim();
+    // Ein alter Name erhält den neuen Namen.
+    const k = ALTE_NAMEN[roh] && ALTE_NAMEN[roh] in werte ? ALTE_NAMEN[roh] : roh;
     if (!(k in werte)) continue;
     zeilen[i] = `${k}=${formatiereWert(werte[k])}`;
     erledigt.add(k);
