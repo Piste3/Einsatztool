@@ -29,7 +29,7 @@ test('Alle Seiten antworten ohne Fehler', async () => {
       `/schichten/${s.schichtId}`, `/schichten/${s.schichtId}/bearbeiten`, `/schichten/${s.schichtId}/loeschen`,
       `/schichten/${s.schichtId}/anrufliste`, `/schichten/${s.schichtId}/anrufliste?alle=1`, `/schichten/${s.schichtId}/ics`,
       `/schichten/${s.schichtId}/termintext`, `/schichten/${s.schichtId}/aufgebot`, `/schichten/${s.schichtId}/essensliste.csv`,
-      `/anmeldungen/${aid}/loeschen`, '/anmeldungen/unbekannt', '/personen', '/personen/1', '/rueckmeldungen',
+      `/anmeldungen/${aid}/loeschen`, '/anmeldungen/unbekannt', '/personen', '/personen/1', '/rueckmeldungen', `/rueckmeldungen/eintrag?schicht=${s.schichtId}&person=1&zurueck=/rueckmeldungen`,
       '/admin/import', '/admin/export', '/admin/benutzer', '/admin/raenge', '/admin/rollen', '/admin/einstellungen', '/admin/konfiguration', '/admin/update',
       '/anmeldung', '/health',
     ];

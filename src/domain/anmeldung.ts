@@ -287,3 +287,8 @@ export async function verlauf(db: Db, anmeldungIds: number[]): Promise<Map<numbe
   }
   return m;
 }
+
+/** Der Eintrag einer Person in einer Schicht, falls es ihn gibt (eine Person hat pro Schicht höchstens einen). */
+export async function anmeldungVonPerson(db: Db, schichtId: number, personId: number): Promise<Anmeldung | null> {
+  return (await eine<Anmeldung>(db, 'SELECT * FROM anmeldung WHERE schicht_id = ? AND person_id = ?', [schichtId, personId])) ?? null;
+}

@@ -312,6 +312,45 @@
 
   var lese = function (text) { return new DOMParser().parseFromString(text, 'text/html'); };
 
+  // ---------- Rückmeldungen: Fenster zum Eintragen ----------
+  // Ein Klick auf ein Feld lädt das Formular in ein Fenster. Speichern läuft über die
+  // bestehenden Routen (Konfliktschutz, Warnungen, Live, Toast). Ohne Skript öffnet der Link eine Seite.
+  var fenster = null;
+  var fensterZu = function () { if (fenster && fenster.open) fenster.close(); };
+  document.addEventListener('click', function (ev) {
+    var link = ev.target && ev.target.closest ? ev.target.closest('a[data-eintrag]') : null;
+    if (link) {
+      if (ev.button !== 0 || ev.ctrlKey || ev.metaKey || ev.shiftKey || !window.fetch || !window.HTMLDialogElement) return;
+      ev.preventDefault();
+      // Die Rücksprung-Adresse ist immer die aktuelle Ansicht (Filter bleiben).
+      var url = new URL(link.href);
+      url.searchParams.set('zurueck', location.pathname + location.search);
+      fetch(url.pathname + url.search, { credentials: 'same-origin', headers: { 'X-Fragment': '1', 'X-Live-Abfrage': '1' } })
+        .then(function (r) { if (!r.ok) throw new Error(String(r.status)); return r.text(); })
+        .then(function (text) {
+          if (!fenster) {
+            fenster = document.createElement('dialog');
+            fenster.className = 'fenster';
+            fenster.setAttribute('aria-label', 'Eintragen');
+            fenster.addEventListener('click', function (e) { if (e.target === fenster) fensterZu(); });
+            document.body.appendChild(fenster);
+          }
+          fenster.innerHTML = text;
+          if (!fenster.open) fenster.showModal();
+          var erstes = fenster.querySelector('input[type="radio"]:checked');
+          if (erstes) erstes.focus();
+        })
+        .catch(function () { location.assign(link.href); });
+      return;
+    }
+    var zu = ev.target && ev.target.closest ? ev.target.closest('[data-fenster-zu]') : null;
+    if (zu && fenster && fenster.contains(zu)) { ev.preventDefault(); fensterZu(); }
+  });
+  // Beim Speichern schliesst das Fenster. Das Senden übernimmt der Live-Teil unten.
+  document.addEventListener('submit', function (ev) {
+    if (fenster && fenster.contains(ev.target)) setTimeout(fensterZu, 0);
+  }, true);
+
   // ---------- Live: Formulare im Hintergrund senden ----------
 
   var meldeFehler = function (text) {

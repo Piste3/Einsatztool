@@ -589,3 +589,47 @@ body.druck { background: var(--hg); padding: 1rem; }
 .pille-punkt.punkt-grau { --punkt: var(--grau); }
 .filterzeile { margin-bottom: .7rem; }
 .schicht-karte footer { border-top: 1px solid var(--linie); padding-top: .7rem; }
+
+/* Rückmeldungen: Felder zum Anklicken und Fenster zum Eintragen */
+.rueck td.zelle-klick { padding: 0; }
+.rueck td.zelle-klick > a { display: flex; align-items: center; justify-content: center; min-height: 2.3rem; padding: .3rem .5rem; color: inherit; }
+.rueck td.zelle-klick > a:hover { background: var(--grau-hg); text-decoration: none; }
+.rueck td.zelle-klick > a:hover .status.leer { color: var(--text); }
+.rueck td.zelle-klick > a:hover .status.leer::after { content: '+'; position: absolute; }
+.rueck td.zelle-klick > a .status.leer { position: relative; }
+.fenster {
+  border: 1px solid var(--linie); border-radius: 12px; padding: 0; width: min(560px, calc(100vw - 1.5rem)); max-height: calc(100vh - 2rem);
+  background: var(--flaeche); color: var(--text); box-shadow: var(--schatten-menue);
+}
+.fenster::backdrop { background: rgba(10, 10, 12, .45); }
+.eintrag-fenster { padding: 1rem 1.1rem 1.1rem; display: flex; flex-direction: column; gap: .7rem; }
+.eintrag-seite .eintrag-fenster { padding: 0; }
+.eintrag-seite [data-fenster-zu].toast-zu { display: none; }
+.eintrag-kopf { display: flex; justify-content: space-between; align-items: flex-start; gap: .8rem; }
+.eintrag-kopf h2 { margin: 0; font-size: 1.1rem; }
+.eintrag-kopf .unter { margin: .15rem 0 0; }
+.eintrag-person { margin: 0; font-size: .88rem; display: flex; flex-wrap: wrap; gap: .3rem .6rem; align-items: center; }
+.eintrag-aktuell { background: var(--flaeche-2); border: 1px solid var(--linie); border-radius: var(--radius-klein); padding: .5rem .7rem; font-size: .85rem; }
+.eintrag-andere { font-size: .85rem; }
+.eintrag-andere ul { margin: .3rem 0 0; display: flex; flex-direction: column; gap: .2rem; }
+.eintrag-andere li { display: flex; align-items: center; gap: .4rem; }
+.eintrag-form { display: flex; flex-direction: column; gap: .6rem; }
+.eintrag-form fieldset { border: 0; margin: 0; padding: 0; }
+.eintrag-form legend, .eintrag-form .feld { font-size: .8rem; font-weight: 500; color: var(--gedämpft); margin-bottom: .25rem; }
+.eintrag-form .feld { margin: 0; gap: .25rem; }
+.eintrag-form .feld select, .eintrag-form .feld textarea { color: var(--text); font-weight: 400; }
+.wahl { display: flex; flex-wrap: wrap; border: 1px solid var(--linie-stark); border-radius: var(--radius-klein); overflow: hidden; }
+.wahl-knopf { flex: 1 1 auto; position: relative; cursor: pointer; border-left: 1px solid var(--linie); }
+.wahl-knopf:first-child { border-left: 0; }
+.wahl-knopf input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+.wahl-knopf > span { display: flex; align-items: center; justify-content: center; gap: .35rem; padding: .45rem .6rem; font-size: .85rem; color: var(--text); white-space: nowrap; }
+.wahl-knopf input:checked + span { background: var(--haupt); color: var(--haupt-text); font-weight: 600; }
+.wahl-knopf input:focus-visible + span { outline: 2px solid var(--akzent); outline-offset: -2px; }
+.wahl-knopf.s-bestaetigt { --punkt: var(--gruen-punkt); }
+.wahl-knopf.s-angemeldet { --punkt: var(--blau-punkt); }
+.wahl-knopf.s-abgemeldet { --punkt: var(--grau); }
+.wahl-knopf.s-unsicher { --punkt: var(--orange-punkt); }
+.wahl-knopf.s-nachricht_gesendet { --punkt: var(--violett-punkt); }
+.eintrag-knoepfe { display: flex; justify-content: space-between; align-items: center; gap: .5rem; flex-wrap: wrap; border-top: 1px solid var(--linie); padding-top: .8rem; }
+.eintrag-verlauf { border-top: 1px solid var(--linie); padding-top: .6rem; }
+@media (max-width: 600px) { .wahl { flex-direction: column; } .wahl-knopf { border-left: 0; border-top: 1px solid var(--linie); } .wahl-knopf:first-child { border-top: 0; } }
