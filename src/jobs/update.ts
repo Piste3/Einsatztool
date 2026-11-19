@@ -140,7 +140,10 @@ export class Updater {
         this.notiz('Es gibt lokale Änderungen. Das Update ist gesperrt.', false, status.ausgabe);
         return this.ende('fehler');
       }
-      const commits = await this.schritt('Neue Commits suchen', 'git', ['log', '--oneline', '--no-decorate', `HEAD..origin/${this.o.branch}`]);
+      const commits = await this.schritt('Neue Commits suchen', 'git', [
+        // Eine Zeile je Commit, neueste oben: Hash, Datum, Titel (durch Tabulator getrennt).
+        'log', '--no-decorate', '--date=format:%d.%m.%Y', '--format=%h%x09%ad%x09%s', `HEAD..origin/${this.o.branch}`,
+      ]);
       if (!commits.ok) return this.ende('fehler');
       this.zustand.neueCommits = commits.ausgabe.split(/\r?\n/).filter(Boolean);
       return this.ende('geprueft');

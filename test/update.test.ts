@@ -91,3 +91,13 @@ test('Update installieren ohne neuen Stand: keine Sicherung, kein Neustart', asy
   assert.ok(!u.zustand.schritte.some((s) => s.text.startsWith('Datenbank gesichert')));
   assert.equal(neustarts.length, 0);
 });
+
+test('Update: Die Liste der Änderungen hat Hash, Datum und Titel, neueste oben', async () => {
+  const aufrufe: string[][] = [];
+  const u = updater(aufrufe, true, 'b9f930c\t19.11.2026\tMeldungen als Toast\nf4582b4\t18.11.2026\tMAIL_INFORMATIK');
+  await u.pruefe();
+  const log = aufrufe.find((a) => a[0] === 'git' && a[1] === 'log')!;
+  assert.ok(log.includes('--format=%h%x09%ad%x09%s'));
+  assert.ok(log.includes('--date=format:%d.%m.%Y'));
+  assert.deepEqual(u.zustand.neueCommits, ['b9f930c\t19.11.2026\tMeldungen als Toast', 'f4582b4\t18.11.2026\tMAIL_INFORMATIK']);
+});

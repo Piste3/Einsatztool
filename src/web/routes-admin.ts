@@ -310,8 +310,14 @@ ${seitenKopf({
   angaben: [html`Branch <code>${konfig.updateBranch}</code>`, z.aktuellerCommit ? html`Stand <code>${z.aktuellerCommit}</code>` : '', zeit ? `zuletzt ${zeit}` : ''],
 })}
 <p class="meldung ${status.art}">${status.text}</p>
+${z.neueCommits.length ? html`<details class="aufklapp aenderungen" open><summary>Änderungen (${z.neueCommits.length})</summary>
+<ul class="commit-liste">${z.neueCommits.map((c) => {
+  // Format: Hash, Datum, Titel. Ältere Einträge haben nur «Hash Titel».
+  const t = c.split('\t');
+  const [hash, datum, titel] = t.length >= 3 ? [t[0], t[1], t.slice(2).join(' ')] : [c.split(' ')[0], '', c.split(' ').slice(1).join(' ')];
+  return html`<li><span class="titel">${titel}</span> <span class="unter">${datum}${datum ? ' · ' : ''}<code>${hash}</code></span></li>`;
+})}</ul></details>` : ''}
 <p class="unter">«Update installieren» sichert immer zuerst Datenbank und Konfiguration. Dann holt es den neuen Stand, baut ihn und startet den Server neu.</p>
-${z.neueCommits.length ? html`<details class="aufklapp"><summary>Änderungen anzeigen (${z.neueCommits.length})</summary><pre class="kompakt">${z.neueCommits.join('\n')}</pre></details>` : ''}
 ${z.schritte.length ? html`<ol class="schritte kompakt">${z.schritte.map((s) => html`<li class="${s.ok === null ? 'laeuft' : s.ok ? 'ok' : 'fehler'}">${
   s.ausgabe
     ? html`<details${s.ok === false ? new Roh(' open') : ''}><summary><span class="zeichen">${s.ok === null ? '…' : s.ok ? '✓' : '✗'}</span> ${s.text}</summary><pre>${s.ausgabe}</pre></details>`

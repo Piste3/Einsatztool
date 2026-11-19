@@ -502,6 +502,10 @@ p.bemerkung:not(.intern) { border-left: 3px solid var(--linie-stark); padding: .
 .wa { font-size: .9em; text-decoration: none; }
 .telefon a { white-space: nowrap; font-weight: 400; }
 .schritte { padding-left: 1.2rem; }
+/* Update: Liste der neuen Commits */
+.commit-liste { list-style: none; padding: 0; margin: .4rem 0 .8rem; }
+.commit-liste li { padding: .3rem 0; border-bottom: 1px solid var(--linie); display: flex; flex-wrap: wrap; gap: .2rem .6rem; justify-content: space-between; }
+.commit-liste .titel { font-weight: 600; }
 /* Update: eine Zeile je Schritt, Ausgabe zum Aufklappen */
 .schritte.kompakt { list-style: none; padding: 0; margin: .5rem 0; font-size: .9rem; }
 .schritte.kompakt li { padding: .2rem 0; border-bottom: 1px solid var(--linie); }
