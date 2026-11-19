@@ -725,3 +725,18 @@ body.druck { background: var(--hg); padding: 1rem; }
 .personen-tabelle tr.unbestaetigt td:first-child { box-shadow: inset 3px 0 0 var(--orange-punkt); }
 .personen-tabelle.rueck .name-spalte { width: 1%; white-space: nowrap; padding-right: 1.5rem; }
 .pille.blau { color: var(--blau); background: var(--blau-hg); border-color: transparent; }
+
+/* ---------- Einsätze: Liste wie im Handbuch ---------- */
+.kopf-suche { width: 13rem; max-width: 100%; }
+.einsatz-filter { align-items: flex-end; }
+.einsatz-liste td { vertical-align: middle; }
+.einsatz-liste .einsatz-name { font-weight: 650; color: var(--text); }
+.einsatz-liste .antreten { max-width: 12rem; white-space: normal; }
+.einsatz-liste .einsatzleitung { white-space: nowrap; }
+.einsatz-liste th.zahl, .einsatz-liste td.zahl { text-align: center; }
+.einsatz-liste .nowrap { white-space: nowrap; }
+.besetzung { display: flex; flex-direction: column; gap: .45rem; min-width: 11rem; }
+.besetzung-zeile { display: grid; grid-template-columns: 1fr auto; column-gap: .6rem; row-gap: 3px; font-size: .78rem; }
+.besetzung-name { color: var(--gedämpft); }
+.besetzung-zahl { font-weight: 650; font-variant-numeric: tabular-nums; }
+.besetzung-zeile .balken { grid-column: 1 / -1; }

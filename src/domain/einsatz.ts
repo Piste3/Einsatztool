@@ -223,6 +223,15 @@ export async function kopiereEinsatz(
   });
 }
 
+export interface EinsatzZeileSchicht {
+  id: number;
+  name: string;
+  start_zeit: string;
+  soll: number | null;
+  teilnehmende: number;
+  publiziert: boolean;
+}
+
 export interface EinsatzZeile {
   id: number;
   name: string;
@@ -232,14 +241,32 @@ export interface EinsatzZeile {
   schichten: number;
   teilnehmende: number;
   unbestaetigt: number;
+  bestaetigt: number;
   soll: number | null;
+  /** Schichten mit Ist / Soll, nach Beginn sortiert. */
+  schichtListe: EinsatzZeileSchicht[];
+  /** Antreten: Ort der ersten Schicht (sonst Ort des Einsatzes). Zeit = Beginn der ersten Schicht. */
+  antretenOrt: string | null;
+  /** true, wenn mindestens eine Schicht publiziert ist (im Formular sichtbar). */
+  publiziert: boolean;
+  /** Einsatzleitung: angemeldete oder bestätigte Einträge mit der Rolle «Einsatzleitung». */
+  einsatzleitung: string[];
+}
+
+export interface EinsatzListeFilter {
+  /** alle, nur publizierte (im Formular) oder nur Entwürfe (keine Schicht publiziert). */
+  status?: 'alle' | 'publiziert' | 'entwurf';
+  /** Datum JJJJ-MM-TT. Der Einsatz endet an oder nach diesem Tag. */
+  von?: string | null;
+  /** Datum JJJJ-MM-TT. Der Einsatz beginnt an oder vor diesem Tag. */
+  bis?: string | null;
 }
 
 /**
  * Liste der Einsätze. «kommend»: letzte Schicht endet in der Zukunft.
  * «archiv»: vergangene Einsätze, neueste zuerst (13.9, 21.2).
  */
-export async function einsatzListe(db: Db, ansicht: 'kommend' | 'archiv'): Promise<EinsatzZeile[]> {
+export async function einsatzListe(db: Db, ansicht: 'kommend' | 'archiv', filter: EinsatzListeFilter = {}): Promise<EinsatzZeile[]> {
   const jetzt = jetztIso();
   const zeilen = await alle<any>(
     db,
@@ -251,27 +278,52 @@ export async function einsatzListe(db: Db, ansicht: 'kommend' | 'archiv'): Promi
     [jetzt],
   );
   if (!zeilen.length) return [];
-  const schichten = await alle<{ id: number; einsatz_id: number; soll_anzahl: number | null }>(
+  const schichten = await alle<{ id: number; einsatz_id: number; name: string; start_zeit: string; ort: string | null; soll_anzahl: number | null; publiziert: number }>(
     db,
-    'SELECT id, einsatz_id, soll_anzahl FROM schicht WHERE einsatz_id IN (?)',
+    'SELECT id, einsatz_id, name, start_zeit, ort, soll_anzahl, publiziert FROM schicht WHERE einsatz_id IN (?) ORDER BY start_zeit, position, id',
     [zeilen.map((z) => z.id)],
   );
   const zahlen = await zahlenFuerSchichten(db, schichten.map((s) => s.id));
-  return zeilen.map((z) => {
+  const leitung = schichten.length
+    ? await alle<{ einsatz_id: number; rang: string | null; vorname: string | null; nachname: string | null; name_text: string | null }>(
+        db,
+        `SELECT DISTINCT s.einsatz_id, r.name AS rang, p.vorname, p.nachname, a.name_text
+           FROM anmeldung a JOIN schicht s ON s.id = a.schicht_id
+           LEFT JOIN person p ON p.clubdesk_id = a.person_id LEFT JOIN rang r ON r.id = p.rang_id
+          WHERE a.schicht_id IN (?) AND a.rolle = 'Einsatzleitung' AND a.status IN ('angemeldet', 'bestaetigt')`,
+        [schichten.map((s) => s.id)],
+      )
+    : [];
+  const liste = zeilen.map((z) => {
     const eigene = schichten.filter((s) => s.einsatz_id === z.id);
     let tn = 0;
     let unb = 0;
+    let best = 0;
     let soll: number | null = null;
     for (const s of eigene) {
       const zs = zahlen.get(s.id);
       // Archiv-Zahl: Summe der Teilnehmenden über alle Schichten (Entscheid Yann).
       tn += zs?.teilnehmende ?? 0;
       unb += zs?.unbestaetigt ?? 0;
+      best += zs?.bestaetigt ?? 0;
       if (s.soll_anzahl !== null) soll = (soll ?? 0) + s.soll_anzahl;
     }
+    const el = [...new Set(leitung.filter((l) => l.einsatz_id === z.id).map((l) => {
+      const name = l.vorname || l.nachname ? `${l.vorname ?? ''} ${l.nachname ?? ''}`.trim() : (l.name_text ?? '');
+      return l.rang ? `${l.rang} ${name}` : name;
+    }))];
     return {
       id: z.id, name: z.name, ort: z.ort, start: z.start, ende: z.ende, schichten: Number(z.schichten),
-      teilnehmende: tn, unbestaetigt: unb, soll,
+      teilnehmende: tn, unbestaetigt: unb, bestaetigt: best, soll,
+      schichtListe: eigene.map((s) => ({ id: s.id, name: s.name, start_zeit: s.start_zeit, soll: s.soll_anzahl, teilnehmende: zahlen.get(s.id)?.teilnehmende ?? 0, publiziert: s.publiziert === 1 })),
+      antretenOrt: eigene[0]?.ort ?? z.ort,
+      publiziert: eigene.some((s) => s.publiziert === 1),
+      einsatzleitung: el,
     };
   });
+  const status = filter.status ?? 'alle';
+  return liste.filter((e) =>
+    (status === 'alle' || (status === 'publiziert') === e.publiziert) &&
+    (!filter.von || lokalesDatum(e.ende) >= filter.von) &&
+    (!filter.bis || lokalesDatum(e.start) <= filter.bis));
 }

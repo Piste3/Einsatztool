@@ -3,7 +3,7 @@ import type { Express, Request, Response } from 'express';
 import type { Abhaengigkeiten } from './app.js';
 import { nurAufgebot, zurueck } from './app.js';
 import {
-  aendereEinsatz, anzahlAnmeldungenEinsatz, einsatzListe, erstelleEinsatz, kopiereEinsatz, ladeEinsatz, loescheEinsatz, vorgabeKopie,
+  aendereEinsatz, anzahlAnmeldungenEinsatz, einsatzListe, type EinsatzZeile, erstelleEinsatz, kopiereEinsatz, ladeEinsatz, loescheEinsatz, vorgabeKopie,
   type Einsatz,
 } from '../domain/einsatz.js';
 import { schichtenVonEinsatz } from '../domain/schicht.js';
@@ -19,7 +19,7 @@ import { html, mehrzeilig, Roh } from './html.js';
 import { k, aktuellerPfad } from './kontext.js';
 import { druckseite, formFelder, mehrMenue, seite, seitenKopf, type Reiter } from './views/layout.js';
 import {
-  abgleichPunkt, istSoll, kachel, kachelLegende, KACHEL_TEXT, knopfPost, publiziertMarke, statusText, warnungen, zeitraum, type KachelArt,
+  abgleichPunkt, istSoll, kachel, kachelLegende, KACHEL_TEXT, knopfPost, publiziertMarke, punktMarke, statusText, warnungen, zeitraum, type KachelArt,
 } from './views/teile.js';
 import { datumChVonIso, jetztIso, lokaleZeit, wochentagKurz } from '../domain/zeit.js';
 
@@ -57,31 +57,55 @@ export function registriereEinsaetze(app: Express, deps: Abhaengigkeiten): void 
   app.get('/einsaetze', nurAufgebot, async (req, res) => {
     const kx = k(res);
     const archiv = req.query.ansicht === 'archiv';
-    const liste = await einsatzListe(db, archiv ? 'archiv' : 'kommend');
+    const q = req.query;
+    const datum = (w: unknown) => (typeof w === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(w) ? w : null);
+    const status = q.status === 'publiziert' || q.status === 'entwurf' ? q.status : 'alle';
+    const filter = { status, von: datum(q.von), bis: datum(q.bis) } as const;
+    const liste = await einsatzListe(db, archiv ? 'archiv' : 'kommend', filter);
+    const gewaehlt = (w: string) => (w === status ? new Roh(' selected') : '');
+    const tag = (iso: string, mitJahr: boolean) => `${wochentagKurz(iso)} ${mitJahr ? datumChVonIso(iso) : datumChVonIso(iso).slice(0, 6)}`;
+    const datumText = (e: EinsatzZeile) =>
+      datumChVonIso(e.start) === datumChVonIso(e.ende) || e.schichtListe.length === 1
+        ? tag(e.start, true)
+        : `${tag(e.start, false)} – ${tag(e.ende, true)}`;
+    const besetzung = (e: EinsatzZeile) => html`<div class="besetzung">${e.schichtListe.map((s) => {
+      const farbe = sollFarbe(s.teilnehmende, s.soll);
+      const prozent = s.soll && s.soll > 0 ? Math.min(100, Math.round((s.teilnehmende / s.soll) * 100)) : 0;
+      return html`<div class="besetzung-zeile f-${farbe}"><span class="besetzung-name">${e.schichtListe.length === 1 ? 'Ganzer Einsatz' : s.name}</span><span class="besetzung-zahl">${s.teilnehmende}${s.soll !== null ? ` / ${s.soll}` : ''}</span><span class="balken"><span class="b${Math.round(prozent / 10) * 10}"></span></span></div>`;
+    })}</div>`;
     const inhalt = html`
 ${seitenKopf({
   titel: archiv ? 'Archiv' : 'Einsätze',
   angaben: [`${liste.length} ${liste.length === 1 ? 'Einsatz' : 'Einsätze'}`],
-  aktionen: archiv ? undefined : html`<a class="knopf haupt" href="/einsaetze/neu">+ Neuer Einsatz</a>`,
+  aktionen: html`<input type="search" class="suche kopf-suche" data-filter=".filterbar tbody tr" placeholder="Suchen …" aria-label="Einsätze suchen">${archiv ? '' : html`<a class="knopf haupt" href="/einsaetze/neu">+ Neuer Einsatz</a>`}`,
   reiter: [
     { text: 'Kommend', href: '/einsaetze', aktiv: !archiv },
     { text: 'Archiv', href: '/einsaetze?ansicht=archiv', aktiv: archiv },
   ],
 })}
+<form method="get" action="/einsaetze" class="filter-form zeilen-form einsatz-filter">
+  ${archiv ? html`<input type="hidden" name="ansicht" value="archiv">` : ''}
+  <label>Status <select name="status"><option value="alle"${gewaehlt('alle')}>Entwürfe und veröffentlichte</option><option value="publiziert"${gewaehlt('publiziert')}>Nur im Formular</option><option value="entwurf"${gewaehlt('entwurf')}>Nur Entwürfe</option></select></label>
+  <label>von <input type="date" name="von" value="${filter.von ?? ''}"></label>
+  <label>bis <input type="date" name="bis" value="${filter.bis ?? ''}"></label>
+  <button type="submit" class="knopf">Anzeigen</button>
+  ${filter.von || filter.bis || status !== 'alle' ? html`<a class="link-knopf" href="/einsaetze${archiv ? '?ansicht=archiv' : ''}">Filter löschen</a>` : ''}
+</form>
 ${liste.length === 0 ? html`<p class="leer">Keine Einsätze.</p>` : html`
-<div class="titelzeile filterzeile"><input type="search" class="suche" data-filter=".filterbar tbody tr" placeholder="Einsatz suchen …" aria-label="Einsätze suchen"></div>
-<div class="rahmen"><table class="tabelle filterbar">
-  <thead><tr><th>Einsatz</th><th>Zeitraum</th><th>Ort</th><th>Schichten</th><th>${archiv ? 'Teilnehmende' : 'Besetzung'}</th>${archiv ? '' : html`<th>Unbestätigt</th>`}</tr></thead>
-  <tbody>${liste.map((e) => html`<tr data-suche="${`${e.name} ${e.ort ?? ''}`.toLowerCase()}">
-    <td><a href="/einsaetze/${e.id}">${e.name}</a></td>
-    <td>${zeitraum(e.start, e.ende)}</td>
-    <td>${e.ort ?? ''}</td>
-    <td>${e.schichten}</td>
-    <td>${archiv ? e.teilnehmende : istSoll(e.teilnehmende, e.soll)}</td>
-    ${archiv ? '' : html`<td>${e.unbestaetigt ? html`<span class="pille orange">${e.unbestaetigt}</span>` : '0'}</td>`}
+<div class="rahmen"><table class="tabelle filterbar einsatz-liste">
+  <thead><tr><th>Datum</th><th>Einsatz</th><th>Antreten</th><th>Status</th><th>Besetzung</th><th class="zahl">Neu</th><th class="zahl">Bestätigt</th><th>Einsatzleitung</th></tr></thead>
+  <tbody>${liste.map((e) => html`<tr data-suche="${`${e.name} ${e.ort ?? ''} ${e.antretenOrt ?? ''} ${e.einsatzleitung.join(' ')}`.toLowerCase()}">
+    <td class="nowrap">${datumText(e)}</td>
+    <td><a class="einsatz-name" href="/einsaetze/${e.id}">${e.name}</a></td>
+    <td class="antreten">${lokaleZeit(e.start)}${e.antretenOrt ? html` · ${e.antretenOrt}` : ''}</td>
+    <td>${e.publiziert ? punktMarke('Im Formular', 'gruen') : punktMarke('Entwurf', 'grau')}</td>
+    <td>${besetzung(e)}</td>
+    <td class="zahl">${e.unbestaetigt ? html`<a href="/einsaetze/${e.id}?personen=offen" class="orange-text">${e.unbestaetigt}</a>` : '–'}</td>
+    <td class="zahl">${e.bestaetigt || '–'}</td>
+    <td class="einsatzleitung">${e.einsatzleitung.length ? e.einsatzleitung.map((n, i) => html`${i ? html`<br>` : ''}${n}`) : '–'}</td>
   </tr>`)}</tbody>
 </table></div>`}`;
-    res.send(seite(kx, archiv ? 'Archiv' : 'Einsätze', archiv ? 'archiv' : 'einsaetze', inhalt));
+    res.send(seite(kx, archiv ? 'Archiv' : 'Einsätze', archiv ? 'archiv' : 'einsaetze', inhalt, { breit: true }));
   });
 
   app.get('/einsaetze/neu', nurAufgebot, (_req, res) => {
