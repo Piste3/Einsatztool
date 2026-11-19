@@ -25,10 +25,10 @@ test('T30 Bemerkung: Formular speichert sie, Aufgebot sieht und bearbeitet sie m
 
     // Das öffentliche Formular hat das Feld «Bemerkung».
     const formular = await (await fetch(`${app.url}/anmeldung`)).text();
-    assert.match(formular, /name="bemerkung"/);
+    assert.match(formular, new RegExp(`name="bemerkung_${s.einsatzId}"`));
 
     // Die Person gibt die Bemerkung bei der Anmeldung ein.
-    const f = await verarbeiteFormular(t.db, { vorname: 'Nina', nachname: 'Baumann', email: 'n@web.kkb.ch', bemerkung: 'Komme erst um 13 Uhr <b>', schichten: [String(s.schichtId)] });
+    const f = await verarbeiteFormular(t.db, { vorname: 'Nina', nachname: 'Baumann', bemerkungen: { [String(s.einsatzId)]: 'Komme erst um 13 Uhr <b>' }, schichten: [String(s.schichtId)] });
     const [a] = await zeilen(t.db, 'SELECT id, version, bemerkung FROM anmeldung WHERE id = ?', [f.anmeldungIds[0]]);
     assert.equal(a.bemerkung, 'Komme erst um 13 Uhr <b>');
 

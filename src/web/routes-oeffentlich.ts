@@ -34,10 +34,19 @@ function hinweisVorgaben(s: FormularSchicht): string {
 interface Werte {
   vorname?: string;
   nachname?: string;
-  email?: string;
-  bemerkung?: string;
-  essen?: string;
+  /** Bemerkung je Einsatz, Schlüssel = Einsatz-ID. */
+  bemerkungen?: Record<string, string>;
   schichten?: string[];
+}
+
+/** Liest die Felder «bemerkung_<Einsatz-ID>» aus dem Formular. */
+function bemerkungenJeEinsatz(b: Record<string, unknown>): Record<string, string> {
+  const ergebnis: Record<string, string> = {};
+  for (const [feld, wert] of Object.entries(b)) {
+    const m = /^bemerkung_(\d{1,10})$/.exec(feld);
+    if (m && typeof wert === 'string') ergebnis[m[1]] = wert;
+  }
+  return ergebnis;
 }
 
 async function zeigeFormular(deps: Abhaengigkeiten, res: Response, werte: Werte = {}, fehler: string | null = null, status = 200): Promise<void> {
@@ -61,7 +70,6 @@ ${schichten.length === 0
   </div>
   <div class="feld"><label for="vorname">Vorname</label><input id="vorname" name="vorname" required maxlength="100" autocomplete="given-name" value="${werte.vorname ?? ''}"></div>
   <div class="feld"><label for="nachname">Nachname</label><input id="nachname" name="nachname" required maxlength="100" autocomplete="family-name" value="${werte.nachname ?? ''}"></div>
-  <div class="feld"><label for="email">E-Mail</label><input id="email" name="email" type="email" required maxlength="255" autocomplete="email" value="${werte.email ?? ''}"></div>
   <fieldset class="schichten">
     <legend>Einsätze und Schichten</legend>
     ${[...gruppen.values()].map((liste) => html`
@@ -79,10 +87,9 @@ ${schichten.length === 0
           ${s.bemerkung_extern ? html`<span class="bemerkung">${mehrzeilig(s.bemerkung_extern)}</span>` : ''}
         </span>
       </label>`)}
+      <div class="feld einsatz-bemerkung"><label for="bemerkung_${liste[0].einsatz_id}">Bemerkung zu ${liste[0].einsatz_name}</label><textarea id="bemerkung_${liste[0].einsatz_id}" name="bemerkung_${liste[0].einsatz_id}" maxlength="2000" rows="2">${werte.bemerkungen?.[String(liste[0].einsatz_id)] ?? ''}</textarea><small>Freiwillig. Zum Beispiel: später da, früher weg, Fragen.</small></div>
     </div>`)}
   </fieldset>
-  <div class="feld"><label for="essen">Essenseinschränkungen</label><input id="essen" name="essen" maxlength="500" value="${werte.essen ?? ''}"><small>Nur ausfüllen, wenn neu oder geändert.</small></div>
-  <div class="feld"><label for="bemerkung">Bemerkung</label><textarea id="bemerkung" name="bemerkung" maxlength="2000" rows="3">${werte.bemerkung ?? ''}</textarea><small>Zum Beispiel: später da, früher weg, Fragen. Die Aufgebotsstelle liest die Bemerkung.</small></div>
   <button type="submit" class="knopf haupt">Anmelden</button>
 </form>`}`;
   res.status(status).type('html').send(formularSeite(inhalt));
@@ -104,9 +111,7 @@ export function registriereOeffentlich(app: Express, deps: Abhaengigkeiten): voi
     const werte: Werte = {
       vorname: typeof b.vorname === 'string' ? b.vorname : '',
       nachname: typeof b.nachname === 'string' ? b.nachname : '',
-      email: typeof b.email === 'string' ? b.email : '',
-      bemerkung: typeof b.bemerkung === 'string' ? b.bemerkung : '',
-      essen: typeof b.essen === 'string' ? b.essen : '',
+      bemerkungen: bemerkungenJeEinsatz(b),
       schichten: liste(b.schichten),
     };
     // Grenze: 20 Anfragen pro Stunde je IP-Adresse (15.2).
@@ -130,7 +135,7 @@ export function registriereOeffentlich(app: Express, deps: Abhaengigkeiten): voi
       return;
     }
     try {
-      await verarbeiteFormular(deps.db, b);
+      await verarbeiteFormular(deps.db, { vorname: b.vorname, nachname: b.nachname, bemerkungen: werte.bemerkungen, schichten: b.schichten });
     } catch (e) {
       if (e instanceof Eingabefehler) {
         await zeigeFormular(deps, res, werte, e.message, 400);
@@ -144,7 +149,7 @@ export function registriereOeffentlich(app: Express, deps: Abhaengigkeiten): voi
   app.get('/anmeldung/danke', (_req, res) => {
     res.type('html').send(
       formularSeite(html`<h1>Danke</h1>
-<p>Danke für deine Anmeldung. Sie gilt erst, wenn die Aufgebotsstelle sie bestätigt. Du bekommst dann eine Mail.</p>
+<p>Danke für deine Anmeldung. Sie gilt erst, wenn die Aufgebotsstelle sie bestätigt. Du bekommst dann eine Mail an deine Adresse aus Clubdesk.</p>
 <p><a href="/anmeldung">Weitere Anmeldung</a></p>`),
     );
   });

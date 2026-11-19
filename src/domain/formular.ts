@@ -65,9 +65,12 @@ export async function sichtbareSchichten(db: Db): Promise<FormularSchicht[]> {
 export interface FormularEingabe {
   vorname: unknown;
   nachname: unknown;
-  email: unknown;
+  /** Freiwillig. Das Formular fragt seit 19.11.2026 nicht mehr danach (Wunsch Yann). */
+  email?: unknown;
+  /** Bemerkung für alle gewählten Schichten (älteres Formular). */
   bemerkung?: unknown;
-  essen?: unknown;
+  /** Bemerkung je Einsatz: Schlüssel = Einsatz-ID. Gilt für alle gewählten Schichten dieses Einsatzes. */
+  bemerkungen?: Record<string, unknown>;
   schichten: unknown;
 }
 
@@ -87,18 +90,25 @@ function haengeAn(alt: string | null, neu: string | null): string | null {
 export async function verarbeiteFormular(db: Db, e: FormularEingabe): Promise<FormularErgebnis> {
   const vorname = pflichtText(e.vorname, 'Vorname', 100);
   const nachname = pflichtText(e.nachname, 'Nachname', 100);
-  const email = pflichtText(e.email, 'E-Mail', 255);
-  if (!MAIL_MUSTER.test(email)) throw new Eingabefehler('Die E-Mail-Adresse ist ungültig.');
-  const bemerkungPerson = text(e.bemerkung, 'Bemerkung', 2000);
-  const essen = text(e.essen, 'Essenseinschränkungen', 500);
+  // E-Mail ist freiwillig. Die Zuordnung läuft nur über den Namen (15.3.2 bis 15.3.5).
+  const email = text(e.email, 'E-Mail', 255);
+  if (email && !MAIL_MUSTER.test(email)) throw new Eingabefehler('Die E-Mail-Adresse ist ungültig.');
+  // Essenseinschränkungen kommen nur aus den Stammdaten (Clubdesk). Das Formular fragt nicht mehr danach (Wunsch Yann).
+  const bemerkungAlle = text(e.bemerkung, 'Bemerkung', 2000);
+  const bemerkungJeEinsatz = new Map<number, string | null>();
+  if (e.bemerkungen && typeof e.bemerkungen === 'object') {
+    for (const [schluessel, wert] of Object.entries(e.bemerkungen)) {
+      if (/^\d+$/.test(schluessel)) bemerkungJeEinsatz.set(Number(schluessel), text(wert, 'Bemerkung', 2000));
+    }
+  }
   const schichtIds = [...new Set(liste(e.schichten).filter((s) => /^\d+$/.test(s)).map(Number))];
   if (!schichtIds.length) throw new Eingabefehler('Wähle mindestens eine Schicht.');
 
   return transaktion(db, async (c) => {
     // Regel 15.3.1: Jede gewählte Schicht muss noch sichtbar sein (13.4).
-    const sichtbar = await alle<{ id: number }>(
+    const sichtbar = await alle<{ id: number; einsatz_id: number }>(
       c,
-      'SELECT id FROM schicht WHERE id IN (?) AND publiziert = 1 AND end_zeit > ?',
+      'SELECT id, einsatz_id FROM schicht WHERE id IN (?) AND publiziert = 1 AND end_zeit > ?',
       [schichtIds, jetztIso()],
     );
     if (sichtbar.length !== schichtIds.length) {
@@ -114,15 +124,19 @@ export async function verarbeiteFormular(db: Db, e: FormularEingabe): Promise<Fo
       if (p) nameText = personenName(p);
     }
 
-    // Bemerkung: Text der Person, Essen mit Präfix (Entscheid Yann), Hinweis bei mehreren Treffern.
-    let bemerkung: string | null = bemerkungPerson;
-    if (essen) bemerkung = haengeAn(bemerkung, `Essen: ${essen}`);
-    if (treffer.length > 1) bemerkung = haengeAn(bemerkung, `Mehrdeutig: Clubdesk-IDs ${treffer.join(', ')}`);
+    // Bemerkung: Text der Person zum Einsatz, Hinweis bei mehreren Treffern.
+    const einsatzVon = new Map(sichtbar.map((x) => [x.id, x.einsatz_id]));
+    const bemerkungFuer = (schichtId: number): string | null => {
+      let b = haengeAn(bemerkungAlle, bemerkungJeEinsatz.get(einsatzVon.get(schichtId)!) ?? null);
+      if (treffer.length > 1) b = haengeAn(b, `Mehrdeutig: Clubdesk-IDs ${treffer.join(', ')}`);
+      return b;
+    };
 
     const zeit = jetztIso();
     const ids: number[] = [];
     for (const schichtId of schichtIds) {
-      // Bestehenden Eintrag suchen: bekannte Person über person_id, unbekannte über Name und E-Mail.
+      const bemerkung = bemerkungFuer(schichtId);
+      // Bestehenden Eintrag suchen: bekannte Person über person_id, unbekannte über Name und E-Mail (leer = leer).
       let vorhanden: { id: number; bemerkung: string | null } | undefined;
       if (personId !== null) {
         vorhanden = await eine(c, 'SELECT id, bemerkung FROM anmeldung WHERE schicht_id = ? AND person_id = ? FOR UPDATE', [schichtId, personId]);
@@ -133,7 +147,7 @@ export async function verarbeiteFormular(db: Db, e: FormularEingabe): Promise<Fo
           [schichtId],
         );
         vorhanden = kandidaten.find(
-          (k) => normalisiereName(k.name_text) === normalisiereName(nameText) && (k.email_text ?? '').toLowerCase() === email.toLowerCase(),
+          (k) => normalisiereName(k.name_text) === normalisiereName(nameText) && (k.email_text ?? '').toLowerCase() === (email ?? '').toLowerCase(),
         );
       }
       if (vorhanden) {

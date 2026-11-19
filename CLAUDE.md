@@ -57,8 +57,8 @@ Sprache mit Yann: Deutsch nach ASD-STE100. Aktiv, höchstens 25 Wörter pro Satz
 - Rollen: Der Admin legt Rollen an, ändert Reihenfolge und Teilnehmerzählung und löscht unbenutzte Rollen. Umbenennen geht nicht.
 - Eine neue Schicht übernimmt Ort, Ort Abtreten, Tenue und Hinweis vom Einsatz. Eine neue zusätzliche Schicht ist nicht publiziert.
 - Namensvergleich im Formular: «ä», «ae» und «a» gelten als gleich (ebenso ö, ü). Akzente zählen nicht.
-- E-Mail aus dem Formular: Das Tool speichert sie nur bei unbekannten Personen. Bei bekannten Personen gilt die Clubdesk-Adresse.
-- Das Formular speichert Essenseinschränkungen in der Bemerkung mit dem Präfix «Essen: ». Es ändert keine Personendaten.
+- Das Formular fragt keine E-Mail (seit 19.11.2026, Wunsch Yann). Die Zuordnung läuft nur über den Namen. Bekannte Personen erhalten Mails an die Clubdesk-Adresse.
+- Das Formular fragt keine Essenseinschränkungen (seit 19.11.2026, Wunsch Yann). Sie kommen nur aus den Stammdaten (Clubdesk).
 - Ohne Geburtsdatum keine Alterswarnung. In Anrufliste und Rückmeldungen gilt eine Person ohne Geburtsdatum (bei Mindestalter) oder ohne Rang (bei Mindestrang) als «nicht passend».
 - `W_UEBERLAPP` prüft nur den Status des anderen Eintrags (angemeldet oder bestätigt).
 - Bestätigung ohne Adresse: ein Log-Eintrag je Änderung. Kommt später eine Adresse, geht die Mail im nächsten Tageslauf weg.
@@ -132,7 +132,7 @@ Diese Liste ergänze ich beim Bauen. Jede Annahme aus Teil B des Konzepts steht 
 
 - Eine neue zusätzliche Schicht hat `publiziert = 0` (13.2).
 - «Änderung melden»: Betreff «Änderung Personendaten: Name (Clubdesk-ID n)» (14.4).
-- Formular-Essenseinschränkungen gehen in die Bemerkung (15.2).
+- Formular-Essenseinschränkungen gingen in die Bemerkung (15.2). Ersetzt am 19.11.2026: Das Formular fragt nicht mehr danach.
 - Spätere Änderungen nach dem Versand lösen keine neue Mail aus (18.2).
 - Der iCal-Abgleich vergleicht nur Titel und Zeiten (17.4).
 - Inaktive Benutzer kommen nicht hinein (22.1).
@@ -185,3 +185,4 @@ Diese Liste ergänze ich beim Bauen. Jede Annahme aus Teil B des Konzepts steht 
 - 19.11.2026 (Vorlage Yann): Rückmeldungen zeigen Kacheln mit Symbol statt Punkten. Farben dort: An dunkelgrün, Bestätigt grün, Ab rot, Nachricht gesendet blau, Unsicher orange, Offen gestrichelt. Die Pillen auf den anderen Seiten bleiben gleich.
 - 19.11.2026: Der Kopf der Rückmeldungen fasst die Schichten eines Einsatzes zusammen (Datum, Einsatz, Schicht, Balken Ist / Soll). Ein leeres Feld zeigt «Andere Schicht, gleiche Zeit» oder «zeitlich möglich», wenn die Person in einer anderen Schicht desselben Einsatzes an ist. Das ist nur eine Anzeige, kein Status.
 - 19.11.2026 (Wunsch Yann): Bemerkung bei der Anmeldung. Die Person gibt sie im Formular ein. Die Aufgebotsstelle sieht und bearbeitet sie in der Schicht und im Fenster der Rückmeldungen, auch beim Eintragen. Ein Feld mit Bemerkung zeigt in den Rückmeldungen die Marke ✎ und die Bemerkung im Titel. Eintragen mit leerer Bemerkung lässt eine vorhandene Bemerkung stehen (Test T30).
+- 19.11.2026 (Wunsch Yann): Formular ohne E-Mail und ohne Essenseinschränkungen. Jeder Einsatz hat ein eigenes Feld «Bemerkung» (`bemerkung_<Einsatz-ID>`). Es gilt für alle gewählten Schichten dieses Einsatzes. Unbekannte Personen haben dann keine Adresse und erhalten keine Bestätigungsmail (Test T31).
