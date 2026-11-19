@@ -27,7 +27,6 @@ import { druckseite, formFelder, mehrMenue, seite, seitenKopf, type PfadTeil } f
 import {
   abgleichPunkt, datumZeit, istSoll, kanalAuswahl, karte, knopfPost, rolleAuswahl, statusAuswahl, statusText, telefon, warnungen, zeitraum,
 } from './views/teile.js';
-import { seitenStand } from './routes-stand.js';
 import { dateiTeil, einsatzReiter, sendeCsv } from './routes-einsaetze.js';
 
 /** Pfad oben: Einsätze › Einsatz › Schicht › … */
@@ -140,7 +139,6 @@ export function registriereSchichten(app: Express, deps: Abhaengigkeiten): void 
   app.get('/schichten/:sid', nurAufgebot, async (req, res) => {
     const kx = k(res);
     const s = await ladeSchicht(db, leseId(req.params.sid));
-    const stand = await seitenStand(db, s.einsatz_id);
     const z = (await zahlenFuerSchichten(db, [s.id])).get(s.id)!;
     const w = await warnungenFuerSchicht(db, s.id);
     const rollen = await ladeRollen(db);
@@ -220,7 +218,6 @@ ${seitenKopf({
     s.min_alter !== null ? `ab ${s.min_alter} Jahren` : '',
     s.min_rang_name ? `ab ${s.min_rang_name}` : '',
   ],
-  live: !!stand,
   aktionen: html`<a class="knopf haupt" href="/schichten/${s.id}/anrufliste">Anrufliste</a>
     <a class="knopf" href="/schichten/${s.id}/bearbeiten">Bearbeiten</a>
     ${mehrMenue([
@@ -298,15 +295,14 @@ ${s.bemerkung_intern ? html`<p class="bemerkung intern"><strong>Intern:</strong>
     <button type="submit" class="knopf">Hinzufügen</button>
   </form>
 </section>`;
-    res.send(seite(kx, s.name, 'einsaetze', inhalt, { breit: true, stand }));
+    res.send(seite(kx, s.name, 'einsaetze', inhalt, { breit: true}));
   });
 
   app.get('/schichten/:sid/bearbeiten', nurAufgebot, async (req, res) => {
     const kx = k(res);
     const s = await ladeSchicht(db, leseId(req.params.sid));
-    const stand = await seitenStand(db, s.einsatz_id);
     const bedarf = await rollenBedarf(db, s.id);
-    res.send(seite(kx, 'Schicht bearbeiten', 'einsaetze', html`${seitenKopf({ pfad: schichtPfad(s, 'Bearbeiten'), titel: 'Schicht bearbeiten', live: !!stand })}${await schichtFormular(deps, kx, `/schichten/${s.id}`, schichtWerte(s), bedarf, null, false)}`, { stand }));
+    res.send(seite(kx, 'Schicht bearbeiten', 'einsaetze', html`${seitenKopf({ pfad: schichtPfad(s, 'Bearbeiten'), titel: 'Schicht bearbeiten' })}${await schichtFormular(deps, kx, `/schichten/${s.id}`, schichtWerte(s), bedarf, null, false)}`));
   });
 
   app.post('/schichten/:sid', nurAufgebot, async (req, res) => {
@@ -394,7 +390,6 @@ ${s.anzahl_schichten <= 1 ? html`<p class="meldung fehler">Das ist die einzige S
   app.get('/schichten/:sid/anrufliste', nurAufgebot, async (req, res) => {
     const kx = k(res);
     const s = await ladeSchicht(db, leseId(req.params.sid));
-    const stand = await seitenStand(db, s.einsatz_id);
     const alleZeigen = req.query.alle === '1';
     const { zeilen, ausgeblendet } = await anrufliste(db, s.id, alleZeigen);
     const hier = aktuellerPfad(req);
@@ -403,7 +398,6 @@ ${seitenKopf({
   pfad: schichtPfad(s, 'Anrufliste'),
   titel: 'Anrufliste',
   angaben: [terminTitel(s), zeitraum(s.start_zeit, s.end_zeit)],
-  live: !!stand,
   aktionen: html`<button type="submit" form="sammel" class="knopf haupt">Nachricht gesendet (gewählte)</button>`,
 })}
 <div class="titelzeile filterzeile">
@@ -432,7 +426,7 @@ ${seitenKopf({
     </td>
   </tr>`)}</tbody>
 </table></div>`;
-    res.send(seite(kx, 'Anrufliste', 'einsaetze', inhalt, { breit: true, stand }));
+    res.send(seite(kx, 'Anrufliste', 'einsaetze', inhalt, { breit: true}));
   });
 
   // Regel 17.3: Erster Export liefert die Datei. Danach zuerst W_ICS_DUPLIKAT, «Trotzdem laden».

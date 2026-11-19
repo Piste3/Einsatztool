@@ -3,6 +3,7 @@
 import { html, Roh, wenn } from '../html.js';
 import type { Kontext } from '../kontext.js';
 import { symbol, type SymbolName } from './symbole.js';
+import { aenderungsStand } from '../../db/aenderungen.js';
 
 export type Bereich =
   | 'start' | 'einsaetze' | 'rueckmeldungen' | 'personen' | 'unbekannt' | 'archiv'
@@ -23,11 +24,6 @@ function initialen(name: string): string {
   return z.toUpperCase();
 }
 
-/** Datenstand der Seite. Das Skript fragt url regelmässig ab und meldet eine Änderung. */
-export interface SeitenStand {
-  url: string;
-  wert: string;
-}
 
 function kopfDaten(titel: string): Roh {
   return html`<meta charset="utf-8">
@@ -39,14 +35,18 @@ function kopfDaten(titel: string): Roh {
 <script src="/static/app.js?v=${VERSION}" defer></script>`;
 }
 
-export function seite(k: Kontext, titel: string, aktiv: Bereich | null, inhalt: Roh, extra: { breit?: boolean; stand?: SeitenStand } = {}): string {
+/**
+ * Seite mit Navigation. Die Seite aktualisiert sich live (data-live-nr, siehe app.js).
+ * ohneLive: Die Seite lädt normal neu, z. B. Admin › Update mit dem Header «Refresh».
+ */
+export function seite(k: Kontext, titel: string, aktiv: Bereich | null, inhalt: Roh, extra: { breit?: boolean; ohneLive?: boolean } = {}): string {
   const b = k.benutzer!;
   const istAdmin = b.rolle === 'admin';
   return `<!doctype html>${html`<html lang="de">
 <head>
 ${kopfDaten(`${titel} · Einsatzplaner`)}
 </head>
-<body class="mit-leiste">
+<body class="mit-leiste" data-live-nr="${aenderungsStand()}"${extra.ohneLive ? new Roh(' data-ohne-live') : ''}>
 <header class="kopf-mobil">
   <button type="button" class="knopf-menue" aria-controls="leiste" aria-expanded="false" aria-label="Menü öffnen">${symbol('menue')}</button>
   <span class="marke-klein">Einsatzplaner</span>
@@ -78,7 +78,7 @@ ${kopfDaten(`${titel} · Einsatzplaner`)}
     <span class="benutzer"><span class="benutzer-name">${b.name}</span><small>${istAdmin ? 'Admin' : 'Aufgebotsstelle'}</small></span>
     <span class="fuss-aktionen">
       <button type="button" class="thema-knopf" data-thema title="Darstellung: wie System" aria-label="Darstellung wechseln">${symbol('bildschirm', 'thema-system')}${symbol('sonne', 'thema-hell')}${symbol('mond', 'thema-dunkel')}</button>
-      <form method="post" action="/logout">
+      <form method="post" action="/logout" data-normal>
         <input type="hidden" name="_csrf" value="${k.csrf}">
         <button type="submit" class="link-knopf">Abmelden</button>
       </form>
@@ -86,10 +86,6 @@ ${kopfDaten(`${titel} · Einsatzplaner`)}
   </div>
 </nav>
 <main class="inhalt${extra.breit ? ' breit' : ''}">
-  ${extra.stand ? html`<div class="meldung hinweis datenstand" role="status" hidden data-stand-url="${extra.stand.url}" data-stand="${extra.stand.wert}">
-    <span>Ein anderer Benutzer hat Daten auf dieser Seite geändert. Lade die Seite neu, um den neuen Stand zu sehen.</span>
-    <button type="button" class="knopf haupt klein" data-neu-laden>Neu laden</button>
-  </div>` : ''}
   ${k.meldung ? html`<div class="meldung ${k.meldung.art}" role="status" data-verschwinden="${k.meldung.art === 'ok' ? '1' : ''}">${k.meldung.text}</div>` : ''}
   ${inhalt}
 </main>
@@ -154,7 +150,7 @@ export interface Kopf {
   angaben?: (Roh | string)[];
   /** Knöpfe rechts. Der erste ist der wichtigste. */
   aktionen?: Roh;
-  /** Anzeige «Live»: Die Seite fragt den Datenstand ab. */
+  /** Anzeige «Live». Standard: an. false bei Seiten ohne Live-Aktualisierung. */
   live?: boolean;
   reiter?: Reiter[];
 }
@@ -169,8 +165,8 @@ export function seitenKopf(k: Kopf): Roh {
       <h1>${k.titel}${k.marke ? html` ${k.marke}` : ''}</h1>
       ${k.angaben?.length ? html`<p class="angaben">${k.angaben.filter((a) => a !== '').map((a) => html`<span>${a}</span>`)}</p>` : ''}
     </div>
-    ${k.live || k.aktionen ? html`<div class="seitenkopf-aktionen">
-      ${k.live ? html`<span class="live" data-live title="Die Seite prüft alle 15 Sekunden, ob jemand etwas geändert hat."><span class="live-punkt" aria-hidden="true"></span><span class="live-text">Live</span></span>` : ''}
+    ${k.live !== false || k.aktionen ? html`<div class="seitenkopf-aktionen">
+      ${k.live !== false ? html`<span class="live" data-live title="Die Seite zeigt Änderungen aller Benutzer sofort an."><span class="live-punkt" aria-hidden="true"></span><span class="live-text">Live</span></span>` : ''}
       ${k.aktionen ?? ''}
     </div>` : ''}
   </div>

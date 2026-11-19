@@ -190,8 +190,10 @@ body.einfach { background: var(--leiste); min-height: 100vh; }
 .live { display: none; align-items: center; gap: .35rem; font-size: .8rem; color: var(--gedämpft); margin-right: .3rem; }
 .live.an { display: inline-flex; }
 .live-punkt { width: 7px; height: 7px; border-radius: 50%; background: var(--gruen-punkt); box-shadow: 0 0 0 3px var(--gruen-hg); }
-.live.neu { color: var(--orange); font-weight: 600; }
-.live.neu .live-punkt { background: var(--orange-punkt); box-shadow: 0 0 0 3px var(--orange-hg); }
+.live.getrennt { display: inline-flex; color: var(--orange); font-weight: 600; }
+.live.getrennt .live-punkt { background: var(--orange-punkt); box-shadow: 0 0 0 3px var(--orange-hg); }
+/* Formular wird im Hintergrund gespeichert */
+form[aria-busy="true"] { opacity: .65; cursor: progress; }
 .reiter { display: flex; gap: .2rem; border-bottom: 1px solid var(--linie); margin-top: 1rem; overflow-x: auto; scrollbar-width: thin; }
 .reiter a { color: var(--gedämpft); padding: .5rem .7rem; border-bottom: 2px solid transparent; margin-bottom: -1px; white-space: nowrap; font-size: .9rem; display: inline-flex; align-items: center; gap: .35rem; }
 .reiter a:hover { color: var(--text); text-decoration: none; }
@@ -253,9 +255,6 @@ form.inline { display: inline; margin: 0; }
 .meldung.hinweis { background: var(--orange-hg); border-color: var(--orange-punkt); color: var(--text); }
 .meldung.weg { opacity: 0; }
 /* Hinweis: Ein anderer Benutzer hat Daten geändert. Bleibt beim Scrollen oben sichtbar. */
-.datenstand { position: sticky; top: .5rem; z-index: 25; display: flex; flex-wrap: wrap; gap: .5rem 1rem; align-items: center; justify-content: space-between; box-shadow: var(--schatten-menue); }
-.datenstand[hidden] { display: none; }
-@media (max-width: 860px) { .datenstand { top: 3.4rem; } }
 .banner.rot { background: var(--rot); color: #fff; font-weight: 700; padding: .8rem 1rem; border-radius: var(--radius); margin: 1rem 0; }
 .hinweis { color: var(--orange); }
 
@@ -524,7 +523,7 @@ body.druck { background: var(--hg); padding: 1rem; }
   :root:not(.nie), :root[data-theme="dark"] { color-scheme: light; --text: #000; --gedämpft: #444; --linie: #ccc; --flaeche: #fff; --flaeche-2: #fff; --hg: #fff; --grau-hg: #f2f2f2; }
   @page { size: A4; margin: 12mm; }
   body, body.druck { background: #fff !important; color: #000 !important; padding: 0; }
-  .nicht-drucken, .leiste, .kopf-mobil, .druck-steuerung, .seitenkopf-aktionen, .reiter, .datenstand, .menue { display: none !important; }
+  .nicht-drucken, .leiste, .kopf-mobil, .druck-steuerung, .seitenkopf-aktionen, .reiter, .menue { display: none !important; }
   .karte, .rahmen, .zahl-karte { border-color: #ccc !important; background: #fff !important; }
   .mit-leiste { display: block; }
   .druck-block { box-shadow: none; padding: 0; break-inside: auto; }

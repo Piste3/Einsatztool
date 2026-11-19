@@ -1,6 +1,7 @@
 // Zugriff auf MySQL / MariaDB. Alle Abfragen nutzen Platzhalter (?), nie zusammengesetzten Text.
 import mysql from 'mysql2/promise';
 import type { Pool, PoolConnection, ResultSetHeader, RowDataPacket } from 'mysql2/promise';
+import { meldeAenderung } from './aenderungen.js';
 
 export type Db = Pool | PoolConnection;
 
@@ -89,7 +90,10 @@ export async function transaktion<T>(db: Db, fn: (c: PoolConnection) => Promise<
   // bricht MySQL eine davon ab. Das Tool startet sie dann nach einer kurzen Pause neu.
   for (let versuch = 1; ; versuch++) {
     try {
-      return await einmal(db, fn);
+      const ergebnis = await einmal(db, fn);
+      // Die Änderung ist gespeichert. Die offenen Seiten der Benutzer aktualisieren sich.
+      meldeAenderung();
+      return ergebnis;
     } catch (fehler) {
       if (versuch >= MAX_VERSUCHE || !darfWiederholen(fehler)) throw fehler;
       await warte(20 * versuch + Math.floor(Math.random() * 30));

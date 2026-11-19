@@ -286,7 +286,7 @@ ${seitenKopf({ titel: 'Einstellungen' })}
     const kx = k(res);
     const u = deps.updater;
     if (!konfig.updateErlaubt || !u) {
-      res.send(seite(kx, 'Update', 'update', html`${seitenKopf({ titel: 'Update' })}<p>Das Update über diese Seite ist ausgeschaltet. Setze <code>UPDATE_ERLAUBT=1</code> in der <a href="/admin/konfiguration">Konfiguration</a> und starte den Server neu.</p>`));
+      res.send(seite(kx, 'Update', 'update', html`${seitenKopf({ titel: 'Update', live: false })}<p>Das Update über diese Seite ist ausgeschaltet. Setze <code>UPDATE_ERLAUBT=1</code> in der <a href="/admin/konfiguration">Konfiguration</a> und starte den Server neu.</p>`, { ohneLive: true }));
       return;
     }
     const z = u.zustand;
@@ -295,8 +295,9 @@ ${seitenKopf({ titel: 'Einstellungen' })}
     };
     // Die Seite lädt sich während des Updates selbst neu (Header «Refresh», kein Skript nötig).
     if (z.laeuft || z.phase === 'fertig') res.setHeader('Refresh', '3');
+    // Ohne Live-Aktualisierung: Die Seite lädt während des Updates normal neu (Header «Refresh»).
     res.send(seite(kx, 'Update', 'update', html`
-${seitenKopf({ titel: 'Update' })}
+${seitenKopf({ titel: 'Update', live: false })}
 <p>Branch: <code>${konfig.updateBranch}</code>${z.aktuellerCommit ? html` · Aktueller Commit: <code>${z.aktuellerCommit}</code>` : ''}</p>
 <p class="meldung ${z.phase === 'fehler' ? 'fehler' : z.phase === 'fertig' ? 'ok' : 'hinweis'}">${phaseText[z.phase]}${z.zeit ? ` (${datumZeit(z.zeit.replace(/\.\d{3}Z$/, 'Z'))})` : ''}</p>
 ${z.schritte.length ? html`<ol class="schritte">${z.schritte.map((s) => html`<li class="${s.ok === null ? 'laeuft' : s.ok ? 'ok' : 'fehler'}"><strong>${s.ok === null ? '…' : s.ok ? '✔' : '✖'} ${s.text}</strong>${s.ausgabe ? html`<pre>${s.ausgabe}</pre>` : ''}</li>`)}</ol>` : ''}
@@ -308,7 +309,7 @@ ${z.phase === 'geprueft' ? (z.neueCommits.length
   <button type="submit" class="knopf haupt">Update starten</button>
 </form>`
     : html`<p>Der Code ist aktuell. Es gibt keine neuen Commits.</p>`) : ''}
-${z.laeuft ? '' : html`<form method="post" action="/admin/update/pruefen">${formFelder(kx)}<button type="submit" class="knopf">Auf Updates prüfen</button></form>`}`));
+${z.laeuft ? '' : html`<form method="post" action="/admin/update/pruefen">${formFelder(kx)}<button type="submit" class="knopf">Auf Updates prüfen</button></form>`}`, { ohneLive: true }));
   });
 
   app.post('/admin/update/pruefen', nurAdmin, async (req, res) => {

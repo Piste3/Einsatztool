@@ -1,4 +1,5 @@
 // Start des Einsatzplaners: ein einziger Prozess mit Web-Server und Jobs.
+import { beendeLive } from './web/routes-live.js';
 import type { Server } from 'node:http';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -62,6 +63,8 @@ async function start(): Promise<void> {
     beendet = true;
     log('info', `Server beendet sich (Code ${code}).`);
     for (const s of stopper) s();
+    // Offene Live-Verbindungen schliessen. Sonst wartet server.close() auf sie.
+    beendeLive();
     const fertig = () => void db.end().finally(() => process.exit(code));
     if (server) server.close(fertig);
     else fertig();

@@ -12,7 +12,6 @@ import { warnungenFuerSchichten } from '../domain/warnungen.js';
 import { zahlenFuerSchichten } from '../domain/zaehlung.js';
 import { teilnehmerlisteCsv } from '../domain/export.js';
 import { rollen as ladeRollen } from '../domain/stammdaten.js';
-import { seitenStand } from './routes-stand.js';
 import { Eingabefehler, Konflikt, id as leseId, type Status } from '../domain/eingabe.js';
 import { alle } from '../db/db.js';
 import { html, mehrzeilig, Roh } from './html.js';
@@ -100,7 +99,6 @@ ${liste.length === 0 ? html`<p class="leer">Keine Einsätze.</p>` : html`
   app.get('/einsaetze/:id', nurAufgebot, async (req, res) => {
     const kx = k(res);
     const e = await ladeEinsatz(db, leseId(req.params.id));
-    const stand = await seitenStand(db, e.id);
     const schichten = await schichtenVonEinsatz(db, e.id);
     const ids = schichten.map((s) => s.id);
     const zahlen = await zahlenFuerSchichten(db, ids);
@@ -189,7 +187,6 @@ ${seitenKopf({
     e.tenue ? `Tenue ${e.tenue}` : '',
     `${schichten.length} ${schichten.length === 1 ? 'Schicht' : 'Schichten'}`,
   ],
-  live: !!stand,
   aktionen: html`<a class="knopf haupt" href="/einsaetze/${e.id}/teilnehmerliste">Teilnehmerliste</a>
     <a class="knopf" href="/einsaetze/${e.id}/bearbeiten">Bearbeiten</a>
     ${mehrMenue([
@@ -253,14 +250,13 @@ ${sortiert.length === 0 ? html`<p class="leer">Noch keine Einträge.</p>` : html
     ${schichten.map((s) => zelle(z, s.id))}
   </tr>`)}</tbody>
 </table></div>`}`;
-    res.send(seite(kx, e.name, 'einsaetze', inhalt, { breit: true, stand }));
+    res.send(seite(kx, e.name, 'einsaetze', inhalt, { breit: true}));
   });
 
   app.get('/einsaetze/:id/bearbeiten', nurAufgebot, async (req, res) => {
     const kx = k(res);
     const e = await ladeEinsatz(db, leseId(req.params.id));
-    const stand = await seitenStand(db, e.id);
-    res.send(seite(kx, `${e.name} bearbeiten`, 'einsaetze', html`${seitenKopf({ pfad: [{ text: 'Einsätze', href: '/einsaetze' }, { text: e.name, href: `/einsaetze/${e.id}` }, { text: 'Bearbeiten' }], titel: 'Einsatz bearbeiten', live: !!stand })}${einsatzFormular(kx, `/einsaetze/${e.id}`, e as unknown as Record<string, unknown>, false, null)}`, { stand }));
+    res.send(seite(kx, `${e.name} bearbeiten`, 'einsaetze', html`${seitenKopf({ pfad: [{ text: 'Einsätze', href: '/einsaetze' }, { text: e.name, href: `/einsaetze/${e.id}` }, { text: 'Bearbeiten' }], titel: 'Einsatz bearbeiten' })}${einsatzFormular(kx, `/einsaetze/${e.id}`, e as unknown as Record<string, unknown>, false, null)}`));
   });
 
   app.post('/einsaetze/:id', nurAufgebot, async (req, res) => {

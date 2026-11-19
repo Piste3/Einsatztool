@@ -92,7 +92,7 @@ ${z.fehler ? html`<div class="meldung fehler" role="alert">${z.fehler}</div>` : 
   <h2>Server neu starten</h2>
   ${deps.neustart
     ? html`<p>Der Server beendet sich. Das Startskript startet ihn nach 3 Sekunden neu. Laufende Arbeit anderer Benutzer geht nicht verloren, offene Formulare müssen sie neu senden.</p>
-  <form method="post" action="${PFAD}/neustart" class="stapel">${formFelder(kx)}
+  <form method="post" action="${PFAD}/neustart" class="stapel" data-normal>${formFelder(kx)}
     <label class="haken wichtig"><input type="checkbox" name="bestaetigt" value="1" required> Server jetzt neu starten.</label>
     <button type="submit" class="knopf">Neu starten</button></form>`
     : html`<p class="unter">Ein Neustart über diese Seite ist hier nicht möglich.</p>`}

@@ -792,10 +792,18 @@ Bis rund 8 Benutzer arbeiten gleichzeitig. Du musst dafür nichts einrichten. Es
 
 - Jeder Benutzer hat eine eigene Sitzung.
 - Speichert ein Benutzer ein veraltetes Formular, speichert das Tool nichts. Es zeigt eine Meldung mit dem neuen Stand.
-- Ändert ein anderer Benutzer einen Einsatz, erscheint oben ein Hinweis mit dem Knopf «Neu laden».
-  Die Seiten Einsatz, Schicht, Anrufliste und die Formulare «Bearbeiten» prüfen das alle 15 Sekunden.
+- **Live:** Jede Seite aktualisiert sich selbst. Ändert ein Benutzer etwas, sehen alle anderen es sofort.
+  Niemand muss die Seite neu laden.
+- Speichern, Eintragen, Bestätigen und Löschen laufen im Hintergrund. Die Seite lädt dabei nicht neu.
+- Offene Eingaben bleiben stehen. Das gilt für ein Formular mit Änderungen, das Feld mit dem Cursor, aufgeklappte Bereiche und Suchfelder.
+- Oben rechts steht «Live» mit einem grünen Punkt. Bei «Getrennt» (orange) fehlt die Verbindung. Die Seite versucht es selbst weiter.
 - Blockieren sich zwei Speichervorgänge in der Datenbank, wiederholt das Tool den Vorgang selbst.
 - Ein täglicher Job läuft nie zweimal gleichzeitig.
+
+**Reverse-Proxy (z. B. Nginx Proxy Manager):** Die Live-Meldungen laufen über `GET /live` (Server-Sent Events).
+Du musst nichts einstellen. Das Tool sendet den Header `X-Accel-Buffering: no`, damit Nginx nichts zurückhält.
+Alle 20 Sekunden sendet das Tool ein Lebenszeichen. So schliesst der Proxy die Verbindung nicht.
+Hält ein Proxy die Meldungen trotzdem zurück, fragt die Seite alle 10 Sekunden selbst nach.
 
 **Datenbank:** Das Update auf diese Version ändert die Datenbank (Schema-Version 2).
 Das Tool ergänzt beim ersten Start die Spalte `version` in den Tabellen `einsatz`, `schicht` und `anmeldung`.

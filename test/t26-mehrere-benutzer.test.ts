@@ -1,13 +1,12 @@
 // T26: Mehrere Benutzer arbeiten gleichzeitig (bis rund 8).
-// Schutz gegen gegenseitiges Überschreiben, Wiederholung bei Sperren, Datenstand, Jobs nur einmal.
+// Schutz gegen gegenseitiges Überschreiben, Wiederholung bei Sperren, Jobs nur einmal. Live-Aktualisierung: T28.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { neueDatenbank, einsatz, inTagen, person, zeilen } from './hilfe.js';
 import { anmelden, starteApp } from './web-hilfe.js';
-import { aendereAnmeldung, loescheAnmeldung, setzeAnmeldung } from '../src/domain/anmeldung.js';
+import { aendereAnmeldung, setzeAnmeldung } from '../src/domain/anmeldung.js';
 import { aendereEinsatz, ladeEinsatz } from '../src/domain/einsatz.js';
-import { aendereSchicht, ladeSchicht, speichereFremdabteilung } from '../src/domain/schicht.js';
-import { datenstandEinsatz } from '../src/domain/datenstand.js';
+import { aendereSchicht, ladeSchicht } from '../src/domain/schicht.js';
 import { Konflikt } from '../src/domain/eingabe.js';
 import { MAX_VERSUCHE, schreibe, transaktion, Wiederholen } from '../src/db/db.js';
 import { fuehreAus, LAEUFT_SCHON } from '../src/jobs/taeglich.js';
@@ -162,40 +161,7 @@ test('T26 Transaktion startet nach einem Deadlock neu, andere Fehler nicht', asy
   }
 });
 
-test('T26 Datenstand ändert sich bei jeder Änderung im Einsatz', async () => {
-  const t = await neueDatenbank();
-  try {
-    await person(t.db, 1);
-    const s = await einsatz(t.db, 'Stand', inTagen(4, 8), inTagen(4, 12));
-    const andere = await einsatz(t.db, 'Anderer', inTagen(4, 8), inTagen(4, 12));
-    const staende = [await datenstandEinsatz(t.db, s.einsatzId)];
-    const neuerStand = async () => {
-      const st = await datenstandEinsatz(t.db, s.einsatzId);
-      assert.ok(!staende.includes(st), 'Der Stand muss sich ändern.');
-      staende.push(st);
-    };
-    // Gleicher Stand ohne Änderung.
-    assert.equal(await datenstandEinsatz(t.db, s.einsatzId), staende[0]);
-    const aid = await setzeAnmeldung(t.db, { schichtId: s.schichtId, personId: 1, status: 'angemeldet', kanal: 'telefon' }, null);
-    await neuerStand();
-    await aendereAnmeldung(t.db, aid, { status: 'bestaetigt' }, null);
-    await neuerStand();
-    await speichereFremdabteilung(t.db, s.schichtId, { name: 'Pfadi', anzahl: '4' });
-    await neuerStand();
-    await aendereEinsatz(t.db, s.einsatzId, { name: 'Stand neu' });
-    await neuerStand();
-    await loescheAnmeldung(t.db, aid);
-    await neuerStand();
-    // Eine Änderung in einem anderen Einsatz ändert den Stand nicht.
-    await setzeAnmeldung(t.db, { schichtId: andere.schichtId, personId: 1, status: 'angemeldet', kanal: 'telefon' }, null);
-    assert.equal(await datenstandEinsatz(t.db, s.einsatzId), staende.at(-1));
-    assert.equal(await datenstandEinsatz(t.db, 999999), 'geloescht');
-  } finally {
-    await t.ende();
-  }
-});
-
-test('T26 Web: Seite meldet Änderungen, Abfrage verlängert die Sitzung nicht, Konflikt führt zurück mit Meldung', async () => {
+test('T26 Web: Konflikt führt zurück mit Meldung, Formular behält die Eingaben', async () => {
   const t = await neueDatenbank();
   const app = await starteApp(t.db);
   try {
@@ -205,25 +171,10 @@ test('T26 Web: Seite meldet Änderungen, Abfrage verlängert die Sitzung nicht, 
     const { cookie, csrf } = await anmelden(t.db);
 
     const seite = await (await fetch(`${app.url}/schichten/${s.schichtId}`, { headers: { cookie } })).text();
-    assert.match(seite, new RegExp(`data-stand-url="/stand/einsatz/${s.einsatzId}"`));
     assert.match(seite, /name="version" value="1"/);
-    const stand = /data-stand="([^"]+)"/.exec(seite)![1];
 
-    // Ohne Anmeldung: 401, kein Stand.
-    assert.equal((await fetch(`${app.url}/stand/einsatz/${s.einsatzId}`)).status, 401);
-
-    // Die Abfrage verlängert die Sitzung nicht.
-    await schreibe(t.db, "UPDATE sitzung SET ablauf = '2999-01-01T00:00:00Z'");
-    const r1 = await fetch(`${app.url}/stand/einsatz/${s.einsatzId}`, { headers: { cookie } });
-    assert.equal(r1.status, 200);
-    assert.deepEqual(await r1.json(), { stand });
-    const [sitzung] = await zeilen(t.db, 'SELECT ablauf FROM sitzung');
-    assert.equal(sitzung.ablauf, '2999-01-01T00:00:00Z');
-
-    // Ein anderer Benutzer ändert den Eintrag. Der Stand ändert sich.
+    // Ein anderer Benutzer ändert den Eintrag.
     await aendereAnmeldung(t.db, aid, { status: 'unsicher' }, null);
-    const r2 = await (await fetch(`${app.url}/stand/einsatz/${s.einsatzId}`, { headers: { cookie } })).json();
-    assert.notEqual(r2.stand, stand);
 
     // Speichern mit dem alten Stand: Rücksprung mit Fehlermeldung, nichts gespeichert.
     const r3 = await fetch(`${app.url}/anmeldungen/${aid}`, {
