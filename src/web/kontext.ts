@@ -5,6 +5,8 @@ import type { Benutzer } from '../domain/stammdaten.js';
 export interface Meldung {
   art: 'ok' | 'fehler' | 'hinweis';
   text: string;
+  /** Schlüssel für den Knopf «Rückgängig» im Toast (src/domain/rueckgaengig.ts). */
+  rueckgaengig?: string;
 }
 
 export interface Kontext {

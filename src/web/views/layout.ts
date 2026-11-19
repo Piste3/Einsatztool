@@ -87,7 +87,7 @@ ${kopfDaten(`${titel} · Einsatzplaner`)}
   </div>
 </nav>
 <main class="inhalt${extra.breit ? ' breit' : ''}">
-  ${k.meldung ? toast(k.meldung.art, k.meldung.text) : ''}
+  ${k.meldung ? toast(k.meldung.art, k.meldung.text, k.meldung.rueckgaengig ? rueckgaengigKnopf(k, k.meldung.rueckgaengig) : undefined) : ''}
   ${inhalt}
 </main>
 </body>
@@ -99,12 +99,24 @@ ${kopfDaten(`${titel} · Einsatzplaner`)}
  * und verschiebt nichts. Das Skript sammelt sie in einem Stapel und blendet sie aus:
  * ok nach 3 Sekunden, Hinweis nach 6 Sekunden. Ein Fehler bleibt, bis man ihn schliesst.
  */
-export function toast(art: 'ok' | 'fehler' | 'hinweis', text: string): Roh {
+export function toast(art: 'ok' | 'fehler' | 'hinweis', text: string, aktion?: Roh): Roh {
   const zeichen = art === 'ok' ? '✓' : art === 'fehler' ? '!' : 'i';
-  return html`<div class="toast ${art}" role="${art === 'fehler' ? 'alert' : 'status'}" data-toast="${art}">
-    <span class="toast-zeichen" aria-hidden="true">${zeichen}</span><span class="toast-text">${text}</span>
+  return html`<div class="toast ${art}" role="${art === 'fehler' ? 'alert' : 'status'}" data-toast="${art}"${aktion ? html` data-toast-aktion` : ''}>
+    <span class="toast-zeichen" aria-hidden="true">${zeichen}</span><span class="toast-text">${text}</span>${aktion ?? ''}
     <button type="button" class="toast-zu" data-toast-zu aria-label="Meldung schliessen">×</button>
   </div>`;
+}
+
+/**
+ * Knopf «Rückgängig» im Toast. Er sendet den Schlüssel der letzten Aktion.
+ * Der Toast bleibt dann 10 Sekunden. Der Server nimmt den Schlüssel 10 Minuten lang an.
+ */
+function rueckgaengigKnopf(k: Kontext, schluessel: string): Roh {
+  return html`<form method="post" action="/rueckgaengig" class="toast-form">
+      ${formFelder(k, k.pfad)}
+      <input type="hidden" name="schluessel" value="${schluessel}">
+      <button type="submit" class="toast-rueckgaengig">Rückgängig</button>
+    </form>`;
 }
 
 /** Druckansicht ohne Seitenleiste. */

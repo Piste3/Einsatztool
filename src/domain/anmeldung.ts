@@ -4,6 +4,7 @@ import type { PoolConnection } from 'mysql2/promise';
 import { alle, eine, schreibe, transaktion, Wiederholen, type Db } from '../db/db.js';
 import { Eingabefehler, NichtGefunden, STATUS, KANAELE, auswahl, pruefeVersion, text, type Kanal, type Status } from './eingabe.js';
 import { jetztIso, lokalesDatum, lokaleZeit } from './zeit.js';
+import { merkeNeu, merkeVorEntfernen, merkeVorher } from './rueckgaengig.js';
 
 export interface Anmeldung {
   id: number;
@@ -86,6 +87,7 @@ async function aendereFelder(c: PoolConnection, alt: Anmeldung, a: Aenderung, be
     await schreibeLog(c, alt.id, benutzerId, feld, vorher, nachher, zeit);
   }
   if (!geaendert) return false;
+  merkeVorher(alt);
   const status = neu.status ?? alt.status;
   const wirdBestaetigt = neu.status === 'bestaetigt' && alt.status !== 'bestaetigt';
   await schreibe(
@@ -181,6 +183,7 @@ export async function setzeAnmeldung(db: Db, n: NeueAnmeldung, benutzerId: numbe
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [n.schichtId, n.personId, personenName(person), status, rolle, kanal, bemerkung, zeit, zeit],
     );
+    merkeNeu(r.insertId);
     await schreibeLog(c, r.insertId, benutzerId, 'erstellt', null, status, zeit);
     if (rolle) await schreibeLog(c, r.insertId, benutzerId, 'rolle', null, rolle, zeit);
     if (bemerkung) await schreibeLog(c, r.insertId, benutzerId, 'bemerkung', null, bemerkung, zeit);
@@ -223,8 +226,9 @@ export async function bestaetigeAlle(db: Db, schichtIds: number[], benutzerId: n
 /** Eintrag entfernen. Die Route verlangt vorher eine Bestätigung. */
 export async function loescheAnmeldung(db: Db, id: number): Promise<number> {
   return transaktion(db, async (c) => {
-    const a = await eine<Anmeldung>(c, 'SELECT * FROM anmeldung WHERE id = ?', [id]);
+    const a = await eine<Anmeldung>(c, 'SELECT * FROM anmeldung WHERE id = ? FOR UPDATE', [id]);
     if (!a) throw new NichtGefunden('Eintrag nicht gefunden. Ein anderer Benutzer hat ihn vielleicht schon entfernt.');
+    await merkeVorEntfernen(c, a);
     await schreibe(c, 'DELETE FROM anmeldung WHERE id = ?', [id]);
     return a.schicht_id;
   });
@@ -253,6 +257,7 @@ export async function ordneZu(db: Db, anmeldungId: number, personId: number, ben
     if (doppelt) return { ok: false, bestehendeId: doppelt.id };
     const name = personenName(p);
     const zeit = jetztIso();
+    merkeVorher(a);
     await schreibe(c, 'UPDATE anmeldung SET person_id = ?, name_text = ?, email_text = NULL, geaendert_am = ?, version = version + 1 WHERE id = ?', [
       personId, name, zeit, anmeldungId,
     ]);

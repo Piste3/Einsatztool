@@ -8,6 +8,7 @@ import {
 } from '../domain/einsatz.js';
 import { anzeigeZeiten, passtInTabelle, schichtenVonEinsatz, speichereSchichtTabelle, zeilenAbdruck, type SchichtZeile } from '../domain/schicht.js';
 import { bestaetigeAlle, verlaufEinsatz } from '../domain/anmeldung.js';
+import { mitRueckgaengig } from '../domain/rueckgaengig.js';
 import { logText } from './routes-schichten.js';
 import { warnungenFuerSchichten } from '../domain/warnungen.js';
 import { sollFarbe, zahlenFuerSchichten } from '../domain/zaehlung.js';
@@ -596,8 +597,8 @@ ${seitenKopf({ pfad: [{ text: 'Einsätze', href: '/einsaetze' }, { text: e.name,
   app.post('/einsaetze/:id/alle-bestaetigen', nurAufgebot, async (req, res) => {
     const id = leseId(req.params.id);
     const ids = (await schichtenVonEinsatz(db, id)).filter((s) => s.end_zeit > jetztIso()).map((s) => s.id);
-    const n = await bestaetigeAlle(db, ids, k(res).benutzer!.id);
-    zurueck(req, res, `/einsaetze/${id}`, `${n} Anmeldungen bestätigt.`);
+    const { ergebnis: n, schluessel } = await mitRueckgaengig(db, k(res).benutzer!.id, () => bestaetigeAlle(db, ids, k(res).benutzer!.id));
+    zurueck(req, res, `/einsaetze/${id}`, `${n} Anmeldungen bestätigt.`, 'ok', schluessel);
   });
 
   app.get('/einsaetze/:id/export.csv', nurAufgebot, async (req, res) => {

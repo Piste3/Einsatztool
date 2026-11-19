@@ -278,6 +278,12 @@ form.inline { display: inline; margin: 0; }
 .toast-text { flex: 1; padding-top: .02rem; }
 .toast-zu { flex: none; background: none; border: 0; color: var(--gedämpft); cursor: pointer; font-size: 1.1rem; line-height: 1; padding: 0 .2rem; border-radius: 4px; }
 .toast-zu:hover { color: var(--text); background: var(--grau-hg); }
+.toast-form { flex: none; margin: 0; }
+.toast-rueckgaengig {
+  background: none; border: 1px solid var(--linie); border-radius: var(--radius-klein); color: var(--text);
+  font: inherit; font-weight: 700; padding: .1rem .55rem; cursor: pointer;
+}
+.toast-rueckgaengig:hover, .toast-rueckgaengig:focus-visible { background: var(--grau-hg); }
 @keyframes toast-rein { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) { .toast { animation: none; transition: none; } }
 @media (max-width: 860px) {

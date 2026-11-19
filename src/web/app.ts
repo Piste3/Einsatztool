@@ -10,6 +10,7 @@ import { Eingabefehler, NichtGefunden } from '../domain/eingabe.js';
 import type { Benutzer } from '../domain/stammdaten.js';
 import { zaehlerSeitenleiste } from '../domain/listen.js';
 import { isoUtc } from '../domain/zeit.js';
+import { gueltigerSchluessel } from '../domain/rueckgaengig.js';
 import { log } from '../log.js';
 import { html } from './html.js';
 import { einfacheSeite } from './views/layout.js';
@@ -82,8 +83,10 @@ export function setzeCookie(res: Response, konfig: Konfiguration, name: string, 
 }
 
 /** Meldung für die nächste Seite (z. B. «Gespeichert»). Signiertes Cookie, eine Minute gültig. */
-export function setzeMeldung(res: Response, konfig: Konfiguration, art: Meldung['art'], text: string): void {
-  const wert = Buffer.from(JSON.stringify({ art, text: text.slice(0, 500) })).toString('base64url');
+export function setzeMeldung(res: Response, konfig: Konfiguration, art: Meldung['art'], text: string, rueckgaengig?: string | null): void {
+  const m: Meldung = { art, text: text.slice(0, 500) };
+  if (rueckgaengig) m.rueckgaengig = rueckgaengig;
+  const wert = Buffer.from(JSON.stringify(m)).toString('base64url');
   setzeCookie(res, konfig, 'meldung', `${wert}.${signiere(konfig.sessionSecret, 'meldung', wert)}`, 60);
 }
 
@@ -95,7 +98,10 @@ function leseMeldung(req: Request, res: Response, konfig: Konfiguration): Meldun
   if (!wert || !sig || !gleich(sig, signiere(konfig.sessionSecret, 'meldung', wert))) return null;
   try {
     const m = JSON.parse(Buffer.from(wert, 'base64url').toString('utf8'));
-    if (['ok', 'fehler', 'hinweis'].includes(m.art) && typeof m.text === 'string') return m;
+    if (['ok', 'fehler', 'hinweis'].includes(m.art) && typeof m.text === 'string') {
+      const r = gueltigerSchluessel(m.rueckgaengig);
+      return r ? { art: m.art, text: m.text, rueckgaengig: r } : { art: m.art, text: m.text };
+    }
   } catch {
     // ignorieren
   }
@@ -115,9 +121,16 @@ export function csrfToken(secret: string, sitzungId: string): string {
 }
 
 /** Leitet nach dem Speichern zurück an dieselbe Stelle, mit Meldung. */
-export function zurueck(req: Request, res: Response, standard: string, text = 'Gespeichert.', art: Meldung['art'] = 'ok'): void {
+export function zurueck(
+  req: Request,
+  res: Response,
+  standard: string,
+  text = 'Gespeichert.',
+  art: Meldung['art'] = 'ok',
+  rueckgaengig: string | null = null,
+): void {
   const deps = res.locals.deps as Abhaengigkeiten;
-  if (text) setzeMeldung(res, deps.konfig, art, text);
+  if (text) setzeMeldung(res, deps.konfig, art, text, rueckgaengig);
   res.redirect(303, sicheresZiel(req.body?.zurueck, standard));
 }
 

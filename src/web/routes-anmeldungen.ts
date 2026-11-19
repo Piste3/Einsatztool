@@ -1,7 +1,8 @@
 // Anmeldungen ändern, entfernen, unbekannte zuordnen (14.1, 14.6).
 import type { Express } from 'express';
 import type { Abhaengigkeiten } from './app.js';
-import { nurAufgebot, zurueck } from './app.js';
+import { nurAufgebot, refererPfad, zurueck } from './app.js';
+import { macheRueckgaengig, mitRueckgaengig } from '../domain/rueckgaengig.js';
 import { aendereAnmeldung, ladeAnmeldung, loescheAnmeldung, ordneZu, verlauf } from '../domain/anmeldung.js';
 import { ladeSchicht } from '../domain/schicht.js';
 import { unbekannteEintraege, zuordnungsVorschlaege } from '../domain/listen.js';
@@ -19,7 +20,7 @@ export function registriereAnmeldungen(app: Express, deps: Abhaengigkeiten): voi
 
   app.post('/anmeldungen/:id', nurAufgebot, async (req, res) => {
     const id = leseId(req.params.id);
-    const a = await aendereAnmeldung(
+    const { ergebnis: a, schluessel } = await mitRueckgaengig(db, k(res).benutzer!.id, () => aendereAnmeldung(
       db,
       id,
       {
@@ -30,8 +31,9 @@ export function registriereAnmeldungen(app: Express, deps: Abhaengigkeiten): voi
         version: req.body.version,
       },
       k(res).benutzer!.id,
-    );
-    zurueck(req, res, `/schichten/${a.schicht_id}`, req.body.status === 'bestaetigt' && Object.keys(req.body).length <= 3 ? 'Bestätigt.' : 'Gespeichert.');
+    ));
+    const text = req.body.status === 'bestaetigt' && Object.keys(req.body).length <= 3 ? 'Bestätigt.' : 'Gespeichert.';
+    zurueck(req, res, `/schichten/${a.schicht_id}`, text, 'ok', schluessel);
   });
 
   app.get('/anmeldungen/:id/loeschen', nurAufgebot, async (req, res) => {
@@ -52,8 +54,15 @@ ${seitenKopf({ titel: 'Eintrag entfernen?' })}
 
   app.post('/anmeldungen/:id/loeschen', nurAufgebot, async (req, res) => {
     if (req.body?.bestaetigt !== '1') throw new Eingabefehler('Bestätige das Entfernen mit dem Häkchen.');
-    const sid = await loescheAnmeldung(db, leseId(req.params.id));
-    zurueck(req, res, `/schichten/${sid}`, 'Eintrag entfernt.');
+    const id = leseId(req.params.id);
+    const { ergebnis: sid, schluessel } = await mitRueckgaengig(db, k(res).benutzer!.id, () => loescheAnmeldung(db, id));
+    zurueck(req, res, `/schichten/${sid}`, 'Eintrag entfernt.', 'ok', schluessel);
+  });
+
+  // Knopf «Rückgängig» im Toast: stellt die Einträge der letzten Aktion wieder her.
+  app.post('/rueckgaengig', nurAufgebot, async (req, res) => {
+    const n = await macheRueckgaengig(db, req.body?.schluessel, k(res).benutzer!.id);
+    zurueck(req, res, refererPfad(req), n === 1 ? 'Rückgängig gemacht.' : `Rückgängig gemacht (${n} Einträge).`);
   });
 
   // Regel 14.6.2 und 14.6.3: unzugeordnete Einträge mit Suche.
@@ -108,9 +117,9 @@ ${liste.length ? html`<div class="karten">${bloecke}</div>` : html`<p class="lee
     const id = leseId(req.params.id);
     const personId = idAusAuswahl(req.body?.person);
     if (!personId) throw new Eingabefehler('Wähle eine Person aus der Liste.');
-    const r = await ordneZu(db, id, personId, kx.benutzer!.id);
+    const { ergebnis: r, schluessel } = await mitRueckgaengig(db, kx.benutzer!.id, () => ordneZu(db, id, personId, kx.benutzer!.id));
     if (r.ok) {
-      zurueck(req, res, '/anmeldungen/unbekannt', 'Zugeordnet.');
+      zurueck(req, res, '/anmeldungen/unbekannt', 'Zugeordnet.', 'ok', schluessel);
       return;
     }
     const a = await ladeAnmeldung(db, id);

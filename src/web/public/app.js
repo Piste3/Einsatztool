@@ -117,7 +117,7 @@
 
   // Meldungen («Gespeichert»): kleine Toasts unten rechts. Sie verschieben das Layout nicht.
   // ok verschwindet nach 3 s, ein Hinweis nach 6 s. Ein Fehler bleibt, bis man ihn schliesst.
-  // Fährt die Maus über einen Toast, wartet er.
+  // Fährt die Maus über einen Toast, wartet er. Ein Toast mit «Rückgängig» bleibt 10 s.
   var DAUER = { ok: 3000, hinweis: 6000 };
   var stapel = null;
   var toastWeg = function (t) {
@@ -128,6 +128,7 @@
   var toastStarten = function (t) {
     var dauer = DAUER[t.getAttribute('data-toast')];
     if (!dauer) return;
+    if (t.hasAttribute('data-toast-aktion')) dauer = 10000;
     var uhr = null;
     var los = function () { uhr = setTimeout(function () { toastWeg(t); }, dauer); };
     t.addEventListener('mouseenter', function () { clearTimeout(uhr); });
@@ -155,6 +156,11 @@
     });
     while (stapel.children.length > 4) stapel.removeChild(stapel.firstChild);
   };
+  // «Rückgängig» geht nur einmal: Der Toast verschwindet nach dem Klick.
+  document.addEventListener('submit', function (ev) {
+    var t = ev.target && ev.target.closest ? ev.target.closest('.toast') : null;
+    if (t) setTimeout(function () { toastWeg(t); }, 0);
+  });
   document.addEventListener('click', function (ev) {
     var zu = ev.target && ev.target.closest ? ev.target.closest('[data-toast-zu]') : null;
     if (zu) toastWeg(zu.closest('.toast'));

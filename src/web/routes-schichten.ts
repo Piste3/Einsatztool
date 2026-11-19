@@ -8,6 +8,7 @@ import {
 } from '../domain/schicht.js';
 import { ladeEinsatz } from '../domain/einsatz.js';
 import { bestaetigeAlle, sammelstatus, setzeAnmeldung, verlauf } from '../domain/anmeldung.js';
+import { mitRueckgaengig } from '../domain/rueckgaengig.js';
 import { warnungenFuerSchicht } from '../domain/warnungen.js';
 import { zahlenFuerSchichten } from '../domain/zaehlung.js';
 import { essenslisteCsv } from '../domain/export.js';
@@ -377,8 +378,9 @@ ${s.anzahl_schichten <= 1 ? html`<p class="meldung fehler">Das ist die einzige S
     const sid = leseId(req.params.sid);
     const personId = idAusAuswahl(req.body?.person);
     if (!personId) throw new Eingabefehler('Wähle eine Person aus der Liste.');
-    await setzeAnmeldung(db, { schichtId: sid, personId, status: req.body.status, kanal: req.body.kanal, rolle: req.body.rolle, bemerkung: nichtLeer(req.body.bemerkung) }, k(res).benutzer!.id);
-    zurueck(req, res, `/schichten/${sid}`, 'Eingetragen.');
+    const { schluessel } = await mitRueckgaengig(db, k(res).benutzer!.id, () =>
+      setzeAnmeldung(db, { schichtId: sid, personId, status: req.body.status, kanal: req.body.kanal, rolle: req.body.rolle, bemerkung: nichtLeer(req.body.bemerkung) }, k(res).benutzer!.id));
+    zurueck(req, res, `/schichten/${sid}`, 'Eingetragen.', 'ok', schluessel);
   });
 
   // Regel 14.3: Sammelstatus. «Nachricht gesendet» für alle gewählten Personen, Kanal whatsapp.
@@ -387,14 +389,14 @@ ${s.anzahl_schichten <= 1 ? html`<p class="meldung fehler">Das ist die einzige S
     const ids = liste(req.body?.personen).map((x) => leseId(x, 'Person'));
     const status = req.body?.status ?? 'nachricht_gesendet';
     const kanal = req.body?.kanal ?? (status === 'nachricht_gesendet' ? 'whatsapp' : 'telefon');
-    const n = await sammelstatus(db, sid, ids, status, kanal, k(res).benutzer!.id);
-    zurueck(req, res, `/schichten/${sid}/anrufliste`, `Status für ${n} Personen gesetzt.`);
+    const { ergebnis: n, schluessel } = await mitRueckgaengig(db, k(res).benutzer!.id, () => sammelstatus(db, sid, ids, status, kanal, k(res).benutzer!.id));
+    zurueck(req, res, `/schichten/${sid}/anrufliste`, `Status für ${n} Personen gesetzt.`, 'ok', schluessel);
   });
 
   app.post('/schichten/:sid/alle-bestaetigen', nurAufgebot, async (req, res) => {
     const sid = leseId(req.params.sid);
-    const n = await bestaetigeAlle(db, [sid], k(res).benutzer!.id);
-    zurueck(req, res, `/schichten/${sid}`, `${n} Anmeldungen bestätigt.`);
+    const { ergebnis: n, schluessel } = await mitRueckgaengig(db, k(res).benutzer!.id, () => bestaetigeAlle(db, [sid], k(res).benutzer!.id));
+    zurueck(req, res, `/schichten/${sid}`, `${n} Anmeldungen bestätigt.`, 'ok', schluessel);
   });
 
   app.get('/schichten/:sid/anrufliste', nurAufgebot, async (req, res) => {
