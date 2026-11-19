@@ -777,10 +777,11 @@ Wichtig:
 ## Update über Admin › Update
 
 1. Setze `UPDATE_ERLAUBT=1` in der Konfiguration.
-2. Öffne Admin › Update. Klick «Auf Updates prüfen». Die Seite zeigt die neuen Commits.
-3. Setz das Häkchen und klick «Update starten».
+2. Öffne Admin › Update. Oben stehen zwei Knöpfe.
+3. «Nach Updates suchen» zeigt, ob es einen neuen Stand gibt.
+4. «Update installieren» installiert den neuen Stand. Der Browser fragt einmal nach.
 
-Das Tool sichert zuerst die Datenbank. Dann holt es den Code, installiert die Pakete und baut neu.
+Das Tool sichert zuerst die Datenbank und die Konfiguration (`export\update-sicherung\`). Dann holt es den Code, installiert die Pakete und baut neu.
 Danach beendet sich Node mit Code 75. `start.cmd` startet Node nach 3 Sekunden neu.
 Bei einem Fehler setzt das Tool den Code auf den alten Commit zurück.
 Git braucht für `git fetch` einen Zugang ohne Passwort-Abfrage (z. B. einen Deploy-Key).

@@ -3,7 +3,7 @@
 // git merge --ff-only, npm ci, npm run build, Neustart mit Exit-Code 75.
 // Befehle und Argumente sind fest im Code. Git fragt nie interaktiv.
 import { execFile } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, readdirSync, unlinkSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, unlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { log } from '../log.js';
 
@@ -67,6 +67,8 @@ export interface UpdaterOptionen {
   exportDir: string;
   branch: string;
   sichern: (datei: string) => Promise<void>;
+  /** Konfigurationsdatei (einsatzplaner.env). Das Update sichert sie vor jeder Änderung. */
+  envDatei?: string | null;
   neustart: () => void;
   ausfuehren?: Ausfuehren;
 }
@@ -155,6 +157,18 @@ export class Updater {
     return this.zustand;
   }
 
+  /**
+   * Ein Knopf «Update installieren»: prüft, sichert, installiert und startet neu.
+   * Läuft im Hintergrund. Gibt es keine neuen Commits, ändert das Tool nichts.
+   */
+  installiere(): boolean {
+    if (this.zustand.laeuft) return false;
+    void this.pruefe().then((z) => {
+      if (z.phase === 'geprueft' && z.neueCommits.length) this.starte();
+    });
+    return true;
+  }
+
   /** Schritt 2: Update ausführen. Läuft im Hintergrund. Die Seite lädt sich selbst neu. */
   starte(): boolean {
     if (this.zustand.laeuft || this.zustand.phase !== 'geprueft' || !this.zustand.neueCommits.length) return false;
@@ -185,12 +199,26 @@ export class Updater {
       const datei = join(ordner, `datenbank-vor-update-${new Date().toISOString().replace(/[:.]/g, '-')}.sql`);
       await this.o.sichern(datei);
       this.notiz(`Datenbank gesichert: ${datei}`, true);
-      const alle = readdirSync(ordner).filter((n) => /^datenbank-vor-update-.*\.sql$/.test(n)).sort();
-      for (const n of alle.slice(0, Math.max(0, alle.length - BEHALTEN))) unlinkSync(join(ordner, n));
+      for (const muster of [/^datenbank-vor-update-.*\.sql$/, /^einsatzplaner-vor-update-.*\.env$/]) {
+        const alle = readdirSync(ordner).filter((n) => muster.test(n)).sort();
+        for (const n of alle.slice(0, Math.max(0, alle.length - BEHALTEN))) unlinkSync(join(ordner, n));
+      }
     } catch (e) {
       this.notiz('Datenbank sichern', false, (e as Error).message);
       this.ende('fehler');
       return;
+    }
+    // Die Konfiguration gehört zur Sicherung. Ohne Sicherung kein Update.
+    if (this.o.envDatei && existsSync(this.o.envDatei)) {
+      try {
+        const ziel = join(ordner, `einsatzplaner-vor-update-${new Date().toISOString().replace(/[:.]/g, '-')}.env`);
+        copyFileSync(this.o.envDatei, ziel);
+        this.notiz(`Konfiguration gesichert: ${ziel}`, true);
+      } catch (e) {
+        this.notiz('Konfiguration sichern', false, (e as Error).message);
+        this.ende('fehler');
+        return;
+      }
     }
     const merge = await this.schritt('Code übernehmen', 'git', ['merge', '--ff-only', `origin/${this.o.branch}`]);
     if (!merge.ok) {

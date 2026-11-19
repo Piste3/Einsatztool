@@ -290,26 +290,33 @@ ${seitenKopf({ titel: 'Einstellungen' })}
       return;
     }
     const z = u.zustand;
-    const phaseText: Record<string, string> = {
-      bereit: 'Noch nicht geprüft.', geprueft: 'Geprüft.', laeuft: 'Läuft …', fertig: 'Update fertig. Der Server startet neu.', fehler: 'Fehler.',
-    };
+    const zeit = z.zeit ? datumZeit(z.zeit.replace(/\.\d{3}Z$/, 'Z')) : '';
+    const status =
+      z.laeuft ? { art: 'hinweis', text: 'Läuft … Die Seite aktualisiert sich selbst.' }
+      : z.phase === 'fertig' ? { art: 'ok', text: 'Update installiert. Der Server startet neu.' }
+      : z.phase === 'fehler' ? { art: 'fehler', text: 'Fehler. Das Tool hat den alten Stand behalten. Details unten.' }
+      : z.phase === 'geprueft' && z.neueCommits.length ? { art: 'hinweis', text: `Update vorhanden: ${z.neueCommits.length} ${z.neueCommits.length === 1 ? 'Änderung' : 'Änderungen'}.` }
+      : z.phase === 'geprueft' ? { art: 'ok', text: 'Kein Update vorhanden. Der Server hat den neuesten Stand.' }
+      : { art: 'hinweis', text: 'Noch nicht gesucht.' };
     // Die Seite lädt sich während des Updates selbst neu (Header «Refresh», kein Skript nötig).
     if (z.laeuft || z.phase === 'fertig') res.setHeader('Refresh', '3');
+    // Genau zwei Knöpfe oben: suchen und installieren. Installieren sichert immer zuerst und startet neu.
+    const knoepfe = html`<form method="post" action="/admin/update/pruefen" class="inline">${formFelder(kx)}<button type="submit" class="knopf"${z.laeuft ? new Roh(' disabled') : ''}>Nach Updates suchen</button></form>
+<form method="post" action="/admin/update/starten" class="inline" data-bestaetigen="Update jetzt installieren? Das Tool sichert zuerst Datenbank und Konfiguration und startet danach neu.">${formFelder(kx)}<button type="submit" class="knopf haupt"${z.laeuft ? new Roh(' disabled') : ''}>Update installieren</button></form>`;
     // Ohne Live-Aktualisierung: Die Seite lädt während des Updates normal neu (Header «Refresh»).
     res.send(seite(kx, 'Update', 'update', html`
-${seitenKopf({ titel: 'Update', live: false })}
-<p>Branch: <code>${konfig.updateBranch}</code>${z.aktuellerCommit ? html` · Aktueller Commit: <code>${z.aktuellerCommit}</code>` : ''}</p>
-<p class="meldung ${z.phase === 'fehler' ? 'fehler' : z.phase === 'fertig' ? 'ok' : 'hinweis'}">${phaseText[z.phase]}${z.zeit ? ` (${datumZeit(z.zeit.replace(/\.\d{3}Z$/, 'Z'))})` : ''}</p>
-${z.schritte.length ? html`<ol class="schritte">${z.schritte.map((s) => html`<li class="${s.ok === null ? 'laeuft' : s.ok ? 'ok' : 'fehler'}"><strong>${s.ok === null ? '…' : s.ok ? '✔' : '✖'} ${s.text}</strong>${s.ausgabe ? html`<pre>${s.ausgabe}</pre>` : ''}</li>`)}</ol>` : ''}
-${z.phase === 'geprueft' ? (z.neueCommits.length
-    ? html`<h2>Neue Commits (${z.neueCommits.length})</h2><pre>${z.neueCommits.join('\n')}</pre>
-<form method="post" action="/admin/update/starten" class="stapel">
-  ${formFelder(kx)}
-  <label class="haken wichtig"><input type="checkbox" name="bestaetigt" value="1" required> Datenbank sichern, Update ausführen und den Server neu starten.</label>
-  <button type="submit" class="knopf haupt">Update starten</button>
-</form>`
-    : html`<p>Der Code ist aktuell. Es gibt keine neuen Commits.</p>`) : ''}
-${z.laeuft ? '' : html`<form method="post" action="/admin/update/pruefen">${formFelder(kx)}<button type="submit" class="knopf">Auf Updates prüfen</button></form>`}`, { ohneLive: true }));
+${seitenKopf({
+  titel: 'Update', live: false, aktionen: knoepfe,
+  angaben: [html`Branch <code>${konfig.updateBranch}</code>`, z.aktuellerCommit ? html`Stand <code>${z.aktuellerCommit}</code>` : '', zeit ? `zuletzt ${zeit}` : ''],
+})}
+<p class="meldung ${status.art}">${status.text}</p>
+<p class="unter">«Update installieren» sichert immer zuerst Datenbank und Konfiguration. Dann holt es den neuen Stand, baut ihn und startet den Server neu.</p>
+${z.neueCommits.length ? html`<details class="aufklapp"><summary>Änderungen anzeigen (${z.neueCommits.length})</summary><pre class="kompakt">${z.neueCommits.join('\n')}</pre></details>` : ''}
+${z.schritte.length ? html`<ol class="schritte kompakt">${z.schritte.map((s) => html`<li class="${s.ok === null ? 'laeuft' : s.ok ? 'ok' : 'fehler'}">${
+  s.ausgabe
+    ? html`<details${s.ok === false ? new Roh(' open') : ''}><summary><span class="zeichen">${s.ok === null ? '…' : s.ok ? '✓' : '✗'}</span> ${s.text}</summary><pre>${s.ausgabe}</pre></details>`
+    : html`<span class="zeichen">${s.ok === null ? '…' : s.ok ? '✓' : '✗'}</span> ${s.text}`
+}</li>`)}</ol>` : ''}`, { ohneLive: true }));
   });
 
   app.post('/admin/update/pruefen', nurAdmin, async (req, res) => {
@@ -318,10 +325,10 @@ ${z.laeuft ? '' : html`<form method="post" action="/admin/update/pruefen">${form
     res.redirect(303, '/admin/update');
   });
 
+  // Ein Knopf: Das Tool sucht selbst nach dem Update, sichert, installiert und startet neu.
   app.post('/admin/update/starten', nurAdmin, (req, res) => {
     if (!konfig.updateErlaubt || !deps.updater) throw new Eingabefehler('Das Update ist ausgeschaltet.');
-    if (req.body?.bestaetigt !== '1') throw new Eingabefehler('Bestätige das Update mit dem Häkchen.');
-    if (!deps.updater.starte()) throw new Eingabefehler('Prüfe zuerst auf Updates.');
+    if (!deps.updater.installiere()) throw new Eingabefehler('Ein Update läuft schon.');
     res.redirect(303, '/admin/update');
   });
 }

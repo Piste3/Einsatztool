@@ -80,6 +80,7 @@ async function start(): Promise<void> {
         exportDir: konfig.exportDir,
         branch: konfig.updateBranch,
         sichern: (datei) => schreibeSicherung(db, datei),
+        envDatei: envDateiPfad(),
         neustart: () => beenden(NEUSTART_CODE),
       })
     : null;

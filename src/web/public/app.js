@@ -149,6 +149,16 @@
   document.addEventListener('input', markiere);
   document.addEventListener('change', markiere);
 
+  // Rückfrage vor wichtigen Aktionen (z. B. «Update installieren»). Ohne Skript sendet der Knopf direkt.
+  document.addEventListener('submit', function (ev) {
+    var form = ev.target;
+    var frage = form && form.getAttribute && form.getAttribute('data-bestaetigen');
+    if (frage && !window.confirm(frage)) {
+      ev.preventDefault();
+      ev.stopImmediatePropagation();
+    }
+  }, true);
+
   if (!LIVE) {
     document.addEventListener('submit', function (ev) {
       var form = ev.target;

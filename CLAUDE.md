@@ -78,12 +78,12 @@ Sprache mit Yann: Deutsch nach ASD-STE100. Aktiv, höchstens 25 Wörter pro Satz
 
 ### Update über die Admin-Seite (nicht im Konzept)
 
-- Seite Admin › Update, nur für Admins, nur mit `UPDATE_ERLAUBT=1`, nur per POST mit CSRF-Token und Häkchen.
-- Ablauf: prüfen (`git fetch`, neue Commits zeigen, keine lokalen Änderungen), Datenbank sichern, `git merge --ff-only origin/<UPDATE_BRANCH>`, `npm ci`, `npm run build`, Neustart mit Exit-Code 75.
+- Seite Admin › Update, nur für Admins, nur mit `UPDATE_ERLAUBT=1`, nur per POST mit CSRF-Token. Seit 19.11.2026 (Wunsch Yann): genau zwei Knöpfe oben, «Nach Updates suchen» und «Update installieren» (Rückfrage im Browser statt Häkchen).
+- Ablauf von «Update installieren»: prüfen (`git fetch`, neue Commits, keine lokalen Änderungen), Datenbank und `einsatzplaner.env` sichern, `git merge --ff-only origin/<UPDATE_BRANCH>`, `npm ci`, `npm run build`, Neustart mit Exit-Code 75.
 - Ein Fehler nach dem Holen setzt den Code auf den alten Commit zurück. Ohne Sicherung kein Update.
 - Das Tool behält die 5 neuesten Sicherungen vor einem Update.
 - Befehle und Argumente sind fest im Code. `UPDATE_BRANCH` ist geprüft (keine Sonderzeichen). Git fragt nie interaktiv (`GIT_TERMINAL_PROMPT=0`).
-- Die Seite zeigt Schritte und Fehlermeldungen von Git vollständig an. Sie lädt sich während des Updates selbst neu.
+- Die Seite zeigt je Schritt eine Zeile mit ✓ oder ✗. Die Ausgabe ist eingeklappt, bei einem Fehler offen. Sie lädt sich während des Updates selbst neu.
 
 ### Aussehen und Bedienung
 

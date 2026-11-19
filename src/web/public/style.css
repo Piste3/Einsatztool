@@ -470,6 +470,14 @@ p.bemerkung:not(.intern) { border-left: 3px solid var(--linie-stark); padding: .
 .wa { font-size: .9em; text-decoration: none; }
 .telefon a { white-space: nowrap; font-weight: 400; }
 .schritte { padding-left: 1.2rem; }
+/* Update: eine Zeile je Schritt, Ausgabe zum Aufklappen */
+.schritte.kompakt { list-style: none; padding: 0; margin: .5rem 0; font-size: .9rem; }
+.schritte.kompakt li { padding: .2rem 0; border-bottom: 1px solid var(--linie); }
+.schritte.kompakt summary { cursor: pointer; }
+.schritte.kompakt pre, pre.kompakt { max-height: 14rem; overflow: auto; font-size: .78rem; margin: .3rem 0 .2rem; }
+.schritte .zeichen { display: inline-block; width: 1.2rem; font-weight: 700; }
+.schritte li.ok .zeichen { color: var(--gruen); }
+.schritte li.fehler, .schritte li.fehler .zeichen { color: var(--rot); }
 .schritte li.fehler strong { color: var(--rot); }
 .schritte li.ok strong { color: var(--gruen); }
 
