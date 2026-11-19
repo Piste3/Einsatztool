@@ -31,6 +31,7 @@ function kopfDaten(titel: string): Roh {
 <meta name="color-scheme" content="light dark">
 <title>${titel}</title>
 <script src="/static/thema.js?v=${VERSION}"></script>
+<link rel="icon" type="image/png" href="/static/favicon.png?v=${VERSION}">
 <link rel="stylesheet" href="/static/style.css?v=${VERSION}">
 <script src="/static/app.js?v=${VERSION}" defer></script>`;
 }
@@ -53,8 +54,8 @@ ${kopfDaten(`${titel} · Einsatzplaner`)}
 </header>
 <nav id="leiste" class="leiste" aria-label="Hauptmenü">
   <a class="marke" href="/">
-    <span class="marke-zeichen" aria-hidden="true">EP</span>
-    <span class="marke-text">Einsatzplaner<small>Verkehrskadetten KKB</small></span>
+    <img class="marke-zeichen" src="/static/logo.png?v=${VERSION}" alt="" width="32" height="32">
+    <span class="marke-text">Einsatzplaner<small>Kadetten-Korps Basel</small></span>
   </a>
   <ul>
     ${link('start', aktiv, '/', 'Cockpit', 'cockpit', k.zaehler.unbestaetigt)}
@@ -113,7 +114,7 @@ ${kopfDaten(`${titel} · Einsatzplaner`)}
 </head>
 <body class="einfach">
 <main class="inhalt schmal">
-  <div class="marke einfach-marke"><span class="marke-zeichen" aria-hidden="true">EP</span><span class="marke-text">Einsatzplaner<small>Verkehrskadetten KKB</small></span></div>
+  <div class="marke einfach-marke"><img class="marke-zeichen" src="/static/logo.png?v=${VERSION}" alt="" width="32" height="32"><span class="marke-text">Einsatzplaner<small>Kadetten-Korps Basel</small></span></div>
   <div class="karte">${inhalt}</div>
 </main>
 </body>
