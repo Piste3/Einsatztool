@@ -53,6 +53,22 @@ const migrationen: { version: number; anweisungen: () => string[] }[] = [
     version: 4,
     anweisungen: () => ['ALTER TABLE schicht ADD COLUMN zeit_offen TINYINT NOT NULL DEFAULT 0'],
   },
+  // Version 5: Vorlagen, die ein Admin in den Einstellungen bearbeitet (z. B. «Änderung melden»).
+  // Ohne Zeile gilt die Standardvorlage aus dem Code.
+  {
+    version: 5,
+    anweisungen: () => [
+      `CREATE TABLE vorlage (
+        schluessel VARCHAR(50) NOT NULL PRIMARY KEY,
+        betreff TEXT NOT NULL,
+        text TEXT NOT NULL,
+        version INT NOT NULL DEFAULT 1,
+        geaendert_am VARCHAR(30) NOT NULL,
+        geaendert_von INT,
+        CONSTRAINT fk_vorlage_benutzer FOREIGN KEY (geaendert_von) REFERENCES benutzer(id)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin`,
+    ],
+  },
 ];
 
 export async function migriere(db: Db): Promise<number> {

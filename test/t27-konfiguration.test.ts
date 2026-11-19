@@ -7,7 +7,8 @@ import { join } from 'node:path';
 import { leseEnvDatei, leseKonfiguration } from '../src/config.js';
 import { aenderungMailText, aenderungMailto } from '../src/domain/personen.js';
 import { erstelleQuelle, formatiereWert, setzeInEnvText, zeilen as konfigZeilen } from '../src/domain/konfiguration.js';
-import { neueDatenbank, zeilen } from './hilfe.js';
+import { neueDatenbank, person, zeilen } from './hilfe.js';
+import { STANDARD_AENDERUNG, ladeVorlage } from '../src/domain/vorlagen.js';
 import { anmelden, starteApp } from './web-hilfe.js';
 
 test('T27a Schreiben behält Kommentare und Zeilenenden, Werte lesen sich gleich zurück', () => {
@@ -112,12 +113,65 @@ test('T27c Alter Name MAIL_ROMAN gilt weiter und erhält beim Speichern den neue
   assert.equal(setzeInEnvText('MAIL_ROMAN=alt@kkb.ch\n', { MAIL_INFORMATIK: 'neu@kkb.ch' }), 'MAIL_INFORMATIK=neu@kkb.ch\n');
 });
 
-test('T27d «Änderung melden»: allgemeine Vorlage an die Informatik', () => {
-  const m = aenderungMailText(42, 'Eva Müller');
+test('T27d «Änderung melden»: Standardvorlage an die Informatik', () => {
+  const m = aenderungMailText({ clubdesk_id: 42, vorname: 'Eva', nachname: 'Müller' }, 'Eva Müller');
   assert.equal(m.betreff, 'Änderung Personendaten: Eva Müller (Clubdesk-ID 42)');
   for (const teil of ['Clubdesk-ID: 42', 'Name: Eva Müller', 'Was ändern: ', 'Alt: ', 'Neu: ', 'Bemerkung: ']) assert.ok(m.text.includes(teil), teil);
-  assert.doesNotMatch(m.text, /Roman/);
-  const link = aenderungMailto('informatik@kkb.ch', 42, 'Eva Müller');
+  assert.doesNotMatch(m.text, /Roman|\{/);
+  assert.ok(m.text.includes('\r\n'));
+  const link = aenderungMailto('informatik@kkb.ch', m);
   assert.ok(link.startsWith('mailto:informatik@kkb.ch?subject='));
   assert.equal(decodeURIComponent(link.split('&body=')[1]), m.text);
+});
+
+test('T27e Admin bearbeitet die Vorlage in den Einstellungen: Version, Konflikt, Protokoll, Standard', async () => {
+  const t = await neueDatenbank();
+  const app = await starteApp(t.db, { MAIL_INFORMATIK: 'informatik@kkb.ch' });
+  try {
+    await person(t.db, 7, { vorname: 'Eva', nachname: 'Müller' });
+    const admin = await anmelden(t.db, 'admin');
+    const aufgebot = await anmelden(t.db, 'aufgebot');
+    const sende = (cookie: string, felder: Record<string, string>) => fetch(`${app.url}/admin/vorlage`, {
+      method: 'POST', redirect: 'manual',
+      headers: { cookie, 'content-type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams(felder),
+    });
+    assert.equal((await sende(aufgebot.cookie, { _csrf: aufgebot.csrf, betreff: 'x', text: 'y', version: '0' })).status, 403);
+
+    const seite = await (await fetch(`${app.url}/admin/einstellungen`, { headers: { cookie: admin.cookie } })).text();
+    assert.match(seite, /Vorlage «Änderung melden»/);
+    assert.match(seite, /\{clubdesk_id\}/);
+
+    const ok = await sende(admin.cookie, { _csrf: admin.csrf, version: '0', betreff: 'Bitte ändern: {name}', text: 'ID {clubdesk_id}\r\nRang: {rang}\r\n<b>Neu:</b>' });
+    assert.equal(ok.status, 303);
+    const v = await ladeVorlage(t.db);
+    assert.equal(v.version, 1);
+    assert.equal(v.text, 'ID {clubdesk_id}\nRang: {rang}\n<b>Neu:</b>');
+
+    // Die Personenseite nutzt die neue Vorlage.
+    const p = await (await fetch(`${app.url}/personen/7`, { headers: { cookie: admin.cookie } })).text();
+    assert.ok(p.includes(`subject=${encodeURIComponent('Bitte ändern: Eva Müller')}`.replace(/&/g, '&amp;')));
+    assert.ok(p.includes(encodeURIComponent('ID 7\r\nRang: \r\n<b>Neu:</b>')));
+
+    // Formular mit alter Version: Konflikt, nichts gespeichert, Eingabe bleibt stehen.
+    const konflikt = await sende(admin.cookie, { _csrf: admin.csrf, version: '0', betreff: 'Anders', text: 'Mein Text' });
+    assert.equal(konflikt.status, 409);
+    assert.match(await konflikt.text(), /Mein Text/);
+    assert.equal((await ladeVorlage(t.db)).betreff, 'Bitte ändern: {name}');
+
+    // Leerer Text: Fehler.
+    assert.equal((await sende(admin.cookie, { _csrf: admin.csrf, version: '1', betreff: 'x', text: '  ' })).status, 400);
+
+    // Standard wiederherstellen.
+    assert.equal((await sende(admin.cookie, { _csrf: admin.csrf, standard: '1' })).status, 303);
+    assert.equal((await ladeVorlage(t.db)).betreff, STANDARD_AENDERUNG.betreff);
+
+    const prot = await zeilen(t.db, "SELECT * FROM konfiguration_protokoll WHERE schluessel = 'Vorlage aenderung_melden' ORDER BY id");
+    assert.equal(prot.length, 2);
+    assert.equal(prot[0].benutzer_id, admin.benutzerId);
+    assert.match(prot[0].neu, /Bitte ändern/);
+  } finally {
+    await app.stopp();
+    await t.ende();
+  }
 });

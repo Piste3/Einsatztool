@@ -1,4 +1,5 @@
 // Personen lesen und suchen (14.4). Das Tool bearbeitet keine Personendaten (5.7.1).
+import { STANDARD_AENDERUNG, fuelleVorlage } from './vorlagen.js';
 import { alle, eine, type Db } from '../db/db.js';
 import { NichtGefunden } from './eingabe.js';
 import { alterAm, lokalesDatum } from './zeit.js';
@@ -115,34 +116,23 @@ export function idAusAuswahl(wert: unknown): number | null {
 }
 
 /**
- * «Änderung melden» (14.4): mailto-Link an die Informatik mit einer allgemeinen Vorlage.
- * Die Aufgebotsstelle trägt jede Änderung direkt in die Mail ein. Das Tool ändert keine Personendaten.
+ * «Änderung melden» (14.4): mailto-Link an die Informatik.
+ * Der Admin bearbeitet die Vorlage in den Einstellungen. Die Aufgebotsstelle trägt jede Änderung direkt in die Mail ein.
+ * Das Tool ändert keine Personendaten.
  */
-export function aenderungMailText(clubdeskId: number, name: string): { betreff: string; text: string } {
+export function aenderungMailText(
+  p: { clubdesk_id: number; vorname?: string | null; nachname?: string | null; rang_name?: string | null },
+  name: string,
+  vorlage: { betreff: string; text: string } = STANDARD_AENDERUNG,
+): { betreff: string; text: string } {
+  const werte = { clubdesk_id: p.clubdesk_id, name, vorname: p.vorname ?? '', nachname: p.nachname ?? '', rang: p.rang_name ?? '' };
   return {
-    betreff: `Änderung Personendaten: ${name} (Clubdesk-ID ${clubdeskId})`,
-    text: [
-      'Hallo Informatik',
-      '',
-      'Bitte ändert in Clubdesk folgende Angaben:',
-      '',
-      `Clubdesk-ID: ${clubdeskId}`,
-      `Name: ${name}`,
-      '',
-      'Was ändern: ',
-      'Alt: ',
-      'Neu: ',
-      '',
-      'Weitere Änderungen: ',
-      '',
-      'Bemerkung: ',
-      '',
-      'Danke',
-    ].join('\r\n'),
+    betreff: fuelleVorlage(vorlage.betreff, werte),
+    // Mailprogramme erwarten CRLF im mailto-Text.
+    text: fuelleVorlage(vorlage.text, werte).replace(/\r?\n/g, '\r\n'),
   };
 }
 
-export function aenderungMailto(an: string, clubdeskId: number, name: string): string {
-  const m = aenderungMailText(clubdeskId, name);
+export function aenderungMailto(an: string, m: { betreff: string; text: string }): string {
   return `mailto:${an}?subject=${encodeURIComponent(m.betreff)}&body=${encodeURIComponent(m.text)}`;
 }

@@ -2,7 +2,8 @@
 import type { Express } from 'express';
 import type { Abhaengigkeiten } from './app.js';
 import { nurAufgebot } from './app.js';
-import { aenderungMailto, alterHeute, ladePerson, personenListe, telefonText } from '../domain/personen.js';
+import { ladeVorlage } from '../domain/vorlagen.js';
+import { aenderungMailText, aenderungMailto, alterHeute, ladePerson, personenListe, telefonText } from '../domain/personen.js';
 import { personUebersicht, rueckmeldungen, type RueckmeldungOptionen } from '../domain/listen.js';
 import { anmeldungVonPerson, verlauf } from '../domain/anmeldung.js';
 import { ladeSchicht, schichtenVonEinsatz } from '../domain/schicht.js';
@@ -49,7 +50,9 @@ ${seitenKopf({ titel: 'Personen', angaben: [`${liste.length} Personen`, 'Die Dat
     const name = `${p.vorname ?? ''} ${p.nachname ?? ''}`.trim() || `Gelöschte Person ${p.clubdesk_id}`;
     const hier = aktuellerPfad(req);
     // Regel 14.4: mailto an die Informatik (MAIL_INFORMATIK) mit einer allgemeinen Vorlage.
-    const mailto = konfig.mailInformatik ? aenderungMailto(konfig.mailInformatik, p.clubdesk_id, name) : null;
+    const mailto = konfig.mailInformatik
+      ? aenderungMailto(konfig.mailInformatik, aenderungMailText(p, name, await ladeVorlage(db)))
+      : null;
     const gruppe = (titel: string, liste: typeof u.kommend) => liste.length
       ? html`<h3>${titel} (${liste.length})</h3><ul class="liste">${liste.map((e) => html`<li>
           <a href="/schichten/${e.schicht_id}">${e.einsatz}${e.einsatz === e.schicht ? '' : ` – ${e.schicht}`}</a> · ${zeitraum(e.start_zeit, e.end_zeit)} · ${statusText(e.status)}${e.rolle ? ` · ${e.rolle}` : ''}

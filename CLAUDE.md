@@ -70,7 +70,7 @@ Sprache mit Yann: Deutsch nach ASD-STE100. Aktiv, höchstens 25 Wörter pro Satz
 - Auch die Dankesseite des Formulars darf im iframe von Clubdesk erscheinen.
 - Cookie `Secure` nur, wenn `BASE_URL` mit `https://` beginnt.
 - Test-Login `DEV_LOGIN=1` nur für lokale Tests: nur ohne `ENTRA_TENANT_ID`, nur mit `NODE_ENV=development`. Der Server lauscht dann nur auf `127.0.0.1`. Nie auf dem Server setzen.
-- «Änderung melden» öffnet einen `mailto:`-Link an die Informatik (`MAIL_INFORMATIK`). Die Mail ist eine allgemeine Vorlage: Clubdesk-ID, Name und leere Zeilen «Was ändern», «Alt», «Neu», «Weitere Änderungen», «Bemerkung».
+- «Änderung melden» öffnet einen `mailto:`-Link an die Informatik (`MAIL_INFORMATIK`). Die Mail ist eine allgemeine Vorlage: Clubdesk-ID, Name und leere Zeilen «Was ändern», «Alt», «Neu», «Weitere Änderungen», «Bemerkung». Der Admin bearbeitet sie in Admin › Einstellungen.
 - Archiv-Zahl: Summe der Teilnehmenden über alle Schichten.
 - Kopieren: Die Vorgabe für den Namen erhöht die erste Jahreszahl um eins. Startdatum = derselbe Tag im nächsten Jahr.
 - Aufgebot für unbekannte bestätigte Einträge: Brief mit dem Hinweis «Adresse fehlt». Gelöschte Personen erhalten keinen Brief. Fehlt die Einsatzleitung, steht das in den Lücken (`W_EINSATZLEITUNG`).
@@ -115,7 +115,7 @@ Seit 19.11.2026 (Entscheid Yann): Aussehen und Bedienung folgen dem Handbuch des
 | Automatisches Aktualisieren von Clubdesk-Terminen | Es gibt keinen gemeinsamen Schlüssel zwischen Tool und Clubdesk. |
 | Status «nicht erreicht» | Eine Person ohne Status ist die Restmenge. Mehr Status verwirren die Nutzer. |
 | Weitere Status (Warteliste, Rückfrage, ungültig) | Entscheid Yann. Gleiche Begründung wie oben. |
-| Oberfläche zum Bearbeiten der Vorlagen (Aufgebot, Mail, Kalender) | Version 1. Änderungen am Text laufen über einen Commit. |
+| Oberfläche zum Bearbeiten der Vorlagen (Aufgebot, Bestätigungsmail, Kalender) | Version 1. Änderungen am Text laufen über einen Commit. Ausnahme: die Vorlage «Änderung melden» (siehe Abschnitt 5). |
 | Getrennte Publikationsschalter für Einsatz und Schicht | Ein Schalter je Schicht genügt. Der Einsatz ist sichtbar, wenn eine Schicht sichtbar ist. |
 | Automatische Zuteilung von Personen zu Schichten | Die Aufgebotsstelle teilt von Hand zu. |
 | Erfassung von Telefonkanälen und Erreichbarkeitszeiten | Nicht nötig. Der Kanal je Anmeldung genügt. |
@@ -197,3 +197,4 @@ Diese Liste ergänze ich beim Bauen. Jede Annahme aus Teil B des Konzepts steht 
 - 19.11.2026: Unterschied zum Handbuch: Soll ist ein eigenes Feld und nicht die Summe der Rollen. Rollen kommen aus Admin › Einstellungen, nicht fest EL/SC/BF/TN. Reiter «Anfragen» und «Formular» gibt es nicht (keine Funktion dafür).
 - 19.11.2026 (Wunsch Yann): Neuer Einsatz: nur Name und Startdatum sind Pflicht (Entscheid Yann: Name bleibt Pflicht). Enddatum leer = gleicher Tag. Ohne Enddatum und mit Ende vor Beginn = Folgetag. Formular in zwei Spalten: links die Daten, rechts die Zeiten.
 - 19.11.2026: Zeiten leer = «Zeit offen». Spalte `schicht.zeit_offen` (Migration 4). Das Tool speichert 00:00 bzw. 23:59 und zeigt «Zeit offen». «Zu tun» meldet die fehlenden Zeiten. Speichern mit Zeiten (Formular der Schicht oder Tabelle) setzt `zeit_offen = 0`. Test T35.
+- 19.11.2026: Der Admin bearbeitet die Vorlage «Änderung melden» in Admin › Einstellungen (Wunsch Yann). Tabelle `vorlage` (Migration 5), Spalte `version` mit Konfliktschutz, Protokoll in `konfiguration_protokoll`. Platzhalter `{clubdesk_id}`, `{name}`, `{vorname}`, `{nachname}`, `{rang}`. Ohne Zeile gilt die Standardvorlage. Text höchstens 1500 Zeichen (Länge des `mailto:`-Links).

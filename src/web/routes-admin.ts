@@ -11,7 +11,8 @@ import {
   benenneRangUm, benutzerListe, legeRangAn, legeRolleAn, loescheRang, loescheRolle, raenge, rollen, setzeBenutzerAktiv, setzeRolleZaehlt,
   verschiebeRang, verschiebeRolle,
 } from '../domain/stammdaten.js';
-import { Eingabefehler, id as leseId, liste } from '../domain/eingabe.js';
+import { Eingabefehler, Konflikt, id as leseId, liste } from '../domain/eingabe.js';
+import { MAX_BETREFF, MAX_TEXT, PLATZHALTER, ladeVorlage, speichereVorlage } from '../domain/vorlagen.js';
 import { feedStand } from '../domain/ical-abgleich.js';
 import { letzterLauf } from '../jobs/taeglich.js';
 import { html, Roh } from './html.js';
@@ -211,10 +212,11 @@ ${liste.map((b) => html`<tr><td>${b.name}</td><td>${b.email}</td><td>${b.rolle =
   });
 
   // ---------- Einstellungen: Ränge und Rollen ----------
-  const einstellungen = async (_req: Request, res: Response) => {
+  const zeigeEinstellungen = async (res: Response, vz: { betreff?: string; text?: string; version?: number; fehler?: string } = {}) => {
     const kx = k(res);
     const r = await raenge(db);
     const ro = await rollen(db);
+    const vo = await ladeVorlage(db);
     const z = '/admin/einstellungen';
     res.send(seite(kx, 'Einstellungen', 'einstellungen', html`
 ${seitenKopf({ titel: 'Einstellungen' })}
@@ -248,11 +250,44 @@ ${seitenKopf({ titel: 'Einstellungen' })}
     </td></tr>`)}
   </tbody></table></div>
   <form method="post" action="/admin/rollen" class="zeilen-form">${formFelder(kx, z)}<input type="hidden" name="aktion" value="anlegen"><input name="name" required maxlength="100" placeholder="Neue Rolle" aria-label="Neue Rolle"><label class="haken"><input type="checkbox" name="zaehlt" value="1" checked> zählt als Teilnehmer</label><button class="knopf" type="submit">Rolle anlegen</button></form>
+</section>
+<section class="abschnitt" id="vorlage">
+  <h2>Vorlage «Änderung melden»</h2>
+  <p class="unter">Der Knopf «Änderung melden» auf der Personenseite öffnet eine Mail an die Informatik mit diesem Text. ${vo.version === 0 ? 'Zurzeit gilt die Standardvorlage.' : ''}</p>
+  ${vz.fehler ? html`<div class="meldung fehler" role="alert">${vz.fehler}</div>` : ''}
+  <form method="post" action="/admin/vorlage" class="stapel">
+    ${formFelder(kx, `${z}#vorlage`)}
+    <input type="hidden" name="version" value="${vz.version ?? vo.version}">
+    <div class="feld breit"><label for="vorlage_betreff">Betreff</label><input id="vorlage_betreff" name="betreff" required maxlength="${MAX_BETREFF}" value="${vz.betreff ?? vo.betreff}"></div>
+    <div class="feld breit"><label for="vorlage_text">Text</label><textarea id="vorlage_text" name="text" rows="16" required maxlength="${MAX_TEXT}">${vz.text ?? vo.text}</textarea>
+      <small>Platzhalter: ${Object.entries(PLATZHALTER).map(([p, t], i) => html`${i ? ', ' : ''}<code>${p}</code> = ${t}`)}. Das Tool setzt die Werte der Person ein.</small></div>
+    <div class="knopfreihe"><button type="submit" class="knopf haupt">Vorlage speichern</button></div>
+  </form>
+  ${vo.version > 0 ? knopfPost(kx, '/admin/vorlage', 'Standardvorlage wiederherstellen', { standard: '1' }, 'knopf klein', `${z}#vorlage`) : ''}
 </section>`));
   };
+  const einstellungen = async (_req: Request, res: Response) => zeigeEinstellungen(res);
   app.get('/admin/einstellungen', nurAdmin, einstellungen);
   app.get('/admin/raenge', nurAdmin, einstellungen);
   app.get('/admin/rollen', nurAdmin, einstellungen);
+
+  app.post('/admin/vorlage', nurAdmin, async (req, res) => {
+    const b = req.body ?? {};
+    try {
+      const geaendert = await speichereVorlage(db, { betreff: b.betreff, text: b.text, version: b.version, standard: b.standard === '1' }, k(res).benutzer!.id);
+      zurueck(req, res, '/admin/einstellungen#vorlage', geaendert ? (b.standard === '1' ? 'Standardvorlage wiederhergestellt.' : 'Vorlage gespeichert.') : 'Keine Änderung.');
+    } catch (e) {
+      if (!(e instanceof Eingabefehler)) throw e;
+      // Die Eingaben bleiben stehen. Nach einem Konflikt überschreibt ein zweites Speichern bewusst.
+      res.status(e instanceof Konflikt ? 409 : 400);
+      await zeigeEinstellungen(res, {
+        betreff: typeof b.betreff === 'string' ? b.betreff : undefined,
+        text: typeof b.text === 'string' ? b.text : undefined,
+        version: e instanceof Konflikt ? e.aktuelleVersion : undefined,
+        fehler: e.message,
+      });
+    }
+  });
 
   app.post('/admin/raenge', nurAdmin, async (req, res) => {
     const b = req.body ?? {};
