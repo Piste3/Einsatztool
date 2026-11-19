@@ -121,3 +121,43 @@ export function punktMarke(text: string, farbe: 'orange' | 'blau' | 'rot' | 'gru
 export function publiziertMarke(publiziert: boolean): Roh {
   return publiziert ? punktMarke('Publiziert', 'gruen') : punktMarke('Nicht publiziert', 'grau');
 }
+
+// ---------- Kacheln für die Seite «Rückmeldungen» ----------
+
+const KACHEL_SVG: Record<Status | 'gleich' | 'moeglich', string> = {
+  angemeldet: '<path d="M6 12.5l4 4 8-9"/>',
+  bestaetigt: '<path d="M6 12.5l4 4 8-9"/>',
+  abgemeldet: '<path d="M7 7l10 10M17 7L7 17"/>',
+  nachricht_gesendet: '<path d="M5 18.5l1.2-3.6A7 7 0 1 1 9 18z"/>',
+  unsicher: '<path d="M8.5 8.8a3.5 3.5 0 1 1 4.9 3.2c-.8.4-1.4 1.1-1.4 2v.6M12 18.5h.01"/>',
+  gleich: '<path d="M8 12h8"/>',
+  moeglich: '<circle cx="12" cy="12" r="3.6"/>',
+};
+
+export type KachelArt = Status | 'gleich' | 'moeglich' | null;
+
+/** Text zu einer Kachel, für Legende und Tooltip. */
+export const KACHEL_TEXT: Record<Status | 'gleich' | 'moeglich' | 'offen', string> = {
+  angemeldet: 'An',
+  bestaetigt: 'Bestätigt',
+  abgemeldet: 'Ab',
+  nachricht_gesendet: 'Nachricht gesendet',
+  unsicher: 'Unsicher',
+  offen: 'Offen',
+  gleich: 'Andere Schicht, gleiche Zeit',
+  moeglich: 'Andere Schicht, zeitlich möglich',
+};
+
+/** Quadratische Kachel mit Symbol. Ohne Art: leere, gestrichelte Kachel («Offen»). */
+export function kachel(art: KachelArt): Roh {
+  if (!art) return new Roh('<span class="kachel k-offen" aria-hidden="true"></span>');
+  return new Roh(
+    `<span class="kachel k-${art}" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" focusable="false">${KACHEL_SVG[art]}</svg></span>`,
+  );
+}
+
+/** Legende der Kacheln. Nur bestehende Status, dazu Offen und die zwei Hinweise zu anderen Schichten. */
+export function kachelLegende(): Roh {
+  const arten: (Status | 'gleich' | 'moeglich' | 'offen')[] = ['angemeldet', 'bestaetigt', 'abgemeldet', 'nachricht_gesendet', 'unsicher', 'offen', 'gleich', 'moeglich'];
+  return html`<p class="legende kachel-legende"><strong>Legende</strong>${arten.map((a) => html`<span>${kachel(a === 'offen' ? null : a)} ${KACHEL_TEXT[a]}</span>`)}</p>`;
+}
