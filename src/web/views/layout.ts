@@ -87,11 +87,24 @@ ${kopfDaten(`${titel} · Einsatzplaner`)}
   </div>
 </nav>
 <main class="inhalt${extra.breit ? ' breit' : ''}">
-  ${k.meldung ? html`<div class="meldung ${k.meldung.art}" role="status" data-verschwinden="${k.meldung.art === 'ok' ? '1' : ''}">${k.meldung.text}</div>` : ''}
+  ${k.meldung ? toast(k.meldung.art, k.meldung.text) : ''}
   ${inhalt}
 </main>
 </body>
 </html>`}`;
+}
+
+/**
+ * Kurze Meldung nach einer Aktion («Gespeichert»). Sie erscheint unten rechts über dem Inhalt
+ * und verschiebt nichts. Das Skript sammelt sie in einem Stapel und blendet sie aus:
+ * ok nach 3 Sekunden, Hinweis nach 6 Sekunden. Ein Fehler bleibt, bis man ihn schliesst.
+ */
+export function toast(art: 'ok' | 'fehler' | 'hinweis', text: string): Roh {
+  const zeichen = art === 'ok' ? '✓' : art === 'fehler' ? '!' : 'i';
+  return html`<div class="toast ${art}" role="${art === 'fehler' ? 'alert' : 'status'}" data-toast="${art}">
+    <span class="toast-zeichen" aria-hidden="true">${zeichen}</span><span class="toast-text">${text}</span>
+    <button type="button" class="toast-zu" data-toast-zu aria-label="Meldung schliessen">×</button>
+  </div>`;
 }
 
 /** Druckansicht ohne Seitenleiste. */

@@ -179,3 +179,4 @@ Diese Liste ergänze ich beim Bauen. Jede Annahme aus Teil B des Konzepts steht 
 - 19.11.2026: Neue Datenbank-Werte prüft das Tool vor dem Speichern. Ohne Verbindung speichert es nur mit «Trotzdem speichern» (Warnen statt verbieten).
 - 19.11.2026: Konfliktschutz über eine Prüfsumme der Datei. Ein Formular mit altem Stand speichert nichts.
 - 19.11.2026: `MAIL_ROMAN` heisst neu `MAIL_INFORMATIK` (Wunsch Yann: Die Adresse gehört der Informatik, nicht einer Person). Der alte Name gilt beim Lesen weiter. Beim Speichern über Admin › Konfiguration erhält die Zeile den neuen Namen.
+- 19.11.2026: Meldungen nach einer Aktion («Gespeichert», Fehler) erscheinen als Toast unten rechts (`toast()` in `layout.ts`). Sie verschieben das Layout nicht. ok verschwindet nach 3 s, Hinweis nach 6 s, Fehler bleibt bis «×». Fehler bei der Eingabe in einem Formular bleiben direkt beim Formular.

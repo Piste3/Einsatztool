@@ -115,15 +115,50 @@
     });
   }, true);
 
-  // Meldungen wie «Gespeichert» verschwinden nach einigen Sekunden.
-  var meldungenAusblenden = function (wurzel) {
-    wurzel.querySelectorAll('.meldung[data-verschwinden="1"]').forEach(function (m) {
-      setTimeout(function () {
-        m.classList.add('weg');
-        setTimeout(function () { m.remove(); }, 600);
-      }, 4000);
-    });
+  // Meldungen («Gespeichert»): kleine Toasts unten rechts. Sie verschieben das Layout nicht.
+  // ok verschwindet nach 3 s, ein Hinweis nach 6 s. Ein Fehler bleibt, bis man ihn schliesst.
+  // Fährt die Maus über einen Toast, wartet er.
+  var DAUER = { ok: 3000, hinweis: 6000 };
+  var stapel = null;
+  var toastWeg = function (t) {
+    if (!t || t.classList.contains('weg')) return;
+    t.classList.add('weg');
+    setTimeout(function () { t.remove(); }, 250);
   };
+  var toastStarten = function (t) {
+    var dauer = DAUER[t.getAttribute('data-toast')];
+    if (!dauer) return;
+    var uhr = null;
+    var los = function () { uhr = setTimeout(function () { toastWeg(t); }, dauer); };
+    t.addEventListener('mouseenter', function () { clearTimeout(uhr); });
+    t.addEventListener('mouseleave', los);
+    los();
+  };
+  var meldungenAusblenden = function (wurzel) {
+    var toasts = wurzel.querySelectorAll('.toast[data-toast]');
+    if (!toasts.length) return;
+    if (!stapel || !document.body.contains(stapel)) {
+      stapel = document.createElement('div');
+      stapel.className = 'toast-stapel';
+      stapel.setAttribute('aria-live', 'polite');
+      document.body.appendChild(stapel);
+    }
+    Array.prototype.forEach.call(toasts, function (t) {
+      if (t.parentNode === stapel) return;
+      // Dieselbe Meldung nur einmal zeigen.
+      var text = t.textContent.trim();
+      Array.prototype.forEach.call(stapel.children, function (alt) {
+        if (alt.textContent.trim() === text) toastWeg(alt);
+      });
+      stapel.appendChild(t);
+      toastStarten(t);
+    });
+    while (stapel.children.length > 4) stapel.removeChild(stapel.firstChild);
+  };
+  document.addEventListener('click', function (ev) {
+    var zu = ev.target && ev.target.closest ? ev.target.closest('[data-toast-zu]') : null;
+    if (zu) toastWeg(zu.closest('.toast'));
+  });
   meldungenAusblenden(document);
 
   // Nach dem Speichern ohne Live-Aktualisierung bleibt die Seite an derselben Stelle.
@@ -280,13 +315,16 @@
   // ---------- Live: Formulare im Hintergrund senden ----------
 
   var meldeFehler = function (text) {
-    var m = main();
-    if (!m) return;
     var div = document.createElement('div');
-    div.className = 'meldung fehler';
+    div.className = 'toast fehler';
     div.setAttribute('role', 'alert');
-    div.textContent = text;
-    m.insertBefore(div, m.firstChild);
+    div.setAttribute('data-toast', 'fehler');
+    var z = document.createElement('span'); z.className = 'toast-zeichen'; z.setAttribute('aria-hidden', 'true'); z.textContent = '!';
+    var t = document.createElement('span'); t.className = 'toast-text'; t.textContent = text;
+    var k = document.createElement('button'); k.type = 'button'; k.className = 'toast-zu'; k.setAttribute('data-toast-zu', ''); k.setAttribute('aria-label', 'Meldung schliessen'); k.textContent = '×';
+    div.appendChild(z); div.appendChild(t); div.appendChild(k);
+    var w = document.createElement('div'); w.appendChild(div);
+    meldungenAusblenden(w);
   };
 
   document.addEventListener('submit', function (ev) {
