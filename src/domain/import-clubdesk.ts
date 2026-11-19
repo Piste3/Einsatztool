@@ -288,7 +288,7 @@ export async function loeschePersonendaten(c: Db, id: number, benutzerId: number
   ]);
   await schreibe(
     c,
-    "UPDATE status_log SET alt_wert = NULL, neu_wert = NULL WHERE anmeldung_id IN (?) AND aktion IN ('bemerkung','zugeordnet')",
+    "UPDATE status_log SET alt_wert = NULL, neu_wert = NULL WHERE anmeldung_id IN (?) AND aktion IN ('bemerkung','zugeordnet','zuordnung_aufgehoben')",
     [ids],
   );
   for (const aid of ids) await schreibeLog(c, aid, benutzerId, 'personendaten_geloescht', null, null, zeit);

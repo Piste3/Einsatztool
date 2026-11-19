@@ -47,6 +47,8 @@ const AKTION_TEXT: Record<string, string> = {
   kanal: 'Kanal',
   bemerkung: 'Bemerkung',
   zugeordnet: 'Zugeordnet',
+  zuordnung_aufgehoben: 'Zuordnung rückgängig',
+  wiederhergestellt: 'Eintrag wiederhergestellt',
   bestaetigungsmail: 'Bestätigungsmail',
   mail_ohne_adresse: 'Keine Mail-Adresse',
   personendaten_geloescht: 'Personendaten gelöscht',
@@ -54,7 +56,7 @@ const AKTION_TEXT: Record<string, string> = {
 
 function wertText(aktion: string, w: string | null): string {
   if (w === null) return '–';
-  if ((aktion === 'status' || aktion === 'erstellt') && w in STATUS_TEXT) return STATUS_TEXT[w as Status];
+  if ((aktion === 'status' || aktion === 'erstellt' || aktion === 'wiederhergestellt') && w in STATUS_TEXT) return STATUS_TEXT[w as Status];
   if (aktion === 'kanal' && w in KANAL_TEXT) return KANAL_TEXT[w as Kanal];
   return w;
 }
@@ -67,7 +69,7 @@ export function verlaufListe(eintraege: { zeit: string; aktion: string; alt_wert
 /** Aktion und Werte eines Eintrags im Statusprotokoll, z. B. «Status angemeldet → bestätigt». */
 export function logText(l: { aktion: string; alt_wert: string | null; neu_wert: string | null }): Roh {
   return html`<strong>${AKTION_TEXT[l.aktion] ?? l.aktion}</strong>${
-    l.aktion === 'erstellt' || l.aktion === 'bestaetigungsmail' || l.aktion === 'mail_ohne_adresse' || l.aktion === 'personendaten_geloescht'
+    l.aktion === 'erstellt' || l.aktion === 'wiederhergestellt' || l.aktion === 'bestaetigungsmail' || l.aktion === 'mail_ohne_adresse' || l.aktion === 'personendaten_geloescht'
       ? html` ${wertText(l.aktion, l.neu_wert)}`
       : html` ${wertText(l.aktion, l.alt_wert)} → ${wertText(l.aktion, l.neu_wert)}`
   }`;
