@@ -1,6 +1,6 @@
 // Schichten: hinzufügen, ändern, publizieren, löschen, Fremdabteilungen (13.2, 13.4, 5.10).
 import { alle, eine, schreibe, transaktion, type Db } from '../db/db.js';
-import { Eingabefehler, NichtGefunden, ganzzahl, pflichtText, text } from './eingabe.js';
+import { Eingabefehler, NichtGefunden, ganzzahl, pflichtText, pruefeVersion, text } from './eingabe.js';
 import { zeitpunkt, ladeEinsatz } from './einsatz.js';
 import { jetztIso } from './zeit.js';
 
@@ -21,6 +21,8 @@ export interface Schicht {
   bemerkung_extern: string | null;
   publiziert: number;
   position: number;
+  /** Zählt jede Änderung im Formular «Schicht bearbeiten». */
+  version: number;
 }
 
 export interface SchichtMitEinsatz extends Schicht {
@@ -69,6 +71,8 @@ export interface SchichtEingabe {
   bemerkung_extern?: unknown;
   /** Rollenbedarf: Name der Rolle → Anzahl (leer oder 0 = kein Bedarf). */
   rollen?: Record<string, unknown>;
+  /** Version, die das Formular angezeigt hat. Leer = keine Prüfung. */
+  version?: unknown;
 }
 
 async function pruefeRang(db: Db, wert: unknown): Promise<number | null> {
@@ -127,11 +131,19 @@ export async function aendereSchicht(db: Db, id: number, e: SchichtEingabe): Pro
   const ende = zeitpunkt(e.end_datum, e.end_zeit, 'Ende');
   if (ende <= start) throw new Eingabefehler('Das Ende muss nach dem Start liegen.');
   await transaktion(db, async (c) => {
+    const alt = await eine<{ version: number }>(c, 'SELECT version FROM schicht WHERE id = ? FOR UPDATE', [id]);
+    if (!alt) throw new NichtGefunden('Schicht nicht gefunden.');
+    pruefeVersion(
+      e.version,
+      alt.version,
+      'Ein anderer Benutzer hat diese Schicht inzwischen geändert. Das Tool hat nichts gespeichert. Deine Eingaben stehen unten. Prüfe die aktuellen Werte in einem neuen Tab. Speichere dann erneut, wenn deine Werte gelten sollen.',
+    );
     const minRang = await pruefeRang(c, e.min_rang_id);
     const r = await schreibe(
       c,
       `UPDATE schicht SET name = ?, start_zeit = ?, end_zeit = ?, ort = ?, abtreten_ort = ?, tenue = ?,
-         aufgebot_hinweis = ?, min_alter = ?, min_rang_id = ?, soll_anzahl = ?, bemerkung_intern = ?, bemerkung_extern = ?
+         aufgebot_hinweis = ?, min_alter = ?, min_rang_id = ?, soll_anzahl = ?, bemerkung_intern = ?, bemerkung_extern = ?,
+         version = version + 1
        WHERE id = ?`,
       [
         name, start, ende, text(e.ort, 'Ort Antreten'), text(e.abtreten_ort, 'Ort Abtreten'), text(e.tenue, 'Tenue'),

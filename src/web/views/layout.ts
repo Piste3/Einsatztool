@@ -11,7 +11,13 @@ function link(k: Kontext, bereich: Bereich, aktiv: Bereich | null, href: string,
     <span>${text}</span>${zaehler ? html`<span class="zaehler" title="offen">${zaehler}</span>` : ''}</a></li>`;
 }
 
-export function seite(k: Kontext, titel: string, aktiv: Bereich | null, inhalt: Roh, extra: { breit?: boolean } = {}): string {
+/** Datenstand der Seite. Das Skript fragt url regelmässig ab und meldet eine Änderung. */
+export interface SeitenStand {
+  url: string;
+  wert: string;
+}
+
+export function seite(k: Kontext, titel: string, aktiv: Bereich | null, inhalt: Roh, extra: { breit?: boolean; stand?: SeitenStand } = {}): string {
   const b = k.benutzer!;
   const istAdmin = b.rolle === 'admin';
   return `<!doctype html>${html`<html lang="de">
@@ -55,6 +61,10 @@ export function seite(k: Kontext, titel: string, aktiv: Bereich | null, inhalt: 
   </div>
 </nav>
 <main class="inhalt${extra.breit ? ' breit' : ''}">
+  ${extra.stand ? html`<div class="meldung hinweis datenstand" role="status" hidden data-stand-url="${extra.stand.url}" data-stand="${extra.stand.wert}">
+    <span>Ein anderer Benutzer hat Daten auf dieser Seite geändert. Lade die Seite neu, um den neuen Stand zu sehen.</span>
+    <button type="button" class="knopf haupt klein" data-neu-laden>Neu laden</button>
+  </div>` : ''}
   ${k.meldung ? html`<div class="meldung ${k.meldung.art}" role="status" data-verschwinden="${k.meldung.art === 'ok' ? '1' : ''}">${k.meldung.text}</div>` : ''}
   ${inhalt}
 </main>

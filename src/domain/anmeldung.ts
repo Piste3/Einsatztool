@@ -1,9 +1,9 @@
 // Anmeldungen: Status, Rolle, Kanal, Bemerkung, Statusprotokoll (13.5, 5.6, 14.6).
 // Jede Änderung schreibt in derselben Transaktion einen Eintrag in status_log.
 import type { PoolConnection } from 'mysql2/promise';
-import { alle, eine, schreibe, transaktion, type Db } from '../db/db.js';
-import { Eingabefehler, NichtGefunden, STATUS, KANAELE, auswahl, text, type Kanal, type Status } from './eingabe.js';
-import { jetztIso } from './zeit.js';
+import { alle, eine, schreibe, transaktion, Wiederholen, type Db } from '../db/db.js';
+import { Eingabefehler, NichtGefunden, STATUS, KANAELE, auswahl, pruefeVersion, text, type Kanal, type Status } from './eingabe.js';
+import { jetztIso, lokalesDatum, lokaleZeit } from './zeit.js';
 
 export interface Anmeldung {
   id: number;
@@ -18,6 +18,8 @@ export interface Anmeldung {
   erstellt_am: string;
   geaendert_am: string;
   mail_gesendet_am: string | null;
+  /** Zählt jede Änderung. Schutz gegen gegenseitiges Überschreiben. */
+  version: number;
 }
 
 export async function schreibeLog(
@@ -57,6 +59,8 @@ export interface Aenderung {
   rolle?: unknown;
   kanal?: unknown;
   bemerkung?: unknown;
+  /** Version, die das Formular angezeigt hat. Leer = keine Prüfung. */
+  version?: unknown;
 }
 
 /**
@@ -86,7 +90,7 @@ async function aendereFelder(c: PoolConnection, alt: Anmeldung, a: Aenderung, be
   const wirdBestaetigt = neu.status === 'bestaetigt' && alt.status !== 'bestaetigt';
   await schreibe(
     c,
-    `UPDATE anmeldung SET status = ?, rolle = ?, kanal = ?, bemerkung = ?, geaendert_am = ?,
+    `UPDATE anmeldung SET status = ?, rolle = ?, kanal = ?, bemerkung = ?, geaendert_am = ?, version = version + 1,
        mail_gesendet_am = ${wirdBestaetigt ? 'NULL' : 'mail_gesendet_am'} WHERE id = ?`,
     [
       status,
@@ -104,10 +108,33 @@ async function aendereFelder(c: PoolConnection, alt: Anmeldung, a: Aenderung, be
 export async function aendereAnmeldung(db: Db, id: number, a: Aenderung, benutzerId: number | null): Promise<Anmeldung> {
   return transaktion(db, async (c) => {
     const alt = await eine<Anmeldung>(c, 'SELECT * FROM anmeldung WHERE id = ? FOR UPDATE', [id]);
-    if (!alt) throw new NichtGefunden('Eintrag nicht gefunden.');
+    if (!alt) throw new NichtGefunden('Eintrag nicht gefunden. Ein anderer Benutzer hat ihn vielleicht entfernt.');
+    pruefeVersion(a.version, alt.version, await konfliktText(c, alt));
     await aendereFelder(c, alt, a, benutzerId);
     return (await eine<Anmeldung>(c, 'SELECT * FROM anmeldung WHERE id = ?', [id]))!;
   });
+}
+
+/** Meldung bei einem Konflikt: wer den Eintrag zuletzt geändert hat und wann. */
+async function konfliktText(c: Db, a: Anmeldung): Promise<string> {
+  const letzte = await eine<{ zeit: string; benutzer: string | null }>(
+    c,
+    `SELECT l.zeit, b.name AS benutzer FROM status_log l LEFT JOIN benutzer b ON b.id = l.benutzer_id
+      WHERE l.anmeldung_id = ? ORDER BY l.zeit DESC, l.id DESC LIMIT 1`,
+    [a.id],
+  );
+  const wer = letzte ? `${letzte.benutzer ?? 'Das Formular'} hat ihn am ${lokalesDatum(letzte.zeit).split('-').reverse().join('.')} um ${lokaleZeit(letzte.zeit)} geändert. ` : '';
+  return `Der Eintrag von ${a.name_text} hat sich inzwischen geändert. ${wer}Das Tool hat deine Änderung nicht gespeichert. Prüfe die neuen Werte und speichere erneut.`;
+}
+
+/** Fügt einen Eintrag ein. Legt ein anderer Benutzer gleichzeitig denselben Eintrag an, startet die Transaktion neu. */
+export async function fuegeEin(c: Db, sql: string, werte: unknown[]) {
+  try {
+    return await schreibe(c, sql, werte);
+  } catch (fehler) {
+    if ((fehler as { code?: string }).code === 'ER_DUP_ENTRY') throw new Wiederholen('Eintrag gleichzeitig angelegt.');
+    throw fehler;
+  }
 }
 
 export interface NeueAnmeldung {
@@ -148,7 +175,7 @@ export async function setzeAnmeldung(db: Db, n: NeueAnmeldung, benutzerId: numbe
     const rolle = await pruefeRolle(c, text(n.rolle, 'Rolle', 100));
     const bemerkung = text(n.bemerkung, 'Bemerkung', 5000);
     const zeit = jetztIso();
-    const r = await schreibe(
+    const r = await fuegeEin(
       c,
       `INSERT INTO anmeldung (schicht_id, person_id, name_text, status, rolle, kanal, bemerkung, erstellt_am, geaendert_am)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -197,7 +224,7 @@ export async function bestaetigeAlle(db: Db, schichtIds: number[], benutzerId: n
 export async function loescheAnmeldung(db: Db, id: number): Promise<number> {
   return transaktion(db, async (c) => {
     const a = await eine<Anmeldung>(c, 'SELECT * FROM anmeldung WHERE id = ?', [id]);
-    if (!a) throw new NichtGefunden('Eintrag nicht gefunden.');
+    if (!a) throw new NichtGefunden('Eintrag nicht gefunden. Ein anderer Benutzer hat ihn vielleicht schon entfernt.');
     await schreibe(c, 'DELETE FROM anmeldung WHERE id = ?', [id]);
     return a.schicht_id;
   });
@@ -226,7 +253,7 @@ export async function ordneZu(db: Db, anmeldungId: number, personId: number, ben
     if (doppelt) return { ok: false, bestehendeId: doppelt.id };
     const name = personenName(p);
     const zeit = jetztIso();
-    await schreibe(c, 'UPDATE anmeldung SET person_id = ?, name_text = ?, email_text = NULL, geaendert_am = ? WHERE id = ?', [
+    await schreibe(c, 'UPDATE anmeldung SET person_id = ?, name_text = ?, email_text = NULL, geaendert_am = ?, version = version + 1 WHERE id = ?', [
       personId, name, zeit, anmeldungId,
     ]);
     const vorher = a.email_text ? `${a.name_text} <${a.email_text}>` : a.name_text;

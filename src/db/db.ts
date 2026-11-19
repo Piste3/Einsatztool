@@ -20,7 +20,8 @@ export function erstellePool(e: DbEinstellungen): Pool {
     user: e.user,
     password: e.password,
     charset: 'utf8mb4_bin',
-    connectionLimit: 10,
+    // Bis rund 8 Benutzer arbeiten gleichzeitig. Dazu kommen Formular, Mail-Versand und Jobs.
+    connectionLimit: 20,
     multipleStatements: false,
     dateStrings: true,
     supportBigNumbers: true,
@@ -31,6 +32,26 @@ export function erstellePool(e: DbEinstellungen): Pool {
 }
 
 const inTransaktion = new WeakSet<object>();
+
+/**
+ * Fehler, nach dem eine Transaktion neu starten darf.
+ * Beispiel: Zwei Benutzer legen gleichzeitig denselben Eintrag an.
+ */
+export class Wiederholen extends Error {}
+
+/** MySQL-Fehler bei gleichzeitigen Zugriffen: Deadlock oder Wartezeit auf eine Sperre. */
+const SPERR_FEHLER = new Set(['ER_LOCK_DEADLOCK', 'ER_LOCK_WAIT_TIMEOUT']);
+
+/** So oft startet eine Transaktion höchstens, wenn sich zwei Benutzer gegenseitig blockieren. */
+export const MAX_VERSUCHE = 4;
+
+function darfWiederholen(fehler: unknown): boolean {
+  if (fehler instanceof Wiederholen) return true;
+  const code = (fehler as { code?: unknown })?.code;
+  return typeof code === 'string' && SPERR_FEHLER.has(code);
+}
+
+const warte = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /** Liefert alle Zeilen einer Abfrage. */
 export async function alle<T = Record<string, any>>(db: Db, sql: string, werte: unknown[] = []): Promise<T[]> {
@@ -56,6 +77,19 @@ export async function schreibe(db: Db, sql: string, werte: unknown[] = []): Prom
  */
 export async function transaktion<T>(db: Db, fn: (c: PoolConnection) => Promise<T>): Promise<T> {
   if (inTransaktion.has(db)) return fn(db as PoolConnection);
+  // Mehrere Benutzer arbeiten gleichzeitig. Blockieren sich zwei Transaktionen,
+  // bricht MySQL eine davon ab. Das Tool startet sie dann nach einer kurzen Pause neu.
+  for (let versuch = 1; ; versuch++) {
+    try {
+      return await einmal(db, fn);
+    } catch (fehler) {
+      if (versuch >= MAX_VERSUCHE || !darfWiederholen(fehler)) throw fehler;
+      await warte(20 * versuch + Math.floor(Math.random() * 30));
+    }
+  }
+}
+
+async function einmal<T>(db: Db, fn: (c: PoolConnection) => Promise<T>): Promise<T> {
   const istVerbindung = typeof (db as PoolConnection).release === 'function';
   const c = istVerbindung ? (db as PoolConnection) : await (db as Pool).getConnection();
   inTransaktion.add(c);

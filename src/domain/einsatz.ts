@@ -1,6 +1,6 @@
 // Einsätze: erstellen, ändern mit Vererbung, kopieren, löschen, Archiv (13.1, 13.3, 13.9, 21).
 import { alle, eine, schreibe, transaktion, type Db } from '../db/db.js';
-import { Eingabefehler, NichtGefunden, pflichtText, text } from './eingabe.js';
+import { Eingabefehler, NichtGefunden, pflichtText, pruefeVersion, text } from './eingabe.js';
 import {
   istDatum,
   istZeit,
@@ -24,6 +24,8 @@ export interface Einsatz {
   abtreten_ort: string | null;
   tenue: string | null;
   aufgebot_hinweis: string | null;
+  /** Zählt jede Änderung. Schutz gegen gegenseitiges Überschreiben. */
+  version: number;
 }
 
 /** Liest Start oder Ende aus Datum und Zeit (lokal) und gibt UTC zurück. */
@@ -88,6 +90,8 @@ export interface EinsatzAenderung {
   abtreten_ort?: unknown;
   tenue?: unknown;
   aufgebot_hinweis?: unknown;
+  /** Version, die das Formular angezeigt hat. Leer = keine Prüfung. */
+  version?: unknown;
 }
 
 /**
@@ -107,17 +111,23 @@ export async function aendereEinsatz(db: Db, id: number, a: EinsatzAenderung): P
   await transaktion(db, async (c) => {
     const alt = await eine<Einsatz>(c, 'SELECT * FROM einsatz WHERE id = ? FOR UPDATE', [id]);
     if (!alt) throw new NichtGefunden('Einsatz nicht gefunden.');
+    pruefeVersion(
+      a.version,
+      alt.version,
+      'Ein anderer Benutzer hat diesen Einsatz inzwischen geändert. Das Tool hat nichts gespeichert. Deine Eingaben stehen unten. Prüfe die aktuellen Werte in einem neuen Tab. Speichere dann erneut, wenn deine Werte gelten sollen.',
+    );
     for (const feld of VERERBTE_FELDER) {
       const vorher = alt[feld];
       const nachher = neu[feld];
       if (vorher === nachher) continue;
       // Schichten mit genau dem alten Wert übernehmen den neuen Wert. NULL gilt als gleich NULL.
-      await schreibe(c, `UPDATE schicht SET ${feld} = ? WHERE einsatz_id = ? AND ${feld} <=> ?`, [nachher, id, vorher]);
+      // Die Version der Schicht steigt mit: Ein offenes Schicht-Formular ist dann veraltet.
+      await schreibe(c, `UPDATE schicht SET ${feld} = ?, version = version + 1 WHERE einsatz_id = ? AND ${feld} <=> ?`, [nachher, id, vorher]);
     }
     await schreibe(
       c,
       `UPDATE einsatz SET name = ?, ort = ?, bemerkung_intern = ?, bemerkung_extern = ?,
-         abtreten_ort = ?, tenue = ?, aufgebot_hinweis = ? WHERE id = ?`,
+         abtreten_ort = ?, tenue = ?, aufgebot_hinweis = ?, version = version + 1 WHERE id = ?`,
       [neu.name, neu.ort, neu.bemerkung_intern, neu.bemerkung_extern, neu.abtreten_ort, neu.tenue, neu.aufgebot_hinweis, id],
     );
   });

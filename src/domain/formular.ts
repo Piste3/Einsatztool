@@ -3,7 +3,7 @@ import { createHmac, timingSafeEqual } from 'node:crypto';
 import { alle, eine, schreibe, transaktion, type Db } from '../db/db.js';
 import { Eingabefehler, liste, pflichtText, text } from './eingabe.js';
 import { findePersonNachName, normalisiereName } from './personen.js';
-import { personenName, schreibeLog } from './anmeldung.js';
+import { fuegeEin, personenName, schreibeLog } from './anmeldung.js';
 import { jetztIso } from './zeit.js';
 
 /** Gültigkeit des Tokens: 2 Stunden (15.1.3). */
@@ -139,13 +139,13 @@ export async function verarbeiteFormular(db: Db, e: FormularEingabe): Promise<Fo
       if (vorhanden) {
         // Regel 13.5.5: Das Formular überschreibt den Status nicht. Es hängt die Bemerkung an.
         const neu = haengeAn(vorhanden.bemerkung, bemerkung ?? 'Erneute Anmeldung über das Formular.');
-        await schreibe(c, 'UPDATE anmeldung SET bemerkung = ?, geaendert_am = ? WHERE id = ?', [neu, zeit, vorhanden.id]);
+        await schreibe(c, 'UPDATE anmeldung SET bemerkung = ?, geaendert_am = ?, version = version + 1 WHERE id = ?', [neu, zeit, vorhanden.id]);
         await schreibeLog(c, vorhanden.id, null, 'bemerkung', vorhanden.bemerkung, neu, zeit);
         ids.push(vorhanden.id);
         continue;
       }
       // Regel 15.3.6: Status angemeldet, Kanal formular. E-Mail nur bei unbekannten Personen (Entscheid Yann).
-      const r = await schreibe(
+      const r = await fuegeEin(
         c,
         `INSERT INTO anmeldung (schicht_id, person_id, name_text, email_text, status, kanal, bemerkung, erstellt_am, geaendert_am)
          VALUES (?, ?, ?, ?, 'angemeldet', 'formular', ?, ?, ?)`,

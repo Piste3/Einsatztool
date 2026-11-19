@@ -12,7 +12,8 @@ import { warnungenFuerSchichten } from '../domain/warnungen.js';
 import { zahlenFuerSchichten } from '../domain/zaehlung.js';
 import { teilnehmerlisteCsv } from '../domain/export.js';
 import { rollen as ladeRollen } from '../domain/stammdaten.js';
-import { Eingabefehler, id as leseId, type Status } from '../domain/eingabe.js';
+import { seitenStand } from './routes-stand.js';
+import { Eingabefehler, Konflikt, id as leseId, type Status } from '../domain/eingabe.js';
 import { alle } from '../db/db.js';
 import { html, mehrzeilig, Roh } from './html.js';
 import { k, aktuellerPfad } from './kontext.js';
@@ -29,7 +30,7 @@ function einsatzFormular(kx: ReturnType<typeof k>, ziel: string, e: Partial<Reco
   return html`
 ${fehler ? html`<div class="meldung fehler" role="alert">${fehler}</div>` : ''}
 <form method="post" action="${ziel}" class="formular-raster">
-  ${formFelder(kx)}
+  ${formFelder(kx)}${neu ? '' : html`<input type="hidden" name="version" value="${v('version')}">`}
   <div class="feld breit"><label for="name">Name</label><input id="name" name="name" required maxlength="255" value="${v('name')}"></div>
   ${neu ? html`
   <div class="feld"><label for="start_datum">Start Datum</label><input id="start_datum" type="date" name="start_datum" required value="${v('start_datum')}"></div>
@@ -94,6 +95,7 @@ ${liste.length === 0 ? html`<p class="leer">Keine Einsätze.</p>` : html`
   app.get('/einsaetze/:id', nurAufgebot, async (req, res) => {
     const kx = k(res);
     const e = await ladeEinsatz(db, leseId(req.params.id));
+    const stand = await seitenStand(db, e.id);
     const schichten = await schichtenVonEinsatz(db, e.id);
     const ids = schichten.map((s) => s.id);
     const zahlen = await zahlenFuerSchichten(db, ids);
@@ -134,7 +136,7 @@ ${liste.length === 0 ? html`<p class="leer">Keine Einsätze.</p>` : html`
       if (a) {
         return html`<td class="zelle${wl?.length ? ' mit-warnung' : ''}"><details><summary>${statusMarke(a.status as Status)}${a.rolle ? html`<small>${a.rolle}</small>` : ''}${wl?.length ? '⚠' : ''}</summary>
           <form method="post" action="/anmeldungen/${a.id}" class="mini-form">
-            ${formFelder(kx, hier)}
+            ${formFelder(kx, hier)}<input type="hidden" name="version" value="${a.version}">
             ${warnungen(wl)}
             <label>Status ${statusAuswahl('status', a.status)}</label>
             <label>Rolle ${rolleAuswahl('rolle', rollen, a.rolle)}</label>
@@ -206,13 +208,14 @@ ${sortiert.length === 0 ? html`<p class="leer">Noch keine Einträge.</p>` : html
     ${schichten.map((s) => zelle(z, s.id))}
   </tr>`)}</tbody>
 </table></div>`}`;
-    res.send(seite(kx, e.name, 'einsaetze', inhalt, { breit: true }));
+    res.send(seite(kx, e.name, 'einsaetze', inhalt, { breit: true, stand }));
   });
 
   app.get('/einsaetze/:id/bearbeiten', nurAufgebot, async (req, res) => {
     const kx = k(res);
     const e = await ladeEinsatz(db, leseId(req.params.id));
-    res.send(seite(kx, `${e.name} bearbeiten`, 'einsaetze', html`<p><a href="/einsaetze/${e.id}">← ${e.name}</a></p><h1>Einsatz bearbeiten</h1>${einsatzFormular(kx, `/einsaetze/${e.id}`, e as unknown as Record<string, unknown>, false, null)}`));
+    const stand = await seitenStand(db, e.id);
+    res.send(seite(kx, `${e.name} bearbeiten`, 'einsaetze', html`<p><a href="/einsaetze/${e.id}">← ${e.name}</a></p><h1>Einsatz bearbeiten</h1>${einsatzFormular(kx, `/einsaetze/${e.id}`, e as unknown as Record<string, unknown>, false, null)}`, { stand }));
   });
 
   app.post('/einsaetze/:id', nurAufgebot, async (req, res) => {
@@ -223,7 +226,12 @@ ${sortiert.length === 0 ? html`<p class="leer">Noch keine Einträge.</p>` : html
       zurueck(req, res, `/einsaetze/${id}`);
     } catch (e) {
       if (!(e instanceof Eingabefehler)) throw e;
-      res.status(400).send(seite(kx, 'Einsatz bearbeiten', 'einsaetze', html`<h1>Einsatz bearbeiten</h1>${einsatzFormular(kx, `/einsaetze/${id}`, req.body, false, e.message)}`));
+      // Konflikt: Die Eingaben bleiben. Ein zweites Speichern überschreibt bewusst den neuen Stand.
+      const konflikt = e instanceof Konflikt;
+      const werte = konflikt ? { ...req.body, version: e.aktuelleVersion } : req.body;
+      res.status(konflikt ? 409 : 400).send(seite(kx, 'Einsatz bearbeiten', 'einsaetze', html`<h1>Einsatz bearbeiten</h1>${
+        konflikt ? html`<p><a href="/einsaetze/${id}" target="_blank" rel="noopener">Aktuellen Stand in neuem Tab öffnen</a></p>` : ''
+      }${einsatzFormular(kx, `/einsaetze/${id}`, werte, false, e.message)}`));
     }
   });
 

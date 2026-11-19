@@ -22,6 +22,16 @@ export function teileSql(text: string): string[] {
 /** Migrationen in Reihenfolge. Version 1 ist das Grundschema. */
 const migrationen: { version: number; anweisungen: () => string[] }[] = [
   { version: 1, anweisungen: () => teileSql(readFileSync(join(ordner, 'schema.sql'), 'utf8')) },
+  // Version 2: Mehrere Benutzer arbeiten gleichzeitig. Die Spalte «version» zählt jede Änderung.
+  // So erkennt das Tool, wenn ein Formular auf einem veralteten Stand beruht.
+  {
+    version: 2,
+    anweisungen: () => [
+      'ALTER TABLE einsatz ADD COLUMN version INT NOT NULL DEFAULT 1',
+      'ALTER TABLE schicht ADD COLUMN version INT NOT NULL DEFAULT 1',
+      'ALTER TABLE anmeldung ADD COLUMN version INT NOT NULL DEFAULT 1',
+    ],
+  },
 ];
 
 export async function migriere(db: Db): Promise<number> {

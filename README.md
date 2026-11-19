@@ -10,7 +10,7 @@ Das Konzept liegt in `docs/Konzept.md`. Die Entscheide stehen in `CLAUDE.md`.
 3. [Starten, stoppen, Log lesen (Windows)](#starten-stoppen-log-lesen-windows)
 4. [Häufige Fehler](#häufige-fehler)
 5. [Installation unter Linux](#installation-unter-linux)
-6. [Konfiguration](#konfiguration), [Update](#update-über-admin--update), [Sicherung](#sicherung-und-wiederherstellung), [Entwicklung](#entwicklung-und-tests)
+6. [Konfiguration](#konfiguration), [Update](#update-über-admin--update), [Mehrere Benutzer gleichzeitig](#mehrere-benutzer-gleichzeitig), [Sicherung](#sicherung-und-wiederherstellung), [Entwicklung](#entwicklung-und-tests)
 
 ---
 
@@ -768,6 +768,22 @@ Danach beendet sich Node mit Code 75. `start.cmd` startet Node nach 3 Sekunden n
 Bei einem Fehler setzt das Tool den Code auf den alten Commit zurück.
 Git braucht für `git fetch` einen Zugang ohne Passwort-Abfrage (z. B. einen Deploy-Key).
 Die Aufgabe läuft als `SYSTEM`. Darum braucht Git den Eintrag `safe.directory` (siehe [Häufige Fehler](#update-git-meldet-dubious-ownership)).
+
+## Mehrere Benutzer gleichzeitig
+
+Bis rund 8 Benutzer arbeiten gleichzeitig. Du musst dafür nichts einrichten. Es braucht keinen weiteren Dienst.
+
+- Jeder Benutzer hat eine eigene Sitzung.
+- Speichert ein Benutzer ein veraltetes Formular, speichert das Tool nichts. Es zeigt eine Meldung mit dem neuen Stand.
+- Ändert ein anderer Benutzer einen Einsatz, erscheint oben ein Hinweis mit dem Knopf «Neu laden».
+  Die Seiten Einsatz, Schicht, Anrufliste und die Formulare «Bearbeiten» prüfen das alle 15 Sekunden.
+- Blockieren sich zwei Speichervorgänge in der Datenbank, wiederholt das Tool den Vorgang selbst.
+- Ein täglicher Job läuft nie zweimal gleichzeitig.
+
+**Datenbank:** Das Update auf diese Version ändert die Datenbank (Schema-Version 2).
+Das Tool ergänzt beim ersten Start die Spalte `version` in den Tabellen `einsatz`, `schicht` und `anmeldung`.
+Das geschieht automatisch. Die Daten bleiben erhalten. Eine ältere Sicherung lässt sich weiter einspielen.
+Der nächste Start ergänzt die Spalte dann wieder.
 
 ## Sicherung und Wiederherstellung
 

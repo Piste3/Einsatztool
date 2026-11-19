@@ -7,6 +7,28 @@ export class Eingabefehler extends Error {
   }
 }
 
+/**
+ * Ein anderer Benutzer hat die Daten geändert, seit das Formular geladen wurde.
+ * Das Tool speichert dann nichts. aktuelleVersion erlaubt ein bewusstes erneutes Speichern.
+ */
+export class Konflikt extends Eingabefehler {
+  constructor(meldung: string, readonly aktuelleVersion: number) {
+    super(meldung);
+    this.name = 'Konflikt';
+  }
+}
+
+/**
+ * Prüft die Version aus dem Formular. Fehlt sie, prüft das Tool nichts
+ * (z. B. Knopf «Bestätigen»: Er ändert nur ein Feld mit klarer Absicht).
+ */
+export function pruefeVersion(wert: unknown, aktuell: number, meldung: string): void {
+  if (wert === undefined || wert === null || wert === '') return;
+  const v = Number(wert);
+  if (!Number.isInteger(v) || v < 1) throw new Eingabefehler('Version ist ungültig.');
+  if (v !== Number(aktuell)) throw new Konflikt(meldung, Number(aktuell));
+}
+
 export class NichtGefunden extends Error {
   constructor(meldung = 'Nicht gefunden.') {
     super(meldung);

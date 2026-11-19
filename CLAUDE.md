@@ -149,3 +149,10 @@ Diese Liste ergänze ich beim Bauen. Jede Annahme aus Teil B des Konzepts steht 
 - 18.11.2026: `start.cmd` und `stop.cmd` liegen im Repo unter `betrieb/windows/` und werden nach `C:\einsatzplaner\` kopiert. Grund: Ein Update ändert `app`, ein laufendes Batch-Skript darf sich nicht ändern.
 - 18.11.2026: Die Aufgabe in der Aufgabenplanung entsteht mit `aufgabe-einrichten.ps1`. `schtasks` allein kann das Zeitlimit nicht ausschalten.
 - 18.11.2026: Die Log-Datei heisst `logs\einsatzplaner-JJJJ-MM-TT.log`. Das Datum ist der Tag des Starts von Node.
+- 19.11.2026: Bis rund 8 Benutzer arbeiten gleichzeitig. Kein weiterer Dienst (kein Redis).
+- 19.11.2026: Spalte `version` in `einsatz`, `schicht`, `anmeldung` (Migration 2). Ein Formular mit alter Version speichert nichts und zeigt eine Meldung (`Konflikt`). Ohne Version im Formular prüft das Tool nichts (z. B. Knopf «Bestätigen», Sammelstatus).
+- 19.11.2026: Nach einem Konflikt im Formular «Bearbeiten» bleiben die Eingaben stehen. Ein zweites Speichern überschreibt bewusst.
+- 19.11.2026: Ändert der Einsatz einen vererbten Wert, steigt auch die Version der betroffenen Schichten.
+- 19.11.2026: Seiten Einsatz, Schicht, Anrufliste und Bearbeiten fragen alle 15 Sekunden `/stand/einsatz/<id>` ab. Bei einer Änderung erscheint ein Hinweis mit «Neu laden». Das Tool lädt nicht von selbst neu. Die Abfrage verlängert die Sitzung nicht.
+- 19.11.2026: `transaktion()` wiederholt einen Vorgang bei Deadlock oder Sperr-Wartezeit (höchstens 4 Versuche). Gleichzeitiges Anlegen desselben Eintrags führt zu einer Wiederholung statt zu einem Fehler.
+- 19.11.2026: Verbindungspool 20 Verbindungen. Ein täglicher Job läuft nie zweimal gleichzeitig (Sperre im Speicher).

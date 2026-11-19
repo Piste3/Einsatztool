@@ -23,6 +23,7 @@ import { registriereSchichten } from './routes-schichten.js';
 import { registriereAnmeldungen } from './routes-anmeldungen.js';
 import { registrierePersonen } from './routes-personen.js';
 import { registriereAdmin } from './routes-admin.js';
+import { registriereStand, STAND_PFAD } from './routes-stand.js';
 import type { Updater } from '../jobs/update.js';
 
 const ordner = dirname(fileURLToPath(import.meta.url));
@@ -186,6 +187,7 @@ export function erstelleApp(deps: Abhaengigkeiten): express.Express {
     const kx: Kontext = { benutzer: null, sitzungId: null, csrf: '', zaehler: { unbestaetigt: 0, unbekannt: 0 }, meldung: null, pfad: req.originalUrl };
     res.locals.k = kx;
     const sid = leseCookies(req).sid;
+    const abfrageStand = req.path.startsWith(STAND_PFAD);
     if (sid && /^[a-f0-9]{64}$/.test(sid)) {
       const jetzt = isoUtc(new Date());
       const z = await alle<Benutzer & { ablauf: string }>(
@@ -197,10 +199,14 @@ export function erstelleApp(deps: Abhaengigkeiten): express.Express {
         kx.benutzer = z[0];
         kx.sitzungId = sid;
         kx.csrf = csrfToken(konfig.sessionSecret, sid);
-        await schreibe(db, 'UPDATE sitzung SET ablauf = ? WHERE id = ?', [isoUtc(new Date(Date.now() + SITZUNG_DAUER_MS)), sid]);
+        // Die automatische Abfrage des Datenstands zählt nicht als Aktivität.
+        // Sonst läuft die Sitzung in einem offenen Tab nie ab.
+        if (!abfrageStand) {
+          await schreibe(db, 'UPDATE sitzung SET ablauf = ? WHERE id = ?', [isoUtc(new Date(Date.now() + SITZUNG_DAUER_MS)), sid]);
+        }
       }
     }
-    if (req.method === 'GET') {
+    if (req.method === 'GET' && !abfrageStand) {
       kx.meldung = leseMeldung(req, res, konfig);
       if (kx.benutzer && !req.path.startsWith('/static')) kx.zaehler = await zaehlerSeitenleiste(db);
     }
@@ -228,6 +234,7 @@ export function erstelleApp(deps: Abhaengigkeiten): express.Express {
   registriereAnmeldungen(app, deps);
   registrierePersonen(app, deps);
   registriereAdmin(app, deps);
+  registriereStand(app, deps);
 
   app.use((req, res) => {
     res.status(404).send(einfacheSeite('Nicht gefunden', html`<h1>Nicht gefunden</h1><p><a href="/">Zur Startseite</a></p>`));

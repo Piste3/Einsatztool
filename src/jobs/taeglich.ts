@@ -31,12 +31,23 @@ async function merke(db: Db, name: string, ok: boolean, meldung: string): Promis
 }
 
 /** Führt einen Job aus und merkt das Ergebnis (auch für «jetzt auslösen»). */
+/** Jobs, die gerade laufen. Ein Server-Prozess genügt, darum liegt die Liste im Speicher. */
+const laufendeJobs = new Set<string>();
+
+/** Meldung, wenn ein Job schon läuft (z. B. zwei Admins klicken gleichzeitig «jetzt auslösen»). */
+export const LAEUFT_SCHON = 'Der Job läuft gerade schon. Warte, bis er fertig ist.';
+
 export async function fuehreAus(db: Db, job: TaeglicherJob, automatisch: boolean): Promise<{ ok: boolean; meldung: string }> {
+  // Ein Job läuft nie zweimal gleichzeitig. Der zweite Aufruf ändert nichts.
+  if (laufendeJobs.has(job.name)) return { ok: false, meldung: LAEUFT_SCHON };
+  laufendeJobs.add(job.name);
   let r: { ok: boolean; meldung: string };
   try {
     r = await job.lauf();
   } catch (e) {
     r = { ok: false, meldung: (e as Error).message };
+  } finally {
+    laufendeJobs.delete(job.name);
   }
   await merke(db, job.name, r.ok, r.meldung);
   if (automatisch) await merke(db, `${job.name}:auto`, r.ok, r.meldung);

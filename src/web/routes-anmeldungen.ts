@@ -27,6 +27,7 @@ export function registriereAnmeldungen(app: Express, deps: Abhaengigkeiten): voi
         rolle: req.body.rolle,
         kanal: req.body.kanal,
         bemerkung: req.body.bemerkung,
+        version: req.body.version,
       },
       k(res).benutzer!.id,
     );

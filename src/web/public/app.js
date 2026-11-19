@@ -93,4 +93,38 @@
       });
     });
   });
+  // Änderungen anderer Benutzer: Die Seite fragt den Datenstand alle 15 Sekunden ab.
+  // Ändert er sich, erscheint ein Hinweis mit dem Knopf «Neu laden».
+  // Das Tool lädt nicht von selbst neu. So gehen keine Eingaben verloren.
+  var hinweis = document.querySelector('.datenstand[data-stand-url]');
+  if (hinweis && window.fetch) {
+    var url = hinweis.getAttribute('data-stand-url');
+    var stand = hinweis.getAttribute('data-stand');
+    var fertigGemeldet = false;
+    var laufend = false;
+    var uhr = null;
+    var frage = function () {
+      if (fertigGemeldet || laufend || document.visibilityState === 'hidden') return;
+      laufend = true;
+      fetch(url, { credentials: 'same-origin', headers: { Accept: 'application/json' } })
+        .then(function (r) {
+          if (r.status === 401) { clearInterval(uhr); return null; }
+          return r.ok ? r.json() : null;
+        })
+        .then(function (d) {
+          if (d && typeof d.stand === 'string' && d.stand !== stand) {
+            fertigGemeldet = true;
+            hinweis.hidden = false;
+          }
+        })
+        .catch(function () { /* Netz kurz weg: beim nächsten Mal erneut */ })
+        .then(function () { laufend = false; });
+    };
+    uhr = setInterval(frage, 15000);
+    document.addEventListener('visibilitychange', function () {
+      if (document.visibilityState === 'visible') frage();
+    });
+    var neu = hinweis.querySelector('[data-neu-laden]');
+    if (neu) neu.addEventListener('click', function () { location.reload(); });
+  }
 })();

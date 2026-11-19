@@ -17,7 +17,7 @@ import { FEST } from '../domain/aufgebot-vorlage.js';
 import { anrufliste, nachRangTiefZuerst } from '../domain/listen.js';
 import { personenListe, personAuswahlText, idAusAuswahl } from '../domain/personen.js';
 import { raenge as ladeRaenge, rollen as ladeRollen } from '../domain/stammdaten.js';
-import { Eingabefehler, STATUS, STATUS_TEXT, KANAL_TEXT, id as leseId, liste, type Status, type Kanal } from '../domain/eingabe.js';
+import { Eingabefehler, Konflikt, STATUS, STATUS_TEXT, KANAL_TEXT, id as leseId, liste, type Status, type Kanal } from '../domain/eingabe.js';
 import { alle } from '../db/db.js';
 import { feedStand } from '../domain/ical-abgleich.js';
 import { alterAm, datumChVonIso, lokalesDatum, lokaleZeit } from '../domain/zeit.js';
@@ -27,6 +27,7 @@ import { druckseite, formFelder, seite } from './views/layout.js';
 import {
   abgleichPunkt, datumZeit, istSoll, kanalAuswahl, karte, knopfPost, rolleAuswahl, statusAuswahl, statusText, telefon, warnungen, zeitraum,
 } from './views/teile.js';
+import { seitenStand } from './routes-stand.js';
 import { dateiTeil, sendeCsv } from './routes-einsaetze.js';
 
 const AKTION_TEXT: Record<string, string> = {
@@ -68,7 +69,7 @@ async function schichtFormular(deps: Abhaengigkeiten, kx: ReturnType<typeof k>, 
   return html`
 ${fehler ? html`<div class="meldung fehler" role="alert">${fehler}</div>` : ''}
 <form method="post" action="${ziel}" class="formular-raster">
-  ${formFelder(kx)}
+  ${formFelder(kx)}${neu ? '' : html`<input type="hidden" name="version" value="${v(e, 'version')}">`}
   <div class="feld breit"><label for="name">Name</label><input id="name" name="name" required maxlength="255" value="${v(e, 'name')}"></div>
   <div class="feld"><label for="start_datum">Start Datum</label><input id="start_datum" type="date" name="start_datum" required value="${v(e, 'start_datum')}"></div>
   <div class="feld"><label for="start_zeit">Start Zeit</label><input id="start_zeit" type="time" name="start_zeit" required value="${v(e, 'start_zeit')}"></div>
@@ -129,6 +130,7 @@ export function registriereSchichten(app: Express, deps: Abhaengigkeiten): void 
   app.get('/schichten/:sid', nurAufgebot, async (req, res) => {
     const kx = k(res);
     const s = await ladeSchicht(db, leseId(req.params.sid));
+    const stand = await seitenStand(db, s.einsatz_id);
     const z = (await zahlenFuerSchichten(db, [s.id])).get(s.id)!;
     const w = await warnungenFuerSchicht(db, s.id);
     const rollen = await ladeRollen(db);
@@ -173,7 +175,7 @@ export function registriereSchichten(app: Express, deps: Abhaengigkeiten): void 
     ${e.status !== 'bestaetigt' ? knopfPost(kx, `/anmeldungen/${e.id}`, 'Bestätigen', { status: 'bestaetigt' }, 'knopf haupt klein', hier) : ''}
     <details class="aufklapp"><summary>Ändern</summary>
       <form method="post" action="/anmeldungen/${e.id}" class="mini-form">
-        ${formFelder(kx, hier)}
+        ${formFelder(kx, hier)}<input type="hidden" name="version" value="${e.version}">
         <label>Status ${statusAuswahl('status', e.status)}</label>
         <label>Rolle ${rolleAuswahl('rolle', rollen, e.rolle)}</label>
         <label>Kanal ${kanalAuswahl('kanal', e.kanal)}</label>
@@ -279,14 +281,15 @@ ${s.bemerkung_intern ? html`<p class="bemerkung intern"><strong>Intern:</strong>
     <button type="submit" class="knopf">Hinzufügen</button>
   </form>
 </section>`;
-    res.send(seite(kx, s.name, 'einsaetze', inhalt, { breit: true }));
+    res.send(seite(kx, s.name, 'einsaetze', inhalt, { breit: true, stand }));
   });
 
   app.get('/schichten/:sid/bearbeiten', nurAufgebot, async (req, res) => {
     const kx = k(res);
     const s = await ladeSchicht(db, leseId(req.params.sid));
+    const stand = await seitenStand(db, s.einsatz_id);
     const bedarf = await rollenBedarf(db, s.id);
-    res.send(seite(kx, 'Schicht bearbeiten', 'einsaetze', html`<p><a href="/schichten/${s.id}">← ${s.name}</a></p><h1>Schicht bearbeiten</h1>${await schichtFormular(deps, kx, `/schichten/${s.id}`, schichtWerte(s), bedarf, null, false)}`));
+    res.send(seite(kx, 'Schicht bearbeiten', 'einsaetze', html`<p><a href="/schichten/${s.id}">← ${s.name}</a></p><h1>Schicht bearbeiten</h1>${await schichtFormular(deps, kx, `/schichten/${s.id}`, schichtWerte(s), bedarf, null, false)}`, { stand }));
   });
 
   app.post('/schichten/:sid', nurAufgebot, async (req, res) => {
@@ -297,7 +300,12 @@ ${s.bemerkung_intern ? html`<p class="bemerkung intern"><strong>Intern:</strong>
       zurueck(req, res, `/schichten/${sid}`);
     } catch (e) {
       if (!(e instanceof Eingabefehler)) throw e;
-      res.status(400).send(seite(kx, 'Schicht bearbeiten', 'einsaetze', html`<h1>Schicht bearbeiten</h1>${await schichtFormular(deps, kx, `/schichten/${sid}`, req.body, new Map(), e.message, false)}`));
+      // Konflikt: Die Eingaben bleiben. Ein zweites Speichern überschreibt bewusst den neuen Stand.
+      const konflikt = e instanceof Konflikt;
+      const werte = konflikt ? { ...req.body, version: e.aktuelleVersion } : req.body;
+      res.status(konflikt ? 409 : 400).send(seite(kx, 'Schicht bearbeiten', 'einsaetze', html`<h1>Schicht bearbeiten</h1>${
+        konflikt ? html`<p><a href="/schichten/${sid}" target="_blank" rel="noopener">Aktuellen Stand in neuem Tab öffnen</a></p>` : ''
+      }${await schichtFormular(deps, kx, `/schichten/${sid}`, werte, new Map(), e.message, false)}`));
     }
   });
 
@@ -369,6 +377,7 @@ ${s.anzahl_schichten <= 1 ? html`<p class="meldung fehler">Das ist die einzige S
   app.get('/schichten/:sid/anrufliste', nurAufgebot, async (req, res) => {
     const kx = k(res);
     const s = await ladeSchicht(db, leseId(req.params.sid));
+    const stand = await seitenStand(db, s.einsatz_id);
     const alleZeigen = req.query.alle === '1';
     const { zeilen, ausgeblendet } = await anrufliste(db, s.id, alleZeigen);
     const hier = aktuellerPfad(req);
@@ -402,7 +411,7 @@ ${s.anzahl_schichten <= 1 ? html`<p class="meldung fehler">Das ist die einzige S
     </td>
   </tr>`)}</tbody>
 </table></div>`;
-    res.send(seite(kx, 'Anrufliste', 'einsaetze', inhalt, { breit: true }));
+    res.send(seite(kx, 'Anrufliste', 'einsaetze', inhalt, { breit: true, stand }));
   });
 
   // Regel 17.3: Erster Export liefert die Datei. Danach zuerst W_ICS_DUPLIKAT, «Trotzdem laden».

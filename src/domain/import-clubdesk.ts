@@ -283,7 +283,7 @@ export async function loeschePersonendaten(c: Db, id: number, benutzerId: number
   const anmeldungen = await alle<{ id: number }>(c, 'SELECT id FROM anmeldung WHERE person_id = ?', [id]);
   if (!anmeldungen.length) return;
   const ids = anmeldungen.map((a) => a.id);
-  await schreibe(c, 'UPDATE anmeldung SET name_text = ?, email_text = NULL, bemerkung = NULL, geaendert_am = ? WHERE person_id = ?', [
+  await schreibe(c, 'UPDATE anmeldung SET name_text = ?, email_text = NULL, bemerkung = NULL, geaendert_am = ?, version = version + 1 WHERE person_id = ?', [
     `Gelöschte Person ${id}`, zeit, id,
   ]);
   await schreibe(
