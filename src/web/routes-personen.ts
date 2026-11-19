@@ -13,9 +13,9 @@ import { STATUS_TEXT, KANAELE, KANAL_TEXT, id as leseId, type Kanal, type Status
 import { html, Roh } from './html.js';
 import { k, aktuellerPfad } from './kontext.js';
 import { formFelder, seite, seitenKopf } from './views/layout.js';
-import { datumZeit, kanalAuswahl, legende, rolleAuswahl, statusMarke, statusText, telefon, warnungen, zeitraum } from './views/teile.js';
+import { datumZeit, istSoll, kachel, kachelLegende, KACHEL_TEXT, kanalAuswahl, legende, rolleAuswahl, statusMarke, statusText, telefon, warnungen, zeitraum } from './views/teile.js';
 import { verlaufListe } from './routes-schichten.js';
-import { alterAm, datumCh, datumChVonIso, lokalesDatum, lokaleZeit } from '../domain/zeit.js';
+import { alterAm, datumCh, datumChVonIso, lokalesDatum, lokaleZeit, wochentagKurz } from '../domain/zeit.js';
 
 export function registrierePersonen(app: Express, deps: Abhaengigkeiten): void {
   const { db, konfig } = deps;
@@ -117,6 +117,21 @@ ${p.geloescht_am ? html`<p class="meldung hinweis">Die Personendaten sind gelös
     const r = await rueckmeldungen(db, o);
     const hier = aktuellerPfad(req);
     const auswahl = (wert: string, aktuell: string) => (wert === aktuell ? new Roh(' selected') : '');
+    // Kopf: aufeinanderfolgende Schichten desselben Einsatzes stehen unter einem gemeinsamen Einsatz-Kopf.
+    const gruppen: { einsatz_id: number; einsatz_name: string; schichten: typeof r.schichten; mehrtaegig: boolean }[] = [];
+    const gruppenStart = new Set<number>();
+    r.schichten.forEach((s, i) => {
+      const letzte = gruppen[gruppen.length - 1];
+      if (letzte && letzte.einsatz_id === s.einsatz_id) letzte.schichten.push(s);
+      else { gruppen.push({ einsatz_id: s.einsatz_id, einsatz_name: s.einsatz_name, schichten: [s], mehrtaegig: false }); gruppenStart.add(i); }
+    });
+    for (const g of gruppen) g.mehrtaegig = new Set(g.schichten.map((s) => lokalesDatum(s.start_zeit))).size > 1;
+    const tag = (iso: string) => `${wochentagKurz(iso)} ${datumChVonIso(iso).slice(0, 6)}`;
+    const tagText = (liste: typeof r.schichten) => {
+      const erster = liste[0].start_zeit;
+      const letzter = liste[liste.length - 1].start_zeit;
+      return lokalesDatum(erster) === lokalesDatum(letzter) ? tag(erster) : `${tag(erster)} – ${tag(letzter)}`;
+    };
     res.send(seite(kx, 'Rückmeldungen', 'rueckmeldungen', html`
 ${seitenKopf({ titel: 'Rückmeldungen', angaben: ['Wer hat sich wofür gemeldet: alle kommenden Schichten im Zeitraum.'] })}
 <form method="get" action="/rueckmeldungen" class="filter-form zeilen-form">
@@ -127,17 +142,20 @@ ${seitenKopf({ titel: 'Rückmeldungen', angaben: ['Wer hat sich wofür gemeldet:
   <input type="search" name="suche" value="${o.suche}" placeholder="Name …" aria-label="Name suchen">
   <button type="submit" class="knopf">Anzeigen</button>
 </form>
-${legende()}
+${kachelLegende()}
 <p class="unter">Klick auf ein Feld: Person eintragen oder Status ändern. Grau = passt nicht zu Mindestalter oder Mindestrang. Eintragen geht trotzdem.</p>
 ${r.schichten.length === 0 ? html`<p class="leer">Keine kommenden Schichten im Zeitraum.</p>` : html`
 <div class="rahmen rueck-rahmen"><table class="tabelle rueck">
-  <thead><tr><th class="name-spalte">Person</th>${r.schichten.map((s) => html`<th><a href="/schichten/${s.id}"><span class="e">${s.einsatz_name}</span>${s.einsatz_name === s.name ? '' : html`<span class="s">${s.name}</span>`}<span class="d">${datumChVonIso(s.start_zeit)}</span></a>${s.publiziert ? '' : html`<span class="pille grau">intern</span>`}</th>`)}</tr></thead>
+  <thead>
+    <tr class="einsatz-zeile"><th class="name-spalte" rowspan="2">Mitglied</th>${gruppen.map((g) => html`<th colspan="${g.schichten.length}" class="einsatz-kopf"><span class="d">${tagText(g.schichten)}</span><a class="e" href="${g.schichten.length === 1 ? `/schichten/${g.schichten[0].id}` : `/einsaetze/${g.einsatz_id}`}">${g.einsatz_name}</a></th>`)}</tr>
+    <tr class="schicht-zeile">${gruppen.map((g) => g.schichten.map((s, i) => html`<th class="schicht-kopf${i === 0 ? ' gruppe-start' : ''}">${g.schichten.length > 1 || s.name !== s.einsatz_name ? html`<a class="s" href="/schichten/${s.id}">${s.name}</a>` : ''}${g.mehrtaegig ? html`<span class="d">${wochentagKurz(s.start_zeit)} ${datumChVonIso(s.start_zeit).slice(0, 6)}</span>` : ''}${s.publiziert ? '' : html`<span class="pille grau">intern</span>`}${istSoll(s.teilnehmende, s.soll_anzahl)}</th>`))}</tr>
+  </thead>
   <tbody>${r.personen.map((p) => html`<tr>
-    <th class="name-spalte"><a href="/personen/${p.clubdesk_id}">${p.rang_name ? html`<span class="rang">${p.rang_name}</span> ` : ''}${p.nachname ?? ''} ${p.vorname ?? ''}</a></th>
-    ${p.zellen.map((c, i) => html`<td class="zelle-klick${c.passt ? '' : ' passt-nicht'}"><a href="/rueckmeldungen/eintrag?schicht=${r.schichten[i].id}&amp;person=${p.clubdesk_id}&amp;zurueck=${encodeURIComponent(hier)}" data-eintrag title="${c.status ? `${STATUS_TEXT[c.status]} · ${datumChVonIso(c.geaendert_am!)} ${lokaleZeit(c.geaendert_am!)} · ${KANAL_TEXT[c.kanal as Kanal]}` : c.passt ? 'nicht gefragt' : 'passt nicht zu Mindestalter oder Mindestrang'} – Klick zum Eintragen">${statusMarke(c.status)}${c.passt ? '' : html`<span class="sr">passt nicht</span>`}</a></td>`)}
+    <th class="name-spalte"><a href="/personen/${p.clubdesk_id}"><span class="rang">${p.rang_name ?? ''}</span><span class="name">${p.vorname ?? ''} ${p.nachname ?? ''}</span></a></th>
+    ${p.zellen.map((c, i) => { const sch = r.schichten[i]; const art = c.status ?? c.andere; return html`<td class="zelle-klick${c.passt ? '' : ' passt-nicht'}${gruppenStart.has(i) ? ' gruppe-start' : ''}"><a href="/rueckmeldungen/eintrag?schicht=${sch.id}&amp;person=${p.clubdesk_id}&amp;zurueck=${encodeURIComponent(hier)}" data-eintrag title="${c.status ? `${STATUS_TEXT[c.status]} · ${datumChVonIso(c.geaendert_am!)} ${lokaleZeit(c.geaendert_am!)} · ${KANAL_TEXT[c.kanal as Kanal]}` : c.andere ? KACHEL_TEXT[c.andere] : c.passt ? 'nicht gefragt' : 'passt nicht zu Mindestalter oder Mindestrang'} – Klick zum Eintragen">${kachel(art)}<span class="sr">${c.status ? STATUS_TEXT[c.status] : c.andere ? KACHEL_TEXT[c.andere] : 'nicht gefragt'}${c.passt ? '' : ', passt nicht'}</span></a></td>`; })}
   </tr>`)}</tbody>
   <tfoot>
-    ${(['an', 'ab', 'unsicher', 'offen'] as const).map((n) => html`<tr><th class="name-spalte">${{ an: 'An', ab: 'Ab', unsicher: 'Unsicher', offen: 'Offen' }[n]}</th>${r.schichten.map((s) => html`<td>${s.summe[n]}</td>`)}</tr>`)}
+    ${(['an', 'ab', 'unsicher', 'offen'] as const).map((n) => html`<tr><th class="name-spalte">${{ an: 'An', ab: 'Ab', unsicher: 'Unsicher', offen: 'Offen' }[n]}</th>${r.schichten.map((s, i) => html`<td${gruppenStart.has(i) ? new Roh(' class="gruppe-start"') : ''}>${s.summe[n]}</td>`)}</tr>`)}
   </tfoot>
 </table></div>`}`, { breit: true }));
   });

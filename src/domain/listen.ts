@@ -87,6 +87,9 @@ export interface RueckmeldungSchicht {
   publiziert: number;
   min_alter: number | null;
   min_rang_reihenfolge: number | null;
+  soll_anzahl: number | null;
+  /** Teilnehmende nach der Zählung der Schicht (13.6), für Ist / Soll im Kopf. */
+  teilnehmende: number;
   summe: { an: number; ab: number; unsicher: number; offen: number };
 }
 
@@ -95,6 +98,11 @@ export interface RueckmeldungZelle {
   geaendert_am: string | null;
   kanal: string | null;
   passt: boolean;
+  /**
+   * Nur bei einem Feld ohne Eintrag: Die Person ist in einer anderen Schicht desselben Einsatzes an
+   * (angemeldet oder bestätigt). «gleich» = die Zeiten überschneiden sich, «moeglich» = nicht.
+   */
+  andere: 'gleich' | 'moeglich' | null;
 }
 
 export interface RueckmeldungOptionen {
@@ -119,14 +127,18 @@ export async function rueckmeldungen(db: Db, o: RueckmeldungOptionen): Promise<{
   bis.setMonth(bis.getMonth() + o.monate);
   const schichten = await alle<RueckmeldungSchicht>(
     db,
-    `SELECT s.id, s.name, e.name AS einsatz_name, e.id AS einsatz_id, s.start_zeit, s.end_zeit, s.publiziert, s.min_alter,
+    `SELECT s.id, s.name, e.name AS einsatz_name, e.id AS einsatz_id, s.start_zeit, s.end_zeit, s.publiziert, s.min_alter, s.soll_anzahl,
             r.reihenfolge AS min_rang_reihenfolge
        FROM schicht s JOIN einsatz e ON e.id = s.einsatz_id LEFT JOIN rang r ON r.id = s.min_rang_id
       WHERE s.end_zeit > ? AND s.start_zeit < ? ${o.unpublizierte ? '' : 'AND s.publiziert = 1'}
       ORDER BY s.start_zeit, s.id`,
     [jetzt, isoUtc(bis)],
   );
-  for (const s of schichten) s.summe = { an: 0, ab: 0, unsicher: 0, offen: 0 };
+  const zahlen = await zahlenFuerSchichten(db, schichten.map((s) => s.id));
+  for (const s of schichten) {
+    s.summe = { an: 0, ab: 0, unsicher: 0, offen: 0 };
+    s.teilnehmende = zahlen.get(s.id)?.teilnehmende ?? 0;
+  }
   let personen = await alle<PersonKurz>(db, PERSON_KURZ);
   const eintraege = schichten.length
     ? await alle<{ schicht_id: number; person_id: number; status: Status; geaendert_am: string; kanal: string }>(
@@ -150,7 +162,17 @@ export async function rueckmeldungen(db: Db, o: RueckmeldungOptionen): Promise<{
       else if (status === 'abgemeldet') s.summe.ab++;
       else if (status === 'unsicher') s.summe.unsicher++;
       else if (passt) s.summe.offen++;
-      return { status, geaendert_am: e?.geaendert_am ?? null, kanal: e?.kanal ?? null, passt };
+      let andere: RueckmeldungZelle['andere'] = null;
+      if (!status) {
+        for (const x of schichten) {
+          if (x.id === s.id || x.einsatz_id !== s.einsatz_id) continue;
+          const st = proZelle.get(key(x.id, p.clubdesk_id))?.status;
+          if (st !== 'angemeldet' && st !== 'bestaetigt') continue;
+          if (x.start_zeit < s.end_zeit && s.start_zeit < x.end_zeit) { andere = 'gleich'; break; }
+          andere = 'moeglich';
+        }
+      }
+      return { status, geaendert_am: e?.geaendert_am ?? null, kanal: e?.kanal ?? null, passt, andere };
     });
     return { ...p, zellen };
   });

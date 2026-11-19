@@ -431,7 +431,7 @@ a.zahl-karte:hover { text-decoration: none; border-color: var(--linie-stark); }
 .matrix tbody th, .rueck tbody th { font-weight: 500; }
 .matrix .name-spalte, .rueck .name-spalte { text-align: left; position: sticky; left: 0; background: var(--flaeche); z-index: 1; border-right: 1px solid var(--linie); }
 .matrix thead .name-spalte, .rueck thead .name-spalte { z-index: 3; }
-.matrix thead th small, .rueck thead th span { display: block; font-weight: 400; }
+.matrix thead th small { display: block; font-weight: 400; }
 .rueck thead th .e { font-weight: 650; color: var(--text); }
 .rueck tfoot { position: sticky; bottom: 0; z-index: 2; }
 .rueck tfoot td, .rueck tfoot th { background: var(--flaeche-2); font-weight: 650; border-top: 1px solid var(--linie); }
@@ -633,3 +633,41 @@ body.druck { background: var(--hg); padding: 1rem; }
 .eintrag-knoepfe { display: flex; justify-content: space-between; align-items: center; gap: .5rem; flex-wrap: wrap; border-top: 1px solid var(--linie); padding-top: .8rem; }
 .eintrag-verlauf { border-top: 1px solid var(--linie); padding-top: .6rem; }
 @media (max-width: 600px) { .wahl { flex-direction: column; } .wahl-knopf { border-left: 0; border-top: 1px solid var(--linie); } .wahl-knopf:first-child { border-top: 0; } }
+
+/* ---------- Rückmeldungen: Kacheln und Kopf mit Einsatz und Schichten ---------- */
+.kachel { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 8px; border: 1px solid transparent; flex: none; }
+.kachel svg { display: block; }
+.kachel.k-offen { border: 1.5px dashed var(--linie-stark); }
+.kachel.k-angemeldet { background: var(--gruen-hg); color: var(--gruen); border-color: color-mix(in srgb, var(--gruen) 30%, transparent); }
+.kachel.k-bestaetigt { background: var(--gruen-punkt); color: #fff; }
+.kachel.k-abgemeldet { background: var(--rot-hg); color: var(--rot); border-color: color-mix(in srgb, var(--rot) 30%, transparent); }
+.kachel.k-nachricht_gesendet { background: var(--blau-hg); color: var(--blau); border-color: color-mix(in srgb, var(--blau) 30%, transparent); }
+.kachel.k-unsicher { background: var(--orange-hg); color: var(--orange); border-color: color-mix(in srgb, var(--orange) 30%, transparent); }
+.kachel.k-gleich { background: var(--grau-hg); color: var(--grau); border-color: var(--linie-stark); }
+.kachel.k-moeglich { background: var(--flaeche); color: var(--gruen-punkt); border-color: var(--linie); }
+.kachel-legende { align-items: center; color: var(--text); font-size: .85rem; gap: .45rem 1.1rem; }
+.kachel-legende strong { margin-right: .2rem; }
+.kachel-legende .kachel { width: 22px; height: 22px; border-radius: 6px; }
+.kachel-legende .kachel svg { width: 13px; height: 13px; }
+
+.rueck thead tr.einsatz-zeile th { position: static; border-bottom: 0; padding-bottom: .1rem; vertical-align: bottom; }
+.rueck thead tr.einsatz-zeile th.name-spalte { position: sticky; top: 0; left: 0; vertical-align: bottom; font-size: .85rem; }
+.rueck thead th.einsatz-kopf { text-align: left; white-space: normal; min-width: 9rem; }
+.rueck thead th.einsatz-kopf .d { display: block; color: var(--gedämpft); font-weight: 400; }
+.rueck thead th.einsatz-kopf .e { display: block; color: var(--text); font-weight: 650; font-size: .86rem; line-height: 1.25; }
+.rueck thead th.schicht-kopf { vertical-align: bottom; min-width: 8.5rem; padding-top: .2rem; }
+.rueck thead th.schicht-kopf .s { display: block; color: var(--orange); font-weight: 650; font-size: .84rem; }
+.rueck thead th.schicht-kopf .d { display: block; color: var(--gedämpft); font-weight: 400; }
+.rueck thead th.schicht-kopf .ist-soll { display: flex; flex-direction: column-reverse; align-items: stretch; width: 100%; margin-top: .35rem; gap: 5px; }
+.rueck thead th.schicht-kopf .ist-soll .zahl { font-size: .8rem; }
+.rueck thead th.schicht-kopf .ist-soll .zahl { color: var(--gedämpft); font-weight: 500; }
+.rueck .gruppe-start { border-left: 1px solid var(--linie-stark); }
+.rueck thead th.einsatz-kopf { border-left: 1px solid var(--linie-stark); }
+.rueck tbody th.name-spalte a { display: grid; grid-template-columns: 2.6rem auto; align-items: baseline; color: inherit; }
+.rueck tbody th.name-spalte .name { font-weight: 650; }
+.rueck tbody th.name-spalte .rang { font-size: .78rem; }
+.rueck tbody td.zelle-klick > a { min-height: 3rem; }
+.rueck td.zelle-klick > a:hover .kachel.k-offen { border-color: var(--text); }
+.rueck td.zelle-klick > a:hover .kachel.k-offen::after { content: '+'; color: var(--text); font-weight: 600; }
+.rueck td.passt-nicht .kachel { opacity: .55; }
+.rueck thead th.schicht-kopf .pille { display: inline-block; margin-top: .15rem; font-size: .7rem; padding: 0 .4rem; }
