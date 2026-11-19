@@ -160,7 +160,10 @@ ${r.schichten.length === 0 ? html`<p class="leer">Keine kommenden Schichten im Z
     const statusIn = (sid: number) => eintraegePerson.find((e) => e.schicht_id === sid)?.status ?? null;
     const gleicheZeit = (x: { start_zeit: string; end_zeit: string }) => x.start_zeit < s.end_zeit && s.start_zeit < x.end_zeit;
     const kanaele = KANAELE.filter((kn) => kn !== 'formular' || a?.kanal === 'formular');
-    const reihenfolge: Status[] = ['angemeldet', 'bestaetigt', 'unsicher', 'nachricht_gesendet', 'abgemeldet'];
+    // Bestätigen geht hier noch nicht (Wunsch Yann). Nur ein schon bestätigter Eintrag zeigt «bestätigt», damit Speichern ihn nicht ändert.
+    const reihenfolge: Status[] = a?.status === 'bestaetigt'
+      ? ['angemeldet', 'bestaetigt', 'unsicher', 'nachricht_gesendet', 'abgemeldet']
+      : ['angemeldet', 'unsicher', 'nachricht_gesendet', 'abgemeldet'];
     const vorgabeStatus: Status = a ? (a.status as Status) : 'angemeldet';
     const vorgabeKanal: Kanal = a ? (a.kanal as Kanal) : 'telefon';
     const wahl = (feld: string, werte: readonly string[], text: (w: string) => string, aktuell: string) => html`<div class="wahl" role="radiogroup">${werte.map((w) => html`<label class="wahl-knopf${feld === 'status' ? ` s-${w}` : ''}"><input type="radio" name="${feld}" value="${w}"${w === aktuell ? new Roh(' checked') : ''}><span>${feld === 'status' ? html`<span class="punkt-marke" aria-hidden="true"></span>` : ''}${text(w)}</span></label>`)}</div>`;

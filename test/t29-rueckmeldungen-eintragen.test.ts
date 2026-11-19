@@ -24,6 +24,9 @@ test('T29 Rückmeldungen: Feld öffnet das Fenster, Eintragen und Ändern laufen
     assert.doesNotMatch(leer, /<html/);
     assert.match(leer, new RegExp(`action="/schichten/${s.schichtId}/anmeldungen"`));
     assert.match(leer, /nicht gefragt/);
+    // Bestätigen geht im Fenster noch nicht.
+    assert.doesNotMatch(leer, /value="bestaetigt"/);
+    assert.match(leer, /value="unsicher"/);
 
     const post = (pfad: string, felder: Record<string, string>) =>
       fetch(`${app.url}${pfad}`, {
