@@ -26,6 +26,7 @@ test('Alle Seiten antworten ohne Fehler', async () => {
       '/', '/einsaetze', '/einsaetze?archiv=1', '/einsaetze/neu', `/einsaetze/${s.einsatzId}`, `/einsaetze/${s.einsatzId}/bearbeiten`,
       `/einsaetze/${s.einsatzId}/kopieren`, `/einsaetze/${s.einsatzId}/loeschen`, `/einsaetze/${s.einsatzId}/export.csv`,
       `/einsaetze/${s.einsatzId}/teilnehmerliste`, `/einsaetze/${s.einsatzId}/schichten/neu`,
+      `/einsaetze/${s.einsatzId}/anmeldungen`, `/einsaetze/${s.einsatzId}/schichten`, `/einsaetze/${s.einsatzId}/verlauf`,
       `/schichten/${s.schichtId}`, `/schichten/${s.schichtId}/bearbeiten`, `/schichten/${s.schichtId}/loeschen`,
       `/schichten/${s.schichtId}/anrufliste`, `/schichten/${s.schichtId}/anrufliste?alle=1`, `/schichten/${s.schichtId}/ics`,
       `/schichten/${s.schichtId}/termintext`, `/schichten/${s.schichtId}/aufgebot`, `/schichten/${s.schichtId}/essensliste.csv`,

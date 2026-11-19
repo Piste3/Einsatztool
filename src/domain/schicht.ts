@@ -2,7 +2,7 @@
 import { alle, eine, schreibe, transaktion, type Db } from '../db/db.js';
 import { Eingabefehler, NichtGefunden, ganzzahl, pflichtText, pruefeVersion, text } from './eingabe.js';
 import { zeitpunkt, ladeEinsatz } from './einsatz.js';
-import { jetztIso } from './zeit.js';
+import { jetztIso, lokalesDatum, lokaleZeit, plusTage } from './zeit.js';
 
 export interface Schicht {
   id: number;
@@ -154,6 +154,119 @@ export async function aendereSchicht(db: Db, id: number, e: SchichtEingabe): Pro
     );
     if (r.affectedRows === 0) throw new NichtGefunden('Schicht nicht gefunden.');
     await speichereRollen(c, id, e.rollen);
+  });
+}
+
+/** Eine Zeile der Tabelle «Schichten bearbeiten» (Einsatz › Schichten). */
+export interface SchichtZeile {
+  /** Leer = neue Schicht (unterste Zeile). */
+  id?: number;
+  version?: unknown;
+  name: unknown;
+  datum: unknown;
+  beginn: unknown;
+  ende: unknown;
+  soll_anzahl?: unknown;
+  ort?: unknown;
+  bemerkung_intern?: unknown;
+  rollen?: Record<string, unknown>;
+  /** Fingerabdruck der Werte beim Anzeigen. Gleich = die Person hat die Zeile nicht angefasst. */
+  ursprung?: unknown;
+}
+
+/** Fingerabdruck der Werte einer Zeile, so wie das Formular sie sendet. */
+export function zeilenAbdruck(z: SchichtZeile): string {
+  const t = (w: unknown) => (typeof w === 'string' ? w.trim() : w === null || w === undefined ? '' : String(w));
+  const rollen = Object.entries(z.rollen ?? {}).map(([r, n]) => [r, t(n) === '0' ? '' : t(n)]).filter(([, n]) => n !== '').sort();
+  return JSON.stringify([t(z.name), t(z.datum), t(z.beginn), t(z.ende), t(z.soll_anzahl), t(z.ort), t(z.bemerkung_intern), rollen]);
+}
+
+/**
+ * Prüft, ob eine Schicht in die Tabelle passt: Das Ende liegt am selben Tag oder am Folgetag (Nachtschicht).
+ * Längere Schichten bearbeitet die Aufgebotsstelle im Formular der Schicht.
+ */
+export function passtInTabelle(s: { start_zeit: string; end_zeit: string }): boolean {
+  const tag = lokalesDatum(s.start_zeit);
+  const endTag = lokalesDatum(s.end_zeit);
+  return endTag === tag || (endTag === plusTage(tag, 1) && lokaleZeit(s.end_zeit) <= lokaleZeit(s.start_zeit));
+}
+
+/** Start und Ende aus Datum, Beginn und Ende. Ende ≤ Beginn = Ende am Folgetag. */
+function zeitenAusZeile(z: SchichtZeile, feld: string): { start: string; ende: string } {
+  const start = zeitpunkt(z.datum, z.beginn, `${feld}: Beginn`);
+  const endeZeit = typeof z.ende === 'string' ? z.ende.trim() : '';
+  const beginnZeit = typeof z.beginn === 'string' ? z.beginn.trim() : '';
+  const datum = typeof z.datum === 'string' ? z.datum.trim() : '';
+  const endDatum = endeZeit && endeZeit <= beginnZeit ? plusTage(datum, 1) : datum;
+  const ende = zeitpunkt(endDatum, endeZeit, `${feld}: Ende`);
+  return { start, ende };
+}
+
+/**
+ * Tabelle «Schichten bearbeiten»: mehrere Schichten auf einmal ändern und eine neue anlegen.
+ * Alles in einer Transaktion. Unveränderte Zeilen schreibt das Tool nicht (keine neue Version).
+ * Eine geänderte Zeile mit alter Version speichert nichts (Konflikt).
+ * Felder ausserhalb der Tabelle (Tenue, Abtreten, Mindestalter, Bemerkung extern …) bleiben gleich.
+ */
+export async function speichereSchichtTabelle(
+  db: Db, einsatzId: number, zeilen: SchichtZeile[], neu: SchichtZeile | null,
+): Promise<{ geaendert: number; neuId: number | null }> {
+  return transaktion(db, async (c) => {
+    await ladeEinsatz(c, einsatzId);
+    const vorhanden = await alle<Schicht>(c, 'SELECT * FROM schicht WHERE einsatz_id = ? FOR UPDATE', [einsatzId]);
+    const bedarf = await alle<{ schicht_id: number; rolle: string; anzahl: number }>(
+      c, 'SELECT r.schicht_id, r.rolle, r.anzahl FROM schicht_rolle r JOIN schicht s ON s.id = r.schicht_id WHERE s.einsatz_id = ?', [einsatzId],
+    );
+    let geaendert = 0;
+    for (const z of zeilen) {
+      const alt = vorhanden.find((s) => s.id === z.id);
+      if (!alt) throw new NichtGefunden('Schicht nicht gefunden.');
+      if (!passtInTabelle(alt)) continue;
+      // Nicht angefasst: nichts schreiben, auch wenn ein anderer Benutzer die Schicht inzwischen geändert hat.
+      if (typeof z.ursprung === 'string' && z.ursprung === zeilenAbdruck(z)) continue;
+      const name = pflichtText(z.name, 'Name');
+      const { start, ende } = zeitenAusZeile(z, name);
+      const soll = ganzzahl(z.soll_anzahl, `${name}: Soll`, 0, 100000);
+      const ort = text(z.ort, `${name}: Antretensort`);
+      const bemerkung = text(z.bemerkung_intern, `${name}: Interne Bemerkung`, 5000);
+      const altRollen = new Map(bedarf.filter((b) => b.schicht_id === alt.id).map((b) => [b.rolle, Number(b.anzahl)]));
+      const neueRollen = new Map<string, number>();
+      for (const [rolle, wert] of Object.entries(z.rollen ?? {})) {
+        const n = ganzzahl(wert, `${name}: ${rolle}`, 0, 10000);
+        if (n) neueRollen.set(rolle, n);
+      }
+      const rollenGleich = altRollen.size === neueRollen.size && [...neueRollen].every(([r, n]) => altRollen.get(r) === n);
+      const gleich = alt.name === name && alt.start_zeit === start && alt.end_zeit === ende && alt.soll_anzahl === soll
+        && alt.ort === ort && alt.bemerkung_intern === bemerkung && rollenGleich;
+      if (gleich) continue;
+      pruefeVersion(
+        z.version,
+        alt.version,
+        `Ein anderer Benutzer hat die Schicht «${alt.name}» inzwischen geändert. Das Tool hat nichts gespeichert. Deine Eingaben stehen unten. Speichere erneut, wenn deine Werte gelten sollen.`,
+      );
+      await schreibe(
+        c,
+        `UPDATE schicht SET name = ?, start_zeit = ?, end_zeit = ?, soll_anzahl = ?, ort = ?, bemerkung_intern = ?, version = version + 1 WHERE id = ?`,
+        [name, start, ende, soll, ort, bemerkung, alt.id],
+      );
+      if (!rollenGleich) await speichereRollen(c, alt.id, z.rollen ?? {});
+      geaendert++;
+    }
+    let neuId: number | null = null;
+    const neuName = typeof neu?.name === 'string' ? neu.name.trim() : '';
+    if (neu && neuName) {
+      const { start, ende } = zeitenAusZeile(neu, neuName);
+      const sDatum = lokalesDatum(start);
+      const eDatum = lokalesDatum(ende);
+      neuId = await erstelleSchicht(c, einsatzId, {
+        name: neuName, start_datum: sDatum, start_zeit: lokaleZeit(start), end_datum: eDatum, end_zeit: lokaleZeit(ende),
+        soll_anzahl: neu.soll_anzahl, bemerkung_intern: neu.bemerkung_intern, rollen: neu.rollen,
+      });
+      // Eine neue Schicht übernimmt den Ort vom Einsatz. Ein Ort in der Zeile gilt nur für diese Schicht.
+      const ort = text(neu.ort, `${neuName}: Antretensort`);
+      if (ort) await schreibe(c, 'UPDATE schicht SET ort = ? WHERE id = ?', [ort, neuId]);
+    }
+    return { geaendert, neuId };
   });
 }
 

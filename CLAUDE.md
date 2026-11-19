@@ -96,7 +96,7 @@ Seit 19.11.2026 (Entscheid Yann): Aussehen und Bedienung folgen dem Handbuch des
 - Helle Navigation links mit Symbolen, unten Benutzer, Darstellung (wie System, Hell, Dunkel) und Abmelden.
 - Jede Seite: Pfad, Titel, Angaben, rechts «Live» und Knöpfe (der wichtigste dunkel), darunter Reiter. Baustein `seitenKopf()` in `src/web/views/layout.ts`.
 - Seltene Aktionen liegen im Menü «Mehr ▾» (`mehrMenue()`, `<details>`, geht ohne Skript).
-- Einsatz und Schichten haben Reiter: «Übersicht» und eine Schicht pro Reiter.
+- Einsatz-Reiter (seit 19.11.2026, Vorlage Yann): «Übersicht», «Anmeldungen», «Schichten», «Verlauf». Die Schichtseite zeigt die Schichten des Einsatzes als Chips.
 - Status als Pille mit farbigem Punkt: angemeldet blau, bestätigt grün, unsicher orange, Nachricht gesendet violett, abgemeldet grau.
 - Die Wahl der Darstellung speichert der Browser (`localStorage`). `thema.js` setzt sie vor dem Zeichnen.
 - CSS und Skripte haben `?v=<Startzeit>`. Nach einem Update lädt der Browser die neuen Dateien.
@@ -191,3 +191,7 @@ Diese Liste ergänze ich beim Bauen. Jede Annahme aus Teil B des Konzepts steht 
 - 19.11.2026: Einsatzleitung im Steckbrief = Einträge (angemeldet oder bestätigt) mit der Rolle «Einsatzleitung». Gibt es die Rolle nicht, fehlt die Angabe und die Zeile in «Zu tun».
 - 19.11.2026: Filter der Personen auf der Einsatz-Übersicht: `?personen=offen` (angemeldet, unsicher, Nachricht gesendet) und `?personen=warnung`.
 - 19.11.2026 (Vorlage Yann, Handbuch Bild 6): Einsatz-Liste mit Datum, Einsatz, Antreten (Beginn und Ort der ersten Schicht), Status («Im Formular» = mindestens eine Schicht publiziert, sonst «Entwurf»), Besetzung je Schicht mit Balken (eine Schicht = «Ganzer Einsatz»), Neu (angemeldet), Bestätigt und Einsatzleitung. Filter Status, von, bis (Server) und Suche (im Browser). Test T33.
+- 19.11.2026 (Vorlage Yann, Handbuch): Einsatz-Seite mit Reitern Übersicht, Anmeldungen (`/einsaetze/:id/anmeldungen`), Schichten (`/einsaetze/:id/schichten`), Verlauf (`/einsaetze/:id/verlauf`). Kopf: Datum, Antreten (Zeit und Ort), Leitung. Alte Links `/einsaetze/:id?personen=…` leiten auf «Anmeldungen» um.
+- 19.11.2026: Reiter «Schichten»: Karten je Schicht (Besetzung, Rollen, angemeldete und bestätigte Personen, sonst «Noch niemand zugeteilt.») und Tabelle «Schichten bearbeiten». Die Tabelle ändert Name, Datum, Beginn, Ende, Bedarf je Rolle, Soll, Antretensort und interne Bemerkung mehrerer Schichten in einer Transaktion (`speichereSchichtTabelle()`). Die unterste Zeile legt eine neue Schicht an (nicht publiziert). Test T34.
+- 19.11.2026: Tabelle: Ende vor Beginn = Ende am Folgetag. Schichten über mehr als den Folgetag zeigt die Tabelle nur lesend mit Link zum Formular. Eine Zeile ohne Änderung (Fingerabdruck `ursprung`) schreibt nichts. Eine geänderte Zeile mit alter Version speichert nichts (Konflikt).
+- 19.11.2026: Unterschied zum Handbuch: Soll ist ein eigenes Feld und nicht die Summe der Rollen. Rollen kommen aus Admin › Einstellungen, nicht fest EL/SC/BF/TN. Reiter «Anfragen» und «Formular» gibt es nicht (keine Funktion dafür).

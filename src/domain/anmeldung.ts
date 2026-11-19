@@ -288,6 +288,37 @@ export async function verlauf(db: Db, anmeldungIds: number[]): Promise<Map<numbe
   return m;
 }
 
+export interface EinsatzLogEintrag extends LogEintrag {
+  anmeldung_id: number;
+  schicht_name: string;
+  person_id: number | null;
+  person_name: string;
+  rang_name: string | null;
+}
+
+/** Statusprotokoll aller Einträge eines Einsatzes, neueste zuerst (Reiter «Verlauf»). */
+export async function verlaufEinsatz(db: Db, einsatzId: number, grenze = 300): Promise<EinsatzLogEintrag[]> {
+  const z = await alle<EinsatzLogEintrag & { vorname: string | null; nachname: string | null; name_text: string | null }>(
+    db,
+    `SELECT l.anmeldung_id, l.zeit, l.aktion, l.alt_wert, l.neu_wert, b.name AS benutzer,
+            s.name AS schicht_name, a.person_id, a.name_text, p.vorname, p.nachname, r.name AS rang_name
+       FROM status_log l
+       JOIN anmeldung a ON a.id = l.anmeldung_id
+       JOIN schicht s ON s.id = a.schicht_id
+       LEFT JOIN person p ON p.clubdesk_id = a.person_id
+       LEFT JOIN rang r ON r.id = p.rang_id
+       LEFT JOIN benutzer b ON b.id = l.benutzer_id
+      WHERE s.einsatz_id = ?
+      ORDER BY l.zeit DESC, l.id DESC
+      LIMIT ?`,
+    [einsatzId, grenze],
+  );
+  return z.map((e) => ({
+    ...e,
+    person_name: e.person_id !== null && (e.vorname || e.nachname) ? `${e.vorname ?? ''} ${e.nachname ?? ''}`.trim() : (e.name_text ?? ''),
+  }));
+}
+
 /** Der Eintrag einer Person in einer Schicht, falls es ihn gibt (eine Person hat pro Schicht höchstens einen). */
 export async function anmeldungVonPerson(db: Db, schichtId: number, personId: number): Promise<Anmeldung | null> {
   return (await eine<Anmeldung>(db, 'SELECT * FROM anmeldung WHERE schicht_id = ? AND person_id = ?', [schichtId, personId])) ?? null;

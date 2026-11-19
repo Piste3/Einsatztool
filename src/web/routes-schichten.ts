@@ -60,11 +60,16 @@ function wertText(aktion: string, w: string | null): string {
 
 export function verlaufListe(eintraege: { zeit: string; aktion: string; alt_wert: string | null; neu_wert: string | null; benutzer: string | null }[] | undefined): Roh {
   if (!eintraege?.length) return html`<p class="leer">Kein Verlauf.</p>`;
-  return html`<ol class="verlauf">${eintraege.map((l) => html`<li><time>${datumZeit(l.zeit)}</time> <strong>${AKTION_TEXT[l.aktion] ?? l.aktion}</strong>${
+  return html`<ol class="verlauf">${eintraege.map((l) => html`<li><time>${datumZeit(l.zeit)}</time> ${logText(l)} <span class="unter">(${l.benutzer ?? 'Formular / System'})</span></li>`)}</ol>`;
+}
+
+/** Aktion und Werte eines Eintrags im Statusprotokoll, z. B. «Status angemeldet → bestätigt». */
+export function logText(l: { aktion: string; alt_wert: string | null; neu_wert: string | null }): Roh {
+  return html`<strong>${AKTION_TEXT[l.aktion] ?? l.aktion}</strong>${
     l.aktion === 'erstellt' || l.aktion === 'bestaetigungsmail' || l.aktion === 'mail_ohne_adresse' || l.aktion === 'personendaten_geloescht'
       ? html` ${wertText(l.aktion, l.neu_wert)}`
       : html` ${wertText(l.aktion, l.alt_wert)} → ${wertText(l.aktion, l.neu_wert)}`
-  } <span class="unter">(${l.benutzer ?? 'Formular / System'})</span></li>`)}</ol>`;
+  }`;
 }
 
 function v(e: Record<string, unknown>, n: string): string {
@@ -228,8 +233,9 @@ ${seitenKopf({
       html`<div class="menue-trenner"></div>`,
       html`<a class="gefahr" href="/schichten/${s.id}/loeschen">Schicht löschen</a>`,
     ])}`,
-  reiter: einsatzReiter(s.einsatz_id, alleSchichten, s.id),
+  reiter: einsatzReiter(s.einsatz_id, 'schichten'),
 })}
+${alleSchichten.length > 1 ? html`<p class="filter-chips schicht-wahl" aria-label="Schichten dieses Einsatzes">${alleSchichten.map((x) => html`<a href="/schichten/${x.id}"${x.id === s.id ? new Roh(' aria-current="page"') : ''}>${x.name}</a>`)}</p>` : ''}
 <div class="zahl-karten">
   <div class="zahl-karte"><span class="wert">${istSoll(z.teilnehmende, s.soll_anzahl)}</span><span class="titel">Teilnehmende</span></div>
   ${karte('Unbestätigt', z.unbestaetigt, z.unbestaetigt ? 'orange' : '')}

@@ -703,19 +703,19 @@ body.druck { background: var(--hg); padding: 1rem; }
 .schicht-tabelle .unter { margin: 0; font-size: .82rem; }
 .schicht-tabelle td.zahl, .schicht-tabelle th.zahl { text-align: right; font-variant-numeric: tabular-nums; }
 .pillen { display: flex; flex-wrap: wrap; gap: .25rem; }
-.besetzung { display: grid; gap: .25rem; min-width: 8.5rem; }
-.besetzung-balken { display: block; width: 100%; height: 7px; border-radius: 4px; overflow: hidden; }
-.besetzung-balken .spur { fill: var(--grau-hg); }
-.besetzung-balken .b { fill: var(--grau); }
-.besetzung-balken .a { fill: color-mix(in srgb, var(--gruen-punkt) 35%, transparent); }
-.besetzung.f-gruen .besetzung-balken .b { fill: var(--gruen-punkt); }
-.besetzung.f-orange .besetzung-balken .b { fill: var(--orange-punkt); }
-.besetzung.f-rot .besetzung-balken .b { fill: var(--rot); }
-.besetzung-text { font-size: .85rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.besetzung-text .unter { margin: 0; }
-.besetzung.f-gruen .besetzung-text strong { color: var(--gruen); }
-.besetzung.f-orange .besetzung-text strong { color: var(--orange); }
-.besetzung.f-rot .besetzung-text strong { color: var(--rot); }
+.belegung { display: grid; gap: .25rem; min-width: 8.5rem; }
+.belegung-balken { display: block; width: 100%; height: 7px; border-radius: 4px; overflow: hidden; }
+.belegung-balken .spur { fill: var(--grau-hg); }
+.belegung-balken .b { fill: var(--grau); }
+.belegung-balken .a { fill: color-mix(in srgb, var(--gruen-punkt) 35%, transparent); }
+.belegung.f-gruen .belegung-balken .b { fill: var(--gruen-punkt); }
+.belegung.f-orange .belegung-balken .b { fill: var(--orange-punkt); }
+.belegung.f-rot .belegung-balken .b { fill: var(--rot); }
+.belegung-text { font-size: .85rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.belegung-text .unter { margin: 0; }
+.belegung.f-gruen .belegung-text strong { color: var(--gruen); }
+.belegung.f-orange .belegung-text strong { color: var(--orange); }
+.belegung.f-rot .belegung-text strong { color: var(--rot); }
 .personen-tabelle.rueck td.zelle-klick > a { flex-direction: column; gap: 2px; }
 .personen-tabelle .rolle { font-size: .68rem; color: var(--gedämpft); line-height: 1.1; }
 .personen-tabelle .kachel-huelle { position: relative; display: inline-flex; }
@@ -740,3 +740,41 @@ body.druck { background: var(--hg); padding: 1rem; }
 .besetzung-name { color: var(--gedämpft); }
 .besetzung-zahl { font-weight: 650; font-variant-numeric: tabular-nums; }
 .besetzung-zeile .balken { grid-column: 1 / -1; }
+
+/* ---------- Einsatz › Schichten: Karten und Tabelle «Schichten bearbeiten» (Vorlage Yann) ---------- */
+.schicht-karten { display: grid; grid-template-columns: repeat(auto-fill, minmax(19rem, 1fr)); gap: 1rem; }
+.schicht-karte2 { display: flex; flex-direction: column; gap: .7rem; padding: 1rem 1.1rem; min-width: 0; }
+.schicht-karte2 header { display: flex; justify-content: space-between; gap: .8rem; align-items: flex-start; }
+.schicht-karte2 h3 { margin: 0; font-size: 1rem; }
+.schicht-karte2 h3 a { color: var(--text); }
+.schicht-karte2 .unter { margin: 0; }
+.karte-besetzung { display: grid; gap: .2rem; min-width: 8.5rem; text-align: right; font-size: .82rem; }
+.karte-besetzung .belegung { min-width: 0; }
+.karte-zahl { font-variant-numeric: tabular-nums; }
+.karte-zahl.f-gruen strong { color: var(--gruen); }
+.karte-zahl.f-orange strong { color: var(--orange); }
+.karte-zahl.f-rot strong { color: var(--rot); }
+.karte-leer { text-align: center; padding: 1.2rem 0; border-top: 1px solid var(--linie); margin: 0; }
+.karte-personen { list-style: none; margin: 0; padding: .4rem 0 0; border-top: 1px solid var(--linie); display: grid; gap: .3rem; font-size: .88rem; }
+.karte-personen li { display: flex; justify-content: space-between; gap: .5rem; align-items: center; }
+.schicht-karte2 footer { display: flex; gap: .4rem; align-items: center; flex-wrap: wrap; margin-top: auto; border-top: 1px solid var(--linie); padding-top: .7rem; }
+.schicht-karte2 footer form { margin-left: auto; }
+.schicht-karte2.vergangen { opacity: .6; }
+.schicht-wahl { margin-top: -.4rem; }
+.bearbeiten-tabelle td { padding: .35rem .3rem; vertical-align: middle; }
+.bearbeiten-tabelle th { padding-left: .3rem; padding-right: .3rem; }
+.bearbeiten-tabelle input { width: 100%; min-width: 0; padding: .3rem .4rem; font-size: .85rem; }
+.bearbeiten-tabelle input[name$="[name]"] { min-width: 8rem; }
+.bearbeiten-tabelle input[type="date"] { min-width: 8.5rem; }
+.bearbeiten-tabelle input[type="time"] { min-width: 5.5rem; }
+.bearbeiten-tabelle input[name$="[ort]"], .bearbeiten-tabelle input[name$="[bemerkung_intern]"] { min-width: 7rem; }
+.bearbeiten-tabelle .zahl-feld { width: 3.2rem; text-align: center; }
+.bearbeiten-tabelle th.zahl, .bearbeiten-tabelle td.zahl { text-align: center; }
+.bearbeiten-tabelle tr.neue-zeile td { background: var(--flaeche-2); }
+.bearbeiten-tabelle tr.nur-lesen td { color: var(--gedämpft); }
+.tabelle-fuss { display: flex; justify-content: space-between; gap: 1rem; align-items: flex-start; margin-top: .6rem; flex-wrap: wrap; }
+.tabelle-fuss .unter { flex: 1 1 20rem; margin: 0; font-size: .82rem; }
+.einsatz-verlauf .nowrap { white-space: nowrap; }
+.schichten-bearbeiten, .tabelle-formular { min-width: 0; }
+.schichten-bearbeiten .rahmen { overflow-x: auto; max-width: 100%; }
+.einsatz-uebersicht, .einsatz-uebersicht > section { grid-template-columns: minmax(0, 1fr); }

@@ -6,8 +6,9 @@ import {
   aendereEinsatz, anzahlAnmeldungenEinsatz, einsatzListe, type EinsatzZeile, erstelleEinsatz, kopiereEinsatz, ladeEinsatz, loescheEinsatz, vorgabeKopie,
   type Einsatz,
 } from '../domain/einsatz.js';
-import { schichtenVonEinsatz } from '../domain/schicht.js';
-import { bestaetigeAlle } from '../domain/anmeldung.js';
+import { passtInTabelle, schichtenVonEinsatz, speichereSchichtTabelle, zeilenAbdruck, type SchichtZeile } from '../domain/schicht.js';
+import { bestaetigeAlle, verlaufEinsatz } from '../domain/anmeldung.js';
+import { logText } from './routes-schichten.js';
 import { warnungenFuerSchichten } from '../domain/warnungen.js';
 import { sollFarbe, zahlenFuerSchichten } from '../domain/zaehlung.js';
 import { teilnehmerlisteCsv } from '../domain/export.js';
@@ -19,9 +20,9 @@ import { html, mehrzeilig, Roh } from './html.js';
 import { k, aktuellerPfad } from './kontext.js';
 import { druckseite, formFelder, mehrMenue, seite, seitenKopf, type Reiter } from './views/layout.js';
 import {
-  abgleichPunkt, istSoll, kachel, kachelLegende, KACHEL_TEXT, knopfPost, publiziertMarke, punktMarke, statusText, warnungen, zeitraum, type KachelArt,
+  abgleichPunkt, datumZeit, istSoll, kachel, kachelLegende, KACHEL_TEXT, knopfPost, publiziertMarke, punktMarke, statusText, warnungen, zeitraum, type KachelArt,
 } from './views/teile.js';
-import { datumChVonIso, jetztIso, lokaleZeit, wochentagKurz } from '../domain/zeit.js';
+import { datumChVonIso, jetztIso, lokalesDatum, lokaleZeit, wochentagKurz } from '../domain/zeit.js';
 
 /** Name der Rolle für die Einsatzleitung (wie im Aufgebot, Regel 20.3). */
 const EINSATZLEITUNG = 'Einsatzleitung';
@@ -100,7 +101,7 @@ ${liste.length === 0 ? html`<p class="leer">Keine Einsätze.</p>` : html`
     <td class="antreten">${lokaleZeit(e.start)}${e.antretenOrt ? html` · ${e.antretenOrt}` : ''}</td>
     <td>${e.publiziert ? punktMarke('Im Formular', 'gruen') : punktMarke('Entwurf', 'grau')}</td>
     <td>${besetzung(e)}</td>
-    <td class="zahl">${e.unbestaetigt ? html`<a href="/einsaetze/${e.id}?personen=offen" class="orange-text">${e.unbestaetigt}</a>` : '–'}</td>
+    <td class="zahl">${e.unbestaetigt ? html`<a href="/einsaetze/${e.id}/anmeldungen?personen=offen" class="orange-text">${e.unbestaetigt}</a>` : '–'}</td>
     <td class="zahl">${e.bestaetigt || '–'}</td>
     <td class="einsatzleitung">${e.einsatzleitung.length ? e.einsatzleitung.map((n, i) => html`${i ? html`<br>` : ''}${n}`) : '–'}</td>
   </tr>`)}</tbody>
@@ -124,7 +125,8 @@ ${liste.length === 0 ? html`<p class="leer">Keine Einsätze.</p>` : html`
     }
   });
 
-  app.get('/einsaetze/:id', nurAufgebot, async (req, res) => {
+  // Einsatz-Seite mit Reitern (Vorlage Yann, Handbuch): Übersicht, Anmeldungen, Schichten, Verlauf.
+  const einsatzSeite = async (req: Request, res: Response, ansicht: Ansicht, tabelle?: { werte: Record<string, any>; fehler: string }) => {
     const kx = k(res);
     const e = await ladeEinsatz(db, leseId(req.params.id));
     const schichten = await schichtenVonEinsatz(db, e.id);
@@ -227,16 +229,16 @@ ${e.bemerkung_extern ? html`<p class="bemerkung"><strong>Extern:</strong> ${mehr
 </section>`;
 
     // ---------- Schichten ----------
-    const besetzung = (z: NonNullable<ReturnType<typeof zahlen.get>>, soll: number | null) => {
+    const belegung = (z: NonNullable<ReturnType<typeof zahlen.get>>, soll: number | null, mitText = true) => {
       const farbe = sollFarbe(z.teilnehmende, soll);
       const basis = soll && soll > 0 ? Math.max(soll, z.teilnehmende) : 0;
       const b = basis ? Math.round((Math.min(z.teilnehmende, basis) / basis) * 100) : 0;
       const a = basis ? Math.min(100 - b, Math.round((z.unbestaetigt / basis) * 100)) : 0;
-      return html`<div class="besetzung f-${farbe}">
-  ${basis ? html`<svg class="besetzung-balken" viewBox="0 0 100 6" preserveAspectRatio="none" aria-hidden="true" focusable="false"><rect class="spur" width="100" height="6"/><rect class="b" width="${b}" height="6"/><rect class="a" x="${b}" width="${a}" height="6"/></svg>` : ''}
-  <span class="besetzung-text">${soll && soll > 0
+      return html`<div class="belegung f-${farbe}">
+  ${basis ? html`<svg class="belegung-balken" viewBox="0 0 100 6" preserveAspectRatio="none" aria-hidden="true" focusable="false"><rect class="spur" width="100" height="6"/><rect class="b" width="${b}" height="6"/><rect class="a" x="${b}" width="${a}" height="6"/></svg>` : ''}
+  ${mitText ? html`<span class="belegung-text">${soll && soll > 0
     ? html`<strong>${z.teilnehmende} / ${soll}</strong>`
-    : html`<strong>${z.teilnehmende} bestätigt</strong>`}${z.unbestaetigt ? html` <span class="unter">+ ${z.unbestaetigt} angemeldet</span>` : ''}${soll && soll > 0 ? '' : html` <span class="unter">· kein Soll</span>`}</span>
+    : html`<strong>${z.teilnehmende} bestätigt</strong>`}${z.unbestaetigt ? html` <span class="unter">+ ${z.unbestaetigt} angemeldet</span>` : ''}${soll && soll > 0 ? '' : html` <span class="unter">· kein Soll</span>`}</span>` : ''}
 </div>`;
     };
     const schichtTabelle = html`<section aria-labelledby="schichten-titel">
@@ -254,7 +256,7 @@ ${!schichten.length ? html`<p class="leer">Keine Schichten.</p>` : html`<div cla
     ].filter((x) => x !== '');
     return html`<tr class="${s.end_zeit <= jetzt ? 'vergangen' : ''}">
     <td><div class="schicht-name">${abgleichPunkt(ws.abgleich)} <a href="/schichten/${s.id}">${s.name}</a></div><div class="unter">${zeitraum(s.start_zeit, s.end_zeit)}${s.ort ? ` · ${s.ort}` : ''}</div></td>
-    <td>${besetzung(z, s.soll_anzahl)}</td>
+    <td>${belegung(z, s.soll_anzahl)}</td>
     <td>${pillen.length ? html`<span class="pillen">${pillen}</span>` : html`<span class="unter">–</span>`}</td>
     <td>${z.rollen.length ? html`<span class="pillen">${z.rollen.map((r) => html`<span class="pille ${r.ist >= r.soll ? 'gruen' : 'rot'}">${r.rolle} ${r.ist}/${r.soll}</span>`)}</span>` : html`<span class="unter">–</span>`}</td>
     <td class="zahl">${z.essen}</td>
@@ -271,12 +273,12 @@ ${!schichten.length ? html`<p class="leer">Keine Schichten.</p>` : html`<div cla
 
     // ---------- Personen ----------
     const filterChips = html`<p class="filter-chips">
-  <a href="/einsaetze/${e.id}"${filter ? '' : new Roh(' aria-current="page"')}>Alle ${alleZeilen.length}</a>
-  <a href="/einsaetze/${e.id}?personen=offen"${filter === 'offen' ? new Roh(' aria-current="page"') : ''}>Offen ${alleZeilen.filter(offen).length}</a>
-  <a href="/einsaetze/${e.id}?personen=warnung"${filter === 'warnung' ? new Roh(' aria-current="page"') : ''}>Mit Warnung ${alleZeilen.filter(mitWarnung).length}</a>
+  <a href="/einsaetze/${e.id}/anmeldungen"${filter ? '' : new Roh(' aria-current="page"')}>Alle ${alleZeilen.length}</a>
+  <a href="/einsaetze/${e.id}/anmeldungen?personen=offen"${filter === 'offen' ? new Roh(' aria-current="page"') : ''}>Offen ${alleZeilen.filter(offen).length}</a>
+  <a href="/einsaetze/${e.id}/anmeldungen?personen=warnung"${filter === 'warnung' ? new Roh(' aria-current="page"') : ''}>Mit Warnung ${alleZeilen.filter(mitWarnung).length}</a>
 </p>`;
     const suche = html`<input type="search" class="suche" data-filter=".personen-tabelle tbody tr" placeholder="Name suchen …" aria-label="Personen suchen">`;
-    const titelPersonen = html`<div class="titelzeile filterzeile"><h2 id="personen-titel">Personen</h2>${alleZeilen.length ? suche : ''}</div>${alleZeilen.length ? filterChips : ''}`;
+    const titelPersonen = html`<div class="titelzeile filterzeile"><h2 id="personen-titel">Anmeldungen</h2>${alleZeilen.length ? suche : ''}</div>${alleZeilen.length ? filterChips : ''}`;
 
     // Mehrere Schichten: Kacheln wie in den Rückmeldungen. Ein Klick öffnet das Fenster zum Eintragen.
     const feld = (z: Zeile, s: (typeof schichten)[number]) => {
@@ -341,6 +343,122 @@ ${!alleZeilen.length
     : schichten.length === 1 ? liste() : matrix}
 </section>`;
 
+    // ---------- Kopf: Leitung ----------
+    const elPersonen = [...new Map(elEintraege.map((a) => [a.person_id ?? `u${a.id}`, a])).values()];
+    const leitung = elPersonen.length ? elPersonen.map((a, i) => html`${i ? ', ' : ''}${name(a)}`) : '–';
+
+    // ---------- Reiter «Schichten»: Karten je Schicht ----------
+    const schichtKarten = () => html`<section aria-labelledby="karten-titel">
+<h2 id="karten-titel" class="sr">Schichten</h2>
+${!schichten.length ? html`<p class="leer">Keine Schichten.</p>` : html`<div class="schicht-karten">${schichten.map((s) => {
+  const z = zahlen.get(s.id)!;
+  const fehlt = s.soll_anzahl && s.soll_anzahl > z.teilnehmende ? s.soll_anzahl - z.teilnehmende : 0;
+  const leute = eintraege.filter((a) => a.schicht_id === s.id && an(a)).sort((x, y) => (x.status === y.status ? nachRangTiefZuerst(x, y) : x.status === 'bestaetigt' ? -1 : 1));
+  const zeigen = leute.slice(0, 12);
+  return html`<article class="karte schicht-karte2${s.end_zeit <= jetzt ? ' vergangen' : ''}">
+  <header>
+    <div><h3><a href="/schichten/${s.id}">${s.name}</a></h3><p class="unter">${zeitraum(s.start_zeit, s.end_zeit)}</p></div>
+    <div class="karte-besetzung">
+      <span class="unter">Besetzung</span>
+      <span class="karte-zahl f-${sollFarbe(z.teilnehmende, s.soll_anzahl)}"><strong>${z.teilnehmende}${s.soll_anzahl ? ` / ${s.soll_anzahl}` : ''}</strong>${fehlt ? ` · ${fehlt} fehlen` : ''}</span>
+      ${belegung(z, s.soll_anzahl, false)}
+    </div>
+  </header>
+  ${z.rollen.length ? html`<p class="pillen">${z.rollen.map((r) => html`<span class="pille ${r.ist >= r.soll ? 'gruen' : 'rot'}">${r.rolle} ${r.ist}/${r.soll}</span>`)}</p>` : ''}
+  ${!leute.length ? html`<p class="leer karte-leer">Noch niemand zugeteilt.</p>` : html`<ul class="karte-personen">${zeigen.map((a) => html`<li><span>${name(a)}${a.rolle ? html` <span class="unter">· ${a.rolle}</span>` : ''}</span>${statusText(a.status as Status)}</li>`)}${leute.length > zeigen.length ? html`<li class="unter">+ ${leute.length - zeigen.length} weitere</li>` : ''}</ul>`}
+  <footer>
+    <a class="knopf klein" href="/schichten/${s.id}">Öffnen</a>
+    <a class="knopf klein" href="/schichten/${s.id}/anrufliste">Anrufliste</a>
+    <form method="post" action="/schichten/${s.id}/publizieren" class="inline">
+      ${formFelder(kx, hier)}
+      <input type="hidden" name="publiziert" value="${s.publiziert ? '0' : '1'}">
+      <button type="submit" class="schalter${s.publiziert ? ' an' : ''}" aria-pressed="${s.publiziert ? 'true' : 'false'}">${s.publiziert ? 'Publiziert' : 'Nicht publiziert'}</button>
+    </form>
+  </footer>
+</article>`;
+})}</div>`}
+</section>`;
+
+    // ---------- Reiter «Schichten»: Tabelle «Schichten bearbeiten» ----------
+    const bearbeitenTabelle = async () => {
+      const bedarf = ids.length
+        ? await alle<{ schicht_id: number; rolle: string; anzahl: number }>(db, 'SELECT schicht_id, rolle, anzahl FROM schicht_rolle WHERE schicht_id IN (?)', [ids])
+        : [];
+      const werte = tabelle?.werte ?? {};
+      const zeileAusDb = (s: (typeof schichten)[number]): SchichtZeile => ({
+        name: s.name, datum: lokalesDatum(s.start_zeit), beginn: lokaleZeit(s.start_zeit), ende: lokaleZeit(s.end_zeit),
+        soll_anzahl: s.soll_anzahl ?? '', ort: s.ort ?? '', bemerkung_intern: s.bemerkung_intern ?? '',
+        rollen: Object.fromEntries(bedarf.filter((b) => b.schicht_id === s.id).map((b) => [b.rolle, String(b.anzahl)])),
+      });
+      const wert = (z: SchichtZeile, feld: keyof SchichtZeile) => (z[feld] === null || z[feld] === undefined ? '' : String(z[feld]));
+      const rolleWert = (z: SchichtZeile, rolle: string) => {
+        const w = z.rollen?.[rolle];
+        return w === null || w === undefined ? '' : String(w);
+      };
+      const zellen = (schluessel: string, z: SchichtZeile, neu: boolean) => html`
+    <td><input name="z[${schluessel}][name]" value="${wert(z, 'name')}" maxlength="255" aria-label="Name"${neu ? new Roh(' placeholder="+ Neue Schicht"') : new Roh(' required')}></td>
+    <td><input type="date" name="z[${schluessel}][datum]" value="${wert(z, 'datum')}" aria-label="Datum"></td>
+    <td><input type="time" name="z[${schluessel}][beginn]" value="${wert(z, 'beginn')}" aria-label="Beginn"></td>
+    <td><input type="time" name="z[${schluessel}][ende]" value="${wert(z, 'ende')}" aria-label="Ende"></td>
+    ${rollen.map((r) => html`<td class="zahl"><input class="zahl-feld" type="number" min="0" max="10000" name="z[${schluessel}][rollen][${r.name}]" value="${rolleWert(z, r.name)}" placeholder="–" aria-label="${r.name}"></td>`)}
+    <td class="zahl"><input class="zahl-feld" type="number" min="0" max="100000" name="z[${schluessel}][soll_anzahl]" value="${wert(z, 'soll_anzahl')}" placeholder="–" aria-label="Soll"></td>
+    <td><input name="z[${schluessel}][ort]" value="${wert(z, 'ort')}" maxlength="255" placeholder="${e.ort ?? 'Ort'}" aria-label="Antretensort"></td>
+    <td><input name="z[${schluessel}][bemerkung_intern]" value="${wert(z, 'bemerkung_intern')}" maxlength="5000" aria-label="Interne Bemerkung"></td>`;
+      const tagVorgabe = schichten.length ? lokalesDatum(schichten[schichten.length - 1].start_zeit) : '';
+      return html`<section aria-labelledby="bearbeiten-titel" class="schichten-bearbeiten">
+<div class="titelzeile"><h2 id="bearbeiten-titel">Schichten bearbeiten <span class="unter">Name, Tag, Zeit, Soll und Bedarf je Rolle</span></h2></div>
+${tabelle ? html`<div class="meldung fehler" role="alert">${tabelle.fehler}</div>` : ''}
+<form method="post" action="/einsaetze/${e.id}/schichten/tabelle" class="tabelle-formular">
+  ${formFelder(kx)}
+  <div class="rahmen"><table class="tabelle bearbeiten-tabelle">
+    <thead><tr><th>Name</th><th>Datum</th><th>Beginn</th><th>Ende</th>${rollen.map((r) => html`<th class="zahl" title="Bedarf ${r.name}">${r.name}</th>`)}<th class="zahl">Soll</th><th>Antretensort</th><th>Interne Bemerkung</th><th><span class="sr">Aktionen</span></th></tr></thead>
+    <tbody>
+    ${schichten.map((s) => {
+      const schluessel = `s${s.id}`;
+      if (!passtInTabelle(s)) {
+        return html`<tr class="nur-lesen"><td>${s.name}</td><td colspan="${3 + rollen.length + 3}">${zeitraum(s.start_zeit, s.end_zeit)} <span class="unter">· dauert über den Folgetag hinaus</span></td><td><a class="knopf klein" href="/schichten/${s.id}/bearbeiten">Bearbeiten</a></td></tr>`;
+      }
+      const ausDb = zeileAusDb(s);
+      const gesendet = werte[schluessel] as SchichtZeile | undefined;
+      const z = gesendet ?? ausDb;
+      const ursprung = typeof gesendet?.ursprung === 'string' ? gesendet.ursprung : zeilenAbdruck(ausDb);
+      return html`<tr>
+    ${zellen(schluessel, z, false)}
+    <td class="aktionen-zelle"><input type="hidden" name="z[${schluessel}][version]" value="${s.version}"><input type="hidden" name="z[${schluessel}][ursprung]" value="${ursprung}"><a class="knopf gefahr klein" href="/schichten/${s.id}/loeschen">Löschen</a></td>
+  </tr>`;
+    })}
+    <tr class="neue-zeile">
+      ${zellen('neu', (werte.neu as SchichtZeile | undefined) ?? { name: '', datum: tagVorgabe, beginn: '', ende: '', rollen: {} }, true)}
+      <td class="unter">neu</td>
+    </tr>
+    </tbody>
+  </table></div>
+  <div class="tabelle-fuss">
+    <p class="unter">Ende vor Beginn = Ende am Folgetag. Soll zählt die Teilnehmenden, die Rollen zeigen den Bedarf je Rolle. Tenue, Abtreten, Mindestalter und Hinweis ändert das Formular der Schicht. Neue Schicht: unterste Zeile ausfüllen. Sie ist danach nicht publiziert.</p>
+    <button type="submit" class="knopf haupt">Speichern</button>
+  </div>
+</form>
+</section>`;
+    };
+
+    // ---------- Reiter «Verlauf» ----------
+    const verlaufAnsicht = async () => {
+      const log = await verlaufEinsatz(db, e.id, 300);
+      return html`<section aria-labelledby="verlauf-titel">
+<div class="titelzeile filterzeile"><h2 id="verlauf-titel">Verlauf</h2>${log.length ? html`<input type="search" class="suche" data-filter=".einsatz-verlauf tbody tr" placeholder="Suchen …" aria-label="Verlauf suchen">` : ''}</div>
+${!log.length ? html`<p class="leer">Noch keine Einträge im Statusprotokoll.</p>` : html`<div class="rahmen"><table class="tabelle einsatz-verlauf">
+  <thead><tr><th>Zeit</th><th>Person</th><th>Schicht</th><th>Änderung</th><th>Durch</th></tr></thead>
+  <tbody>${log.map((l) => html`<tr data-suche="${`${l.person_name} ${l.schicht_name} ${l.benutzer ?? ''}`.toLowerCase()}">
+    <td class="nowrap">${datumZeit(l.zeit)}</td>
+    <td>${l.person_id !== null ? html`<a href="/personen/${l.person_id}">${name({ rang_name: l.rang_name, name: l.person_name })}</a>` : l.person_name}</td>
+    <td>${l.schicht_name}</td>
+    <td>${logText(l)}</td>
+    <td class="unter">${l.benutzer ?? 'Formular / System'}</td>
+  </tr>`)}</tbody>
+</table></div>${log.length >= 300 ? html`<p class="unter">Das Tool zeigt die 300 neuesten Einträge.</p>` : ''}`}
+</section>`;
+    };
+
     const inhalt = html`
 ${seitenKopf({
   pfad: [{ text: 'Einsätze', href: '/einsaetze' }, { text: e.name }],
@@ -348,8 +466,8 @@ ${seitenKopf({
   marke: publiziertMarke(schichten.some((sc) => sc.publiziert)),
   angaben: [
     schichten.length ? html`<strong>${zeitraum(schichten[0].start_zeit, ende)}</strong>` : '',
-    `${schichten.length} ${schichten.length === 1 ? 'Schicht' : 'Schichten'}`,
-    `${alleZeilen.length} ${alleZeilen.length === 1 ? 'Person' : 'Personen'} eingetragen`,
+    `Antreten ${schichten.length ? lokaleZeit(schichten[0].start_zeit) : ''}${e.ort ? ` · ${e.ort}` : ''}`,
+    elRolle ? html`Leitung ${leitung}` : '',
   ],
   aktionen: html`<a class="knopf haupt" href="/einsaetze/${e.id}/teilnehmerliste">Teilnehmerliste</a>
     <a class="knopf" href="/einsaetze/${e.id}/bearbeiten">Bearbeiten</a>
@@ -362,15 +480,49 @@ ${seitenKopf({
       html`<div class="menue-trenner"></div>`,
       html`<a class="gefahr" href="/einsaetze/${e.id}/loeschen">Einsatz löschen</a>`,
     ])}`,
-  reiter: einsatzReiter(e.id, schichten, null),
+  reiter: einsatzReiter(e.id, ansicht, { anmeldungen: alleZeilen.length, schichten: schichten.length }),
 })}
 <div class="einsatz-uebersicht">
-${steckbrief}
-${zuTun}
-${schichtTabelle}
-${personen}
+${ansicht === 'uebersicht' ? html`${steckbrief}${zuTun}${schichtTabelle}`
+  : ansicht === 'anmeldungen' ? personen
+  : ansicht === 'schichten' ? html`${schichtKarten()}${await bearbeitenTabelle()}`
+  : await verlaufAnsicht()}
 </div>`;
-    res.send(seite(kx, e.name, 'einsaetze', inhalt, { breit: true }));
+    res.status(tabelle ? (tabelle.fehler.startsWith('Ein anderer Benutzer') ? 409 : 400) : 200)
+      .send(seite(kx, ansicht === 'uebersicht' ? e.name : `${e.name} · ${ANSICHT_TEXT[ansicht]}`, 'einsaetze', inhalt, { breit: true }));
+  };
+
+  app.get('/einsaetze/:id', nurAufgebot, async (req, res) => {
+    // Alte Links mit Filter der Personen führen auf den Reiter «Anmeldungen».
+    if (typeof req.query.personen === 'string') {
+      res.redirect(303, `/einsaetze/${leseId(req.params.id)}/anmeldungen?personen=${encodeURIComponent(req.query.personen)}`);
+      return;
+    }
+    await einsatzSeite(req, res, 'uebersicht');
+  });
+  app.get('/einsaetze/:id/anmeldungen', nurAufgebot, (req, res) => einsatzSeite(req, res, 'anmeldungen'));
+  app.get('/einsaetze/:id/schichten', nurAufgebot, (req, res) => einsatzSeite(req, res, 'schichten'));
+  app.get('/einsaetze/:id/verlauf', nurAufgebot, (req, res) => einsatzSeite(req, res, 'verlauf'));
+
+  // Tabelle «Schichten bearbeiten»: alle Zeilen in einer Transaktion, dazu eine neue Schicht (unterste Zeile).
+  app.post('/einsaetze/:id/schichten/tabelle', nurAufgebot, async (req, res) => {
+    const id = leseId(req.params.id);
+    const roh = (req.body?.z ?? {}) as Record<string, any>;
+    if (typeof roh !== 'object' || Array.isArray(roh)) throw new Eingabefehler('Die Tabelle ist ungültig.');
+    const zeilen: SchichtZeile[] = [];
+    for (const [schluessel, wert] of Object.entries(roh)) {
+      if (!/^s\d+$/.test(schluessel) || typeof wert !== 'object' || wert === null) continue;
+      zeilen.push({ ...wert, id: Number(schluessel.slice(1)), rollen: typeof wert.rollen === 'object' && wert.rollen ? wert.rollen : {} });
+    }
+    const neu = typeof roh.neu === 'object' && roh.neu ? { ...roh.neu, rollen: typeof roh.neu.rollen === 'object' && roh.neu.rollen ? roh.neu.rollen : {} } : null;
+    try {
+      const r = await speichereSchichtTabelle(db, id, zeilen, neu);
+      const teile = [r.geaendert ? `${r.geaendert} ${r.geaendert === 1 ? 'Schicht' : 'Schichten'} gespeichert.` : '', r.neuId ? 'Neue Schicht angelegt. Sie ist nicht publiziert.' : ''].filter(Boolean);
+      zurueck(req, res, `/einsaetze/${id}/schichten`, teile.length ? teile.join(' ') : 'Keine Änderung.');
+    } catch (fehler) {
+      if (!(fehler instanceof Eingabefehler)) throw fehler;
+      await einsatzSeite(req, res, 'schichten', { werte: roh, fehler: fehler.message });
+    }
   });
 
   app.get('/einsaetze/:id/bearbeiten', nurAufgebot, async (req, res) => {
@@ -456,11 +608,17 @@ ${seitenKopf({ pfad: [{ text: 'Einsätze', href: '/einsaetze' }, { text: e.name,
   });
 }
 
-/** Reiter eines Einsatzes: Übersicht und eine Schicht pro Reiter. */
-export function einsatzReiter(einsatzId: number, schichten: { id: number; name: string }[], aktiveSchicht: number | null): Reiter[] {
+export type Ansicht = 'uebersicht' | 'anmeldungen' | 'schichten' | 'verlauf';
+
+const ANSICHT_TEXT: Record<Ansicht, string> = { uebersicht: 'Übersicht', anmeldungen: 'Anmeldungen', schichten: 'Schichten', verlauf: 'Verlauf' };
+
+/** Reiter eines Einsatzes (Vorlage Yann, Handbuch): Übersicht, Anmeldungen, Schichten, Verlauf. */
+export function einsatzReiter(einsatzId: number, aktiv: Ansicht, zahlen: { anmeldungen?: number; schichten?: number } = {}): Reiter[] {
   return [
-    { text: 'Übersicht', href: `/einsaetze/${einsatzId}`, aktiv: aktiveSchicht === null },
-    ...schichten.map((sc) => ({ text: sc.name, href: `/schichten/${sc.id}`, aktiv: sc.id === aktiveSchicht })),
+    { text: 'Übersicht', href: `/einsaetze/${einsatzId}`, aktiv: aktiv === 'uebersicht' },
+    { text: 'Anmeldungen', href: `/einsaetze/${einsatzId}/anmeldungen`, aktiv: aktiv === 'anmeldungen', zahl: zahlen.anmeldungen },
+    { text: 'Schichten', href: `/einsaetze/${einsatzId}/schichten`, aktiv: aktiv === 'schichten', zahl: zahlen.schichten },
+    { text: 'Verlauf', href: `/einsaetze/${einsatzId}/verlauf`, aktiv: aktiv === 'verlauf' },
   ];
 }
 
