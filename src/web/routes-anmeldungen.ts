@@ -9,7 +9,7 @@ import { personAuswahlText, idAusAuswahl, personenListe } from '../domain/person
 import { Eingabefehler, STATUS_TEXT, id as leseId } from '../domain/eingabe.js';
 import { html, mehrzeilig } from './html.js';
 import { k, sicheresZiel } from './kontext.js';
-import { formFelder, seite } from './views/layout.js';
+import { formFelder, seite, seitenKopf } from './views/layout.js';
 import { datumZeit, statusText, zeitraum } from './views/teile.js';
 import { verlaufListe } from './routes-schichten.js';
 import { terminTitel } from '../domain/ics.js';
@@ -40,7 +40,7 @@ export function registriereAnmeldungen(app: Express, deps: Abhaengigkeiten): voi
     const s = await ladeSchicht(db, a.schicht_id);
     const ziel = sicheresZiel(req.query.zurueck, `/schichten/${s.id}`);
     res.send(seite(kx, 'Eintrag entfernen', 'einsaetze', html`
-<h1>Eintrag entfernen?</h1>
+${seitenKopf({ titel: 'Eintrag entfernen?' })}
 <p>${a.name_text} in «${terminTitel(s)}» (${STATUS_TEXT[a.status]}).</p>
 <p class="meldung fehler">Das Tool entfernt den Eintrag mit seinem Verlauf. Die Person gilt dann als «nicht gefragt».</p>
 <form method="post" action="/anmeldungen/${a.id}/loeschen" class="stapel">
@@ -96,7 +96,7 @@ export function registriereAnmeldungen(app: Express, deps: Abhaengigkeiten): voi
 </section>`);
     }
     res.send(seite(kx, 'Unbekannte Anmeldungen', 'unbekannt', html`
-<h1>Unbekannte Anmeldungen (${liste.length})</h1>
+${seitenKopf({ titel: 'Unbekannte Anmeldungen', angaben: [`${liste.length} offen`, 'Namen, die das Tool keiner Person sicher zuordnen konnte.'] })}
 <p class="unter">Diese Anmeldungen aus dem Formular passen zu keiner Person aus Clubdesk. Ordne sie von Hand zu.</p>
 <datalist id="personen-alle">${personen.map((p) => html`<option value="${personAuswahlText(p)}"></option>`)}</datalist>
 ${liste.length ? html`<div class="karten">${bloecke}</div>` : html`<p class="leer">Keine unbekannten Anmeldungen.</p>`}`));
@@ -115,7 +115,7 @@ ${liste.length ? html`<div class="karten">${bloecke}</div>` : html`<p class="lee
     }
     const a = await ladeAnmeldung(db, id);
     res.send(seite(kx, 'Person hat schon einen Eintrag', 'unbekannt', html`
-<h1>Person hat schon einen Eintrag.</h1>
+${seitenKopf({ titel: 'Person hat schon einen Eintrag.' })}
 <p>Die gewählte Person hat in dieser Schicht schon einen Eintrag. Das Tool führt Einträge nie automatisch zusammen.</p>
 <p>Unbekannter Eintrag: ${a.name_text}${a.email_text ? ` (${a.email_text})` : ''}${a.bemerkung ? html`<br><small>${mehrzeilig(a.bemerkung)}</small>` : ''}</p>
 <div class="knopfreihe">

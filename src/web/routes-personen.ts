@@ -8,7 +8,7 @@ import { verlauf } from '../domain/anmeldung.js';
 import { STATUS_TEXT, KANAL_TEXT, id as leseId, type Kanal } from '../domain/eingabe.js';
 import { html, Roh } from './html.js';
 import { k, aktuellerPfad } from './kontext.js';
-import { formFelder, seite } from './views/layout.js';
+import { formFelder, seite, seitenKopf } from './views/layout.js';
 import { datumZeit, kanalAuswahl, legende, statusMarke, statusText, telefon, zeitraum } from './views/teile.js';
 import { verlaufListe } from './routes-schichten.js';
 import { datumCh, datumChVonIso, lokaleZeit } from '../domain/zeit.js';
@@ -20,11 +20,10 @@ export function registrierePersonen(app: Express, deps: Abhaengigkeiten): void {
     const kx = k(res);
     const liste = await personenListe(db);
     res.send(seite(kx, 'Personen', 'personen', html`
-<div class="titelzeile">
-  <h1>Personen (${liste.length})</h1>
-  <input type="search" class="suche" data-filter=".filterbar tbody tr" placeholder="Suchen …" aria-label="Personen suchen">
+${seitenKopf({ titel: 'Personen', angaben: [`${liste.length} Personen`, 'Die Daten kommen aus Clubdesk. Das Tool ändert keine Personendaten.'] })}
+<div class="titelzeile filterzeile">
+  <input type="search" class="suche" data-filter=".filterbar tbody tr" placeholder="Name, Rang oder E-Mail …" aria-label="Personen suchen">
 </div>
-<p class="unter">Die Daten kommen aus Clubdesk. Das Tool ändert keine Personendaten.</p>
 <div class="rahmen"><table class="tabelle filterbar">
   <thead><tr><th>Rang</th><th>Name</th><th>Alter</th><th>Telefon</th><th>E-Mail</th><th>Essen</th></tr></thead>
   <tbody>${liste.map((p) => html`<tr data-suche="${`${p.vorname ?? ''} ${p.nachname ?? ''} ${p.rang_name ?? ''} ${p.email ?? ''}`.toLowerCase()}">
@@ -56,11 +55,12 @@ export function registrierePersonen(app: Express, deps: Abhaengigkeiten): void {
       : '';
     const zeigen = (feld: string, wert: unknown) => (wert ? html`<tr><th>${feld}</th><td>${wert as string}</td></tr>` : '');
     res.send(seite(kx, name, 'personen', html`
-<p><a href="/personen">← Personen</a></p>
-<div class="titelzeile">
-  <h1>${p.rang_name ? html`<span class="rang">${p.rang_name}</span> ` : ''}${name}</h1>
-  ${mailto ? html`<a class="knopf" href="${mailto}">Änderung melden</a>` : html`<span class="unter">MAIL_ROMAN fehlt in der Konfiguration.</span>`}
-</div>
+${seitenKopf({
+  pfad: [{ text: 'Personen', href: '/personen' }, { text: name }],
+  titel: html`${p.rang_name ? html`<span class="rang">${p.rang_name}</span> ` : ''}${name}`,
+  angaben: [`Clubdesk-ID ${p.clubdesk_id}`],
+  aktionen: mailto ? html`<a class="knopf" href="${mailto}">Änderung melden</a>` : html`<span class="unter">MAIL_ROMAN fehlt in der Konfiguration.</span>`,
+})}
 ${p.geloescht_am ? html`<p class="meldung hinweis">Die Personendaten sind gelöscht (${datumZeit(p.geloescht_am)}). Die ID bleibt.</p>` : ''}
 <div class="zwei-spalten">
 <section class="karte">
@@ -115,7 +115,7 @@ ${p.geloescht_am ? html`<p class="meldung hinweis">Die Personendaten sind gelös
     const r = await rueckmeldungen(db, o);
     const auswahl = (wert: string, aktuell: string) => (wert === aktuell ? new Roh(' selected') : '');
     res.send(seite(kx, 'Rückmeldungen', 'rueckmeldungen', html`
-<h1>Rückmeldungen</h1>
+${seitenKopf({ titel: 'Rückmeldungen', angaben: ['Wer hat sich wofür gemeldet: alle kommenden Schichten im Zeitraum.'] })}
 <form method="get" action="/rueckmeldungen" class="filter-form zeilen-form">
   <label>Zeitraum <select name="monate">${[1, 3, 6, 12].map((m) => html`<option value="${m}"${auswahl(String(m), String(monate))}>${m} ${m === 1 ? 'Monat' : 'Monate'}</option>`)}</select></label>
   <label>Sortierung <select name="sort"><option value="rang"${auswahl('rang', o.sortierung)}>Rang</option><option value="name"${auswahl('name', o.sortierung)}>Name</option></select></label>

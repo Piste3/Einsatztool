@@ -87,7 +87,17 @@ Sprache mit Yann: Deutsch nach ASD-STE100. Aktiv, höchstens 25 Wörter pro Satz
 
 ### Aussehen und Bedienung
 
-Siehe Abschnitt 3 des Auftrags. Kurz: Seitenleiste dunkelblau, Startseite «Zu tun», Ist/Soll-Farben (grün voll, orange ≥ 80 %, rot weniger), neue Seite «Rückmeldungen», Druckansicht Teilnehmerliste, Anruf- und WhatsApp-Links, heller und dunkler Modus, Systemschrift, alle Seiten handytauglich.
+Siehe Abschnitt 3 des Auftrags. Kurz: Startseite «Cockpit» mit «Zu tun», Ist/Soll-Farben (grün voll, orange ≥ 80 %, rot weniger), neue Seite «Rückmeldungen», Druckansicht Teilnehmerliste, Anruf- und WhatsApp-Links, heller und dunkler Modus, Systemschrift, alle Seiten handytauglich.
+
+Seit 19.11.2026 (Entscheid Yann): Aussehen und Bedienung folgen dem Handbuch des KKB-Einsatzplaners (nur als Vorbild). Funktionen bleiben gleich. Kein fremdes Logo.
+
+- Helle Navigation links mit Symbolen, unten Benutzer, Darstellung (wie System, Hell, Dunkel) und Abmelden.
+- Jede Seite: Pfad, Titel, Angaben, rechts «Live» und Knöpfe (der wichtigste dunkel), darunter Reiter. Baustein `seitenKopf()` in `src/web/views/layout.ts`.
+- Seltene Aktionen liegen im Menü «Mehr ▾» (`mehrMenue()`, `<details>`, geht ohne Skript).
+- Einsatz und Schichten haben Reiter: «Übersicht» und eine Schicht pro Reiter.
+- Status als Pille mit farbigem Punkt: angemeldet blau, bestätigt grün, unsicher orange, Nachricht gesendet violett, abgemeldet grau.
+- Die Wahl der Darstellung speichert der Browser (`localStorage`). `thema.js` setzt sie vor dem Zeichnen.
+- CSS und Skripte haben `?v=<Startzeit>`. Nach einem Update lädt der Browser die neuen Dateien.
 
 ### Betrieb
 
@@ -157,3 +167,4 @@ Diese Liste ergänze ich beim Bauen. Jede Annahme aus Teil B des Konzepts steht 
 - 19.11.2026: `transaktion()` wiederholt einen Vorgang bei Deadlock oder Sperr-Wartezeit (höchstens 4 Versuche). Gleichzeitiges Anlegen desselben Eintrags führt zu einer Wiederholung statt zu einem Fehler.
 - 19.11.2026: Verbindungspool 20 Verbindungen. Ein täglicher Job läuft nie zweimal gleichzeitig (Sperre im Speicher).
 - 19.11.2026: Das Update ruft `npm ci --include=dev` auf. Grund: `start.cmd` setzt `NODE_ENV=production`. Ohne `--include=dev` fehlt TypeScript (`tsc`) beim Bauen.
+- 19.11.2026: Oberfläche nach dem Handbuch des KKB-Einsatzplaners umgestaltet (siehe «Aussehen und Bedienung»). Regeln, Routen und Daten sind unverändert.

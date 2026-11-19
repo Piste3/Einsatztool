@@ -17,9 +17,9 @@ import { Eingabefehler, Konflikt, id as leseId, type Status } from '../domain/ei
 import { alle } from '../db/db.js';
 import { html, mehrzeilig, Roh } from './html.js';
 import { k, aktuellerPfad } from './kontext.js';
-import { druckseite, formFelder, seite } from './views/layout.js';
+import { druckseite, formFelder, mehrMenue, seite, seitenKopf, type Reiter } from './views/layout.js';
 import {
-  abgleichPunkt, istSoll, kanalAuswahl, knopfPost, legende, rolleAuswahl, statusAuswahl, statusMarke, warnungen, zeitraum,
+  abgleichPunkt, istSoll, kanalAuswahl, knopfPost, legende, publiziertMarke, rolleAuswahl, statusAuswahl, statusMarke, warnungen, zeitraum,
 } from './views/teile.js';
 import { jetztIso, lokalesDatum, lokaleZeit } from '../domain/zeit.js';
 import { telefonText, hauptnummer } from '../domain/personen.js';
@@ -56,15 +56,20 @@ export function registriereEinsaetze(app: Express, deps: Abhaengigkeiten): void 
     const archiv = req.query.ansicht === 'archiv';
     const liste = await einsatzListe(db, archiv ? 'archiv' : 'kommend');
     const inhalt = html`
-<div class="titelzeile">
-  <h1>${archiv ? 'Archiv' : 'Einsätze'}</h1>
-  ${archiv ? '' : html`<a class="knopf haupt" href="/einsaetze/neu">Neuer Einsatz</a>`}
-</div>
-<p class="tabs"><a href="/einsaetze"${archiv ? '' : new Roh(' aria-current="page"')}>Kommend</a> <a href="/einsaetze?ansicht=archiv"${archiv ? new Roh(' aria-current="page"') : ''}>Archiv</a></p>
+${seitenKopf({
+  titel: archiv ? 'Archiv' : 'Einsätze',
+  angaben: [`${liste.length} ${liste.length === 1 ? 'Einsatz' : 'Einsätze'}`],
+  aktionen: archiv ? undefined : html`<a class="knopf haupt" href="/einsaetze/neu">+ Neuer Einsatz</a>`,
+  reiter: [
+    { text: 'Kommend', href: '/einsaetze', aktiv: !archiv },
+    { text: 'Archiv', href: '/einsaetze?ansicht=archiv', aktiv: archiv },
+  ],
+})}
 ${liste.length === 0 ? html`<p class="leer">Keine Einsätze.</p>` : html`
-<div class="rahmen"><table class="tabelle">
-  <thead><tr><th>Einsatz</th><th>Zeitraum</th><th>Ort</th><th>Schichten</th><th>${archiv ? 'Teilnehmende' : 'Ist / Soll'}</th>${archiv ? '' : html`<th>Unbestätigt</th>`}</tr></thead>
-  <tbody>${liste.map((e) => html`<tr>
+<div class="titelzeile filterzeile"><input type="search" class="suche" data-filter=".filterbar tbody tr" placeholder="Einsatz suchen …" aria-label="Einsätze suchen"></div>
+<div class="rahmen"><table class="tabelle filterbar">
+  <thead><tr><th>Einsatz</th><th>Zeitraum</th><th>Ort</th><th>Schichten</th><th>${archiv ? 'Teilnehmende' : 'Besetzung'}</th>${archiv ? '' : html`<th>Unbestätigt</th>`}</tr></thead>
+  <tbody>${liste.map((e) => html`<tr data-suche="${`${e.name} ${e.ort ?? ''}`.toLowerCase()}">
     <td><a href="/einsaetze/${e.id}">${e.name}</a></td>
     <td>${zeitraum(e.start, e.ende)}</td>
     <td>${e.ort ?? ''}</td>
@@ -78,7 +83,7 @@ ${liste.length === 0 ? html`<p class="leer">Keine Einsätze.</p>` : html`
 
   app.get('/einsaetze/neu', nurAufgebot, (_req, res) => {
     const kx = k(res);
-    res.send(seite(kx, 'Neuer Einsatz', 'einsaetze', html`<h1>Neuer Einsatz</h1>${einsatzFormular(kx, '/einsaetze', {}, true, null)}`));
+    res.send(seite(kx, 'Neuer Einsatz', 'einsaetze', html`${seitenKopf({ pfad: [{ text: 'Einsätze', href: '/einsaetze' }, { text: 'Neuer Einsatz' }], titel: 'Neuer Einsatz', angaben: ['Eine Standardschicht entsteht automatisch. Sie ist publiziert.'] })}${einsatzFormular(kx, '/einsaetze', {}, true, null)}`));
   });
 
   app.post('/einsaetze', nurAufgebot, async (req, res) => {
@@ -88,7 +93,7 @@ ${liste.length === 0 ? html`<p class="leer">Keine Einsätze.</p>` : html`
       zurueck(req, res, `/einsaetze/${id}`, 'Einsatz erstellt.');
     } catch (e) {
       if (!(e instanceof Eingabefehler)) throw e;
-      res.status(400).send(seite(kx, 'Neuer Einsatz', 'einsaetze', html`<h1>Neuer Einsatz</h1>${einsatzFormular(kx, '/einsaetze', req.body, true, e.message)}`));
+      res.status(400).send(seite(kx, 'Neuer Einsatz', 'einsaetze', html`${seitenKopf({ pfad: [{ text: 'Einsätze', href: '/einsaetze' }, { text: 'Neuer Einsatz' }], titel: 'Neuer Einsatz' })}${einsatzFormular(kx, '/einsaetze', req.body, true, e.message)}`));
     }
   });
 
@@ -157,20 +162,60 @@ ${liste.length === 0 ? html`<p class="leer">Keine Einsätze.</p>` : html`
         </form></details></td>`;
     };
 
+    const ende = schichten.reduce((m, sc) => (sc.end_zeit > m ? sc.end_zeit : m), schichten[0]?.end_zeit ?? '');
+    // Lage: ein Satz, ob alle kommenden Schichten besetzt sind oder was fehlt.
+    const kommend = schichten.filter((sc) => sc.end_zeit > jetzt);
+    const fehlend = kommend
+      .map((sc) => ({ s: sc, fehlt: sc.soll_anzahl === null ? 0 : Math.max(0, sc.soll_anzahl - zahlen.get(sc.id)!.teilnehmende) }))
+      .filter((x) => x.fehlt > 0);
+    const summe = (f: (z: ReturnType<typeof zahlen.get> & object) => number) => schichten.reduce((n, sc) => n + f(zahlen.get(sc.id)!), 0);
+    const lage = !kommend.length
+      ? { farbe: 'grau' as const, text: 'Alle Schichten sind vorbei.', unter: '' }
+      : !fehlend.length
+        ? { farbe: 'gruen' as const, text: 'Alle Schichten sind besetzt.', unter: '' }
+        : fehlend.length <= 2
+          ? { farbe: 'rot' as const, text: 'Es fehlen noch Personen.', unter: fehlend.map((x) => `${x.s.name}: ${x.fehlt} ${x.fehlt === 1 ? 'fehlt' : 'fehlen'}`).join(' · ') }
+          : { farbe: 'rot' as const, text: 'Es fehlen noch Personen.', unter: `In ${fehlend.length} von ${kommend.length} Schichten fehlen noch ${fehlend.reduce((n, x) => n + x.fehlt, 0)} Personen.` };
+    const unbestaetigtTotal = summe((z) => z.unbestaetigt);
+
     const inhalt = html`
-<div class="titelzeile">
-  <div><h1>${e.name}</h1><p class="unter">${schichten.length ? zeitraum(schichten[0].start_zeit, schichten.reduce((m, s) => (s.end_zeit > m ? s.end_zeit : m), schichten[0].end_zeit)) : ''}${e.ort ? ` · ${e.ort}` : ''}</p></div>
-  <div class="knopfreihe">
+${seitenKopf({
+  pfad: [{ text: 'Einsätze', href: '/einsaetze' }, { text: e.name }],
+  titel: e.name,
+  marke: publiziertMarke(schichten.some((sc) => sc.publiziert)),
+  angaben: [
+    schichten.length ? html`<strong>${zeitraum(schichten[0].start_zeit, ende)}</strong>` : '',
+    e.ort ? `Antreten ${e.ort}` : '',
+    e.tenue ? `Tenue ${e.tenue}` : '',
+    `${schichten.length} ${schichten.length === 1 ? 'Schicht' : 'Schichten'}`,
+  ],
+  live: !!stand,
+  aktionen: html`<a class="knopf haupt" href="/einsaetze/${e.id}/teilnehmerliste">Teilnehmerliste</a>
     <a class="knopf" href="/einsaetze/${e.id}/bearbeiten">Bearbeiten</a>
-    <a class="knopf" href="/einsaetze/${e.id}/kopieren">Kopieren</a>
-    <a class="knopf" href="/einsaetze/${e.id}/schichten/neu">Schicht hinzufügen</a>
-    <a class="knopf" href="/einsaetze/${e.id}/teilnehmerliste">Teilnehmerliste drucken</a>
-    <a class="knopf" href="/einsaetze/${e.id}/export.csv">CSV</a>
-    <a class="knopf gefahr" href="/einsaetze/${e.id}/loeschen">Löschen</a>
+    ${mehrMenue([
+      html`<a href="/einsaetze/${e.id}/schichten/neu">Schicht hinzufügen</a>`,
+      html`<a href="/einsaetze/${e.id}/kopieren">Einsatz kopieren</a>`,
+      html`<div class="menue-trenner"></div><div class="menue-titel">Export</div>`,
+      html`<a href="/einsaetze/${e.id}/teilnehmerliste">Teilnehmerliste drucken</a>`,
+      html`<a href="/einsaetze/${e.id}/export.csv">Teilnehmerliste als CSV</a>`,
+      html`<div class="menue-trenner"></div>`,
+      html`<a class="gefahr" href="/einsaetze/${e.id}/loeschen">Einsatz löschen</a>`,
+    ])}`,
+  reiter: einsatzReiter(e.id, schichten, null),
+})}
+<section class="karte lage">
+  <div class="lage-text">${punktMarkeAllein(lage.farbe)}<div><strong>${lage.text}</strong>${lage.unter ? html`<p class="unter">${lage.unter}</p>` : ''}</div></div>
+  <div class="lage-zahlen">
+    <span class="${unbestaetigtTotal ? 'orange' : ''}"><strong>${unbestaetigtTotal}</strong>unbestätigt</span>
+    <span><strong>${summe((z) => z.unsicher)}</strong>unsicher</span>
+    <span><strong>${summe((z) => z.nachricht)}</strong>Nachricht gesendet</span>
+    <span><strong>${sortiert.length}</strong>Personen eingetragen</span>
+    ${unbestaetigtTotal ? knopfPost(kx, `/einsaetze/${e.id}/alle-bestaetigen`, `Alle ${unbestaetigtTotal} bestätigen`, {}, 'knopf klein', hier) : ''}
   </div>
-</div>
+</section>
 ${e.bemerkung_intern ? html`<p class="bemerkung intern"><strong>Intern:</strong> ${mehrzeilig(e.bemerkung_intern)}</p>` : ''}
 ${e.bemerkung_extern ? html`<p class="bemerkung"><strong>Extern:</strong> ${mehrzeilig(e.bemerkung_extern)}</p>` : ''}
+<div class="titelzeile"><h2>Besetzung</h2><a class="knopf klein" href="/einsaetze/${e.id}/schichten/neu">+ Schicht hinzufügen</a></div>
 <div class="karten schichten">
 ${schichten.map((s) => {
   const z = zahlen.get(s.id)!;
@@ -195,11 +240,11 @@ ${schichten.map((s) => {
     ${z.rollen.length ? html`<p class="rollen">${z.rollen.map((r) => html`<span class="pille ${r.ist >= r.soll ? 'gruen' : 'rot'}">${r.rolle} ${r.ist}/${r.soll}</span> `)}</p>` : ''}
     ${warnungen(ws.schicht)}
     ${warnZahl(s.id) ? html`<p class="warn-text">⚠ ${warnZahl(s.id)} Warnungen bei Einträgen</p>` : ''}
+    <footer><a class="knopf klein" href="/schichten/${s.id}">Einträge</a><a class="knopf klein" href="/schichten/${s.id}/anrufliste">Anrufliste</a></footer>
   </section>`;
 })}
 </div>
-<h2>Personen × Schichten</h2>
-${legende()}
+<div class="titelzeile"><h2>Personen × Schichten</h2>${legende()}</div>
 ${sortiert.length === 0 ? html`<p class="leer">Noch keine Einträge.</p>` : html`
 <div class="rahmen matrix-rahmen"><table class="tabelle matrix">
   <thead><tr><th class="name-spalte">Person</th>${schichten.map((s) => html`<th><a href="/schichten/${s.id}">${s.name}</a><small>${lokalesDatum(s.start_zeit).split('-').reverse().join('.')} ${lokaleZeit(s.start_zeit)}</small></th>`)}</tr></thead>
@@ -215,7 +260,7 @@ ${sortiert.length === 0 ? html`<p class="leer">Noch keine Einträge.</p>` : html
     const kx = k(res);
     const e = await ladeEinsatz(db, leseId(req.params.id));
     const stand = await seitenStand(db, e.id);
-    res.send(seite(kx, `${e.name} bearbeiten`, 'einsaetze', html`<p><a href="/einsaetze/${e.id}">← ${e.name}</a></p><h1>Einsatz bearbeiten</h1>${einsatzFormular(kx, `/einsaetze/${e.id}`, e as unknown as Record<string, unknown>, false, null)}`, { stand }));
+    res.send(seite(kx, `${e.name} bearbeiten`, 'einsaetze', html`${seitenKopf({ pfad: [{ text: 'Einsätze', href: '/einsaetze' }, { text: e.name, href: `/einsaetze/${e.id}` }, { text: 'Bearbeiten' }], titel: 'Einsatz bearbeiten', live: !!stand })}${einsatzFormular(kx, `/einsaetze/${e.id}`, e as unknown as Record<string, unknown>, false, null)}`, { stand }));
   });
 
   app.post('/einsaetze/:id', nurAufgebot, async (req, res) => {
@@ -229,7 +274,7 @@ ${sortiert.length === 0 ? html`<p class="leer">Noch keine Einträge.</p>` : html
       // Konflikt: Die Eingaben bleiben. Ein zweites Speichern überschreibt bewusst den neuen Stand.
       const konflikt = e instanceof Konflikt;
       const werte = konflikt ? { ...req.body, version: e.aktuelleVersion } : req.body;
-      res.status(konflikt ? 409 : 400).send(seite(kx, 'Einsatz bearbeiten', 'einsaetze', html`<h1>Einsatz bearbeiten</h1>${
+      res.status(konflikt ? 409 : 400).send(seite(kx, 'Einsatz bearbeiten', 'einsaetze', html`${seitenKopf({ pfad: [{ text: 'Einsätze', href: '/einsaetze' }, { text: 'Bearbeiten' }], titel: 'Einsatz bearbeiten' })}${
         konflikt ? html`<p><a href="/einsaetze/${id}" target="_blank" rel="noopener">Aktuellen Stand in neuem Tab öffnen</a></p>` : ''
       }${einsatzFormular(kx, `/einsaetze/${id}`, werte, false, e.message)}`));
     }
@@ -240,8 +285,7 @@ ${sortiert.length === 0 ? html`<p class="leer">Noch keine Einträge.</p>` : html
     const e = await ladeEinsatz(db, leseId(req.params.id));
     const v = await vorgabeKopie(db, e.id);
     res.send(seite(kx, 'Einsatz kopieren', 'einsaetze', html`
-<p><a href="/einsaetze/${e.id}">← ${e.name}</a></p>
-<h1>Einsatz kopieren</h1>
+${seitenKopf({ pfad: [{ text: 'Einsätze', href: '/einsaetze' }, { text: e.name, href: `/einsaetze/${e.id}` }, { text: 'Kopieren' }], titel: 'Einsatz kopieren' })}
 <p>Das Tool kopiert alle Schichten mit Ort, Vorgaben, Rollenbedarf und Bemerkungen. Es kopiert keine Anmeldungen und keine Fremdabteilungen. Alle Schichten sind danach nicht publiziert.</p>
 <form method="post" action="/einsaetze/${e.id}/kopieren" class="formular-raster">
   ${formFelder(kx)}
@@ -262,7 +306,7 @@ ${sortiert.length === 0 ? html`<p class="leer">Noch keine Einträge.</p>` : html
     const e = await ladeEinsatz(db, leseId(req.params.id));
     const n = await anzahlAnmeldungenEinsatz(db, e.id);
     res.send(seite(kx, 'Einsatz löschen', 'einsaetze', html`
-<h1>Einsatz «${e.name}» löschen?</h1>
+${seitenKopf({ pfad: [{ text: 'Einsätze', href: '/einsaetze' }, { text: e.name, href: `/einsaetze/${e.id}` }, { text: 'Löschen' }], titel: `Einsatz «${e.name}» löschen?` })}
 <p class="meldung fehler">${n > 0 ? `Der Einsatz hat ${n} Anmeldungen. ` : ''}Das Tool löscht den Einsatz mit allen Schichten und Anmeldungen. Es gibt keine Wiederherstellung. Nur das nächtliche Backup enthält die Daten noch.</p>
 <form method="post" action="/einsaetze/${e.id}/loeschen" class="stapel">
   ${formFelder(kx)}
@@ -294,6 +338,18 @@ ${sortiert.length === 0 ? html`<p class="leer">Noch keine Einträge.</p>` : html
     const e = await ladeEinsatz(db, leseId(req.params.id));
     res.send(await teilnehmerlisteDruck(deps, e, req.query.umfang === 'beide'));
   });
+}
+
+/** Reiter eines Einsatzes: Übersicht und eine Schicht pro Reiter. */
+export function einsatzReiter(einsatzId: number, schichten: { id: number; name: string }[], aktiveSchicht: number | null): Reiter[] {
+  return [
+    { text: 'Übersicht', href: `/einsaetze/${einsatzId}`, aktiv: aktiveSchicht === null },
+    ...schichten.map((sc) => ({ text: sc.name, href: `/schichten/${sc.id}`, aktiv: sc.id === aktiveSchicht })),
+  ];
+}
+
+function punktMarkeAllein(farbe: 'gruen' | 'rot' | 'grau'): Roh {
+  return html`<span class="pille-punkt punkt-${farbe}"><span class="punkt-marke" aria-hidden="true"></span></span>`;
 }
 
 export function dateiTeil(name: string): string {

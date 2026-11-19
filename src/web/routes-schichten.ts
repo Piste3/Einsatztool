@@ -4,7 +4,7 @@ import type { Abhaengigkeiten } from './app.js';
 import { nurAufgebot, zurueck } from './app.js';
 import {
   aendereSchicht, anzahlAnmeldungenSchicht, erstelleSchicht, fremdabteilungen, ladeSchicht, loescheSchicht, rollenBedarf, setzePubliziert,
-  speichereFremdabteilung, type SchichtMitEinsatz,
+  speichereFremdabteilung, schichtenVonEinsatz, type SchichtMitEinsatz,
 } from '../domain/schicht.js';
 import { ladeEinsatz } from '../domain/einsatz.js';
 import { bestaetigeAlle, sammelstatus, setzeAnmeldung, verlauf } from '../domain/anmeldung.js';
@@ -23,12 +23,22 @@ import { feedStand } from '../domain/ical-abgleich.js';
 import { alterAm, datumChVonIso, lokalesDatum, lokaleZeit } from '../domain/zeit.js';
 import { html, mehrzeilig, Roh } from './html.js';
 import { k, aktuellerPfad } from './kontext.js';
-import { druckseite, formFelder, seite } from './views/layout.js';
+import { druckseite, formFelder, mehrMenue, seite, seitenKopf, type PfadTeil } from './views/layout.js';
 import {
   abgleichPunkt, datumZeit, istSoll, kanalAuswahl, karte, knopfPost, rolleAuswahl, statusAuswahl, statusText, telefon, warnungen, zeitraum,
 } from './views/teile.js';
 import { seitenStand } from './routes-stand.js';
-import { dateiTeil, sendeCsv } from './routes-einsaetze.js';
+import { dateiTeil, einsatzReiter, sendeCsv } from './routes-einsaetze.js';
+
+/** Pfad oben: Einsätze › Einsatz › Schicht › … */
+function schichtPfad(s: { id: number; name: string; einsatz_id: number; einsatz_name: string }, weiter?: string): PfadTeil[] {
+  return [
+    { text: 'Einsätze', href: '/einsaetze' },
+    { text: s.einsatz_name, href: `/einsaetze/${s.einsatz_id}` },
+    weiter ? { text: s.name, href: `/schichten/${s.id}` } : { text: s.name },
+    ...(weiter ? [{ text: weiter }] : []),
+  ];
+}
 
 const AKTION_TEXT: Record<string, string> = {
   erstellt: 'Eintrag erstellt',
@@ -112,7 +122,7 @@ export function registriereSchichten(app: Express, deps: Abhaengigkeiten): void 
     const vorgabe = erste.length
       ? { start_datum: lokalesDatum(erste[0].start_zeit), start_zeit: lokaleZeit(erste[0].start_zeit), end_datum: lokalesDatum(erste[0].end_zeit), end_zeit: lokaleZeit(erste[0].end_zeit) }
       : {};
-    res.send(seite(kx, 'Schicht hinzufügen', 'einsaetze', html`<p><a href="/einsaetze/${e.id}">← ${e.name}</a></p><h1>Schicht hinzufügen</h1>${await schichtFormular(deps, kx, `/einsaetze/${e.id}/schichten`, vorgabe, new Map(), null, true)}`));
+    res.send(seite(kx, 'Schicht hinzufügen', 'einsaetze', html`${seitenKopf({ pfad: [{ text: 'Einsätze', href: '/einsaetze' }, { text: e.name, href: `/einsaetze/${e.id}` }, { text: 'Schicht hinzufügen' }], titel: 'Schicht hinzufügen' })}${await schichtFormular(deps, kx, `/einsaetze/${e.id}/schichten`, vorgabe, new Map(), null, true)}`));
   });
 
   app.post('/einsaetze/:id/schichten', nurAufgebot, async (req, res) => {
@@ -123,7 +133,7 @@ export function registriereSchichten(app: Express, deps: Abhaengigkeiten): void 
       zurueck(req, res, `/schichten/${sid}`, 'Schicht hinzugefügt. Sie ist nicht publiziert.');
     } catch (e) {
       if (!(e instanceof Eingabefehler)) throw e;
-      res.status(400).send(seite(kx, 'Schicht hinzufügen', 'einsaetze', html`<h1>Schicht hinzufügen</h1>${await schichtFormular(deps, kx, `/einsaetze/${einsatzId}/schichten`, req.body, new Map(), e.message, true)}`));
+      res.status(400).send(seite(kx, 'Schicht hinzufügen', 'einsaetze', html`${seitenKopf({ pfad: [{ text: 'Einsätze', href: '/einsaetze' }, { text: 'Schicht hinzufügen' }], titel: 'Schicht hinzufügen' })}${await schichtFormular(deps, kx, `/einsaetze/${einsatzId}/schichten`, req.body, new Map(), e.message, true)}`));
     }
   });
 
@@ -155,6 +165,7 @@ export function registriereSchichten(app: Express, deps: Abhaengigkeiten): void 
     const personen = await personenListe(db);
     const vermerk = await icsVermerk(db, s.id);
     const feed = feedStand();
+    const alleSchichten = await schichtenVonEinsatz(db, s.einsatz_id);
 
     const zaehlerStatus = new Map<Status, number>();
     for (const e of eintraege) zaehlerStatus.set(e.status, (zaehlerStatus.get(e.status) ?? 0) + 1);
@@ -172,7 +183,7 @@ export function registriereSchichten(app: Express, deps: Abhaengigkeiten): void 
   <td>${warnungen(wl)}</td>
   <td>${e.essenseinschraenkung ?? ''}</td>
   <td class="aktionen-zelle">
-    ${e.status !== 'bestaetigt' ? knopfPost(kx, `/anmeldungen/${e.id}`, 'Bestätigen', { status: 'bestaetigt' }, 'knopf haupt klein', hier) : ''}
+    ${e.status !== 'bestaetigt' ? knopfPost(kx, `/anmeldungen/${e.id}`, 'Bestätigen', { status: 'bestaetigt' }, 'knopf klein', hier) : ''}
     <details class="aufklapp"><summary>Ändern</summary>
       <form method="post" action="/anmeldungen/${e.id}" class="mini-form">
         ${formFelder(kx, hier)}<input type="hidden" name="version" value="${e.version}">
@@ -196,26 +207,32 @@ export function registriereSchichten(app: Express, deps: Abhaengigkeiten): void 
     const abgemeldet = sichtbar.filter((e) => e.status === 'abgemeldet');
 
     const inhalt = html`
-<p><a href="/einsaetze/${s.einsatz_id}">← ${s.einsatz_name}</a></p>
-<div class="titelzeile">
-  <div>
-    <h1>${abgleichPunkt(w.abgleich)} ${s.name}</h1>
-    <p class="unter">${zeitraum(s.start_zeit, s.end_zeit)}${s.ort ? ` · ${s.ort}` : ''}${s.min_alter !== null ? ` · ab ${s.min_alter} Jahren` : ''}${s.min_rang_name ? ` · ab ${s.min_rang_name}` : ''}</p>
-  </div>
-  <div class="knopfreihe">
-    <form method="post" action="/schichten/${s.id}/publizieren" class="inline">
+${seitenKopf({
+  pfad: schichtPfad(s),
+  titel: html`${abgleichPunkt(w.abgleich)} ${s.name}`,
+  marke: html`<form method="post" action="/schichten/${s.id}/publizieren" class="inline">
       ${formFelder(kx, hier)}<input type="hidden" name="publiziert" value="${s.publiziert ? '0' : '1'}">
-      <button type="submit" class="schalter${s.publiziert ? ' an' : ''}" aria-pressed="${s.publiziert ? 'true' : 'false'}">${s.publiziert ? 'Publiziert' : 'Nicht publiziert'}</button>
-    </form>
+      <button type="submit" class="schalter${s.publiziert ? ' an' : ''}" aria-pressed="${s.publiziert ? 'true' : 'false'}" title="Nur die Schicht hat den Schalter «Publiziert».">${s.publiziert ? 'Publiziert' : 'Nicht publiziert'}</button>
+    </form>`,
+  angaben: [
+    html`<strong>${zeitraum(s.start_zeit, s.end_zeit)}</strong>`,
+    s.ort ? `Antreten ${s.ort}` : '',
+    s.min_alter !== null ? `ab ${s.min_alter} Jahren` : '',
+    s.min_rang_name ? `ab ${s.min_rang_name}` : '',
+  ],
+  live: !!stand,
+  aktionen: html`<a class="knopf haupt" href="/schichten/${s.id}/anrufliste">Anrufliste</a>
     <a class="knopf" href="/schichten/${s.id}/bearbeiten">Bearbeiten</a>
-    <a class="knopf" href="/schichten/${s.id}/anrufliste">Anrufliste</a>
-    <a class="knopf" href="/schichten/${s.id}/aufgebot">Aufgebot</a>
-    <a class="knopf" href="/schichten/${s.id}/essensliste.csv">Essensliste</a>
-    <a class="knopf" href="/schichten/${s.id}/ics">ICS</a>
-    <a class="knopf" href="/schichten/${s.id}/termintext">Termintext</a>
-    <a class="knopf gefahr" href="/schichten/${s.id}/loeschen">Löschen</a>
-  </div>
-</div>
+    ${mehrMenue([
+      html`<a href="/schichten/${s.id}/aufgebot">Aufgebot (Briefe)</a>`,
+      html`<a href="/schichten/${s.id}/ics">Kalendertermin (ICS)</a>`,
+      html`<a href="/schichten/${s.id}/termintext">Text für Clubdesk-Termin</a>`,
+      html`<a href="/schichten/${s.id}/essensliste.csv">Essensliste (CSV)</a>`,
+      html`<div class="menue-trenner"></div>`,
+      html`<a class="gefahr" href="/schichten/${s.id}/loeschen">Schicht löschen</a>`,
+    ])}`,
+  reiter: einsatzReiter(s.einsatz_id, alleSchichten, s.id),
+})}
 <div class="zahl-karten">
   <div class="zahl-karte"><span class="wert">${istSoll(z.teilnehmende, s.soll_anzahl)}</span><span class="titel">Teilnehmende</span></div>
   ${karte('Unbestätigt', z.unbestaetigt, z.unbestaetigt ? 'orange' : '')}
@@ -289,7 +306,7 @@ ${s.bemerkung_intern ? html`<p class="bemerkung intern"><strong>Intern:</strong>
     const s = await ladeSchicht(db, leseId(req.params.sid));
     const stand = await seitenStand(db, s.einsatz_id);
     const bedarf = await rollenBedarf(db, s.id);
-    res.send(seite(kx, 'Schicht bearbeiten', 'einsaetze', html`<p><a href="/schichten/${s.id}">← ${s.name}</a></p><h1>Schicht bearbeiten</h1>${await schichtFormular(deps, kx, `/schichten/${s.id}`, schichtWerte(s), bedarf, null, false)}`, { stand }));
+    res.send(seite(kx, 'Schicht bearbeiten', 'einsaetze', html`${seitenKopf({ pfad: schichtPfad(s, 'Bearbeiten'), titel: 'Schicht bearbeiten', live: !!stand })}${await schichtFormular(deps, kx, `/schichten/${s.id}`, schichtWerte(s), bedarf, null, false)}`, { stand }));
   });
 
   app.post('/schichten/:sid', nurAufgebot, async (req, res) => {
@@ -303,7 +320,7 @@ ${s.bemerkung_intern ? html`<p class="bemerkung intern"><strong>Intern:</strong>
       // Konflikt: Die Eingaben bleiben. Ein zweites Speichern überschreibt bewusst den neuen Stand.
       const konflikt = e instanceof Konflikt;
       const werte = konflikt ? { ...req.body, version: e.aktuelleVersion } : req.body;
-      res.status(konflikt ? 409 : 400).send(seite(kx, 'Schicht bearbeiten', 'einsaetze', html`<h1>Schicht bearbeiten</h1>${
+      res.status(konflikt ? 409 : 400).send(seite(kx, 'Schicht bearbeiten', 'einsaetze', html`${seitenKopf({ pfad: [{ text: 'Einsätze', href: '/einsaetze' }, { text: 'Schicht bearbeiten' }], titel: 'Schicht bearbeiten' })}${
         konflikt ? html`<p><a href="/schichten/${sid}" target="_blank" rel="noopener">Aktuellen Stand in neuem Tab öffnen</a></p>` : ''
       }${await schichtFormular(deps, kx, `/schichten/${sid}`, werte, new Map(), e.message, false)}`));
     }
@@ -322,7 +339,7 @@ ${s.bemerkung_intern ? html`<p class="bemerkung intern"><strong>Intern:</strong>
     const s = await ladeSchicht(db, leseId(req.params.sid));
     const n = await anzahlAnmeldungenSchicht(db, s.id);
     res.send(seite(kx, 'Schicht löschen', 'einsaetze', html`
-<h1>Schicht «${s.name}» löschen?</h1>
+${seitenKopf({ pfad: schichtPfad(s, 'Löschen'), titel: `Schicht «${s.name}» löschen?` })}
 ${s.anzahl_schichten <= 1 ? html`<p class="meldung fehler">Das ist die einzige Schicht des Einsatzes. Lösche stattdessen den Einsatz.</p>` : html`
 <p class="meldung fehler">${n > 0 ? `Die Schicht hat ${n} Anmeldungen. ` : ''}Das Tool löscht die Schicht mit allen Einträgen.</p>
 <form method="post" action="/schichten/${s.id}/loeschen" class="stapel">
@@ -382,10 +399,15 @@ ${s.anzahl_schichten <= 1 ? html`<p class="meldung fehler">Das ist die einzige S
     const { zeilen, ausgeblendet } = await anrufliste(db, s.id, alleZeigen);
     const hier = aktuellerPfad(req);
     const inhalt = html`
-<p><a href="/schichten/${s.id}">← ${s.name}</a></p>
-<div class="titelzeile">
-  <div><h1>Anrufliste</h1><p class="unter">${terminTitel(s)} · ${zeitraum(s.start_zeit, s.end_zeit)}</p></div>
-  <input type="search" class="suche" data-filter=".filterbar tbody tr" placeholder="Suchen …" aria-label="Personen suchen">
+${seitenKopf({
+  pfad: schichtPfad(s, 'Anrufliste'),
+  titel: 'Anrufliste',
+  angaben: [terminTitel(s), zeitraum(s.start_zeit, s.end_zeit)],
+  live: !!stand,
+  aktionen: html`<button type="submit" form="sammel" class="knopf haupt">Nachricht gesendet (gewählte)</button>`,
+})}
+<div class="titelzeile filterzeile">
+  <input type="search" class="suche" data-filter=".filterbar tbody tr" placeholder="Person suchen …" aria-label="Personen suchen">
 </div>
 <p>${alleZeigen
     ? html`Alle Personen sichtbar. <a href="/schichten/${s.id}/anrufliste">Unpassende ausblenden</a>`
@@ -395,7 +417,6 @@ ${s.anzahl_schichten <= 1 ? html`<p class="meldung fehler">Das ist die einzige S
   <input type="hidden" name="status" value="nachricht_gesendet">
   <input type="hidden" name="kanal" value="whatsapp">
 </form>
-<p><button type="submit" form="sammel" class="knopf haupt">Nachricht gesendet (gewählte)</button></p>
 <div class="rahmen"><table class="tabelle filterbar">
   <thead><tr><th><input type="checkbox" data-alle-waehlen="personen" aria-label="Alle wählen"></th><th>Rang</th><th>Name</th><th>Alter</th><th>Telefon</th><th>Status</th><th>Aktion</th></tr></thead>
   <tbody>${zeilen.map((p) => html`<tr class="${p.passt ? '' : 'passt-nicht'}" data-suche="${`${p.vorname ?? ''} ${p.nachname ?? ''} ${p.rang_name ?? ''}`.toLowerCase()}">
@@ -421,8 +442,7 @@ ${s.anzahl_schichten <= 1 ? html`<p class="meldung fehler">Das ist die einzige S
     const vermerk = await icsVermerk(db, s.id);
     if (vermerk && req.query.trotzdem !== '1') {
       res.send(seite(kx, 'ICS-Export', 'einsaetze', html`
-<p><a href="/schichten/${s.id}">← ${s.name}</a></p>
-<h1>ICS-Export</h1>
+${seitenKopf({ pfad: schichtPfad(s, 'ICS-Export'), titel: 'ICS-Export' })}
 <p class="meldung hinweis" data-code="W_ICS_DUPLIKAT">⚠ Export fand am ${datumZeit(vermerk.exportiert_am)}${vermerk.benutzer ? ` durch ${vermerk.benutzer}` : ''} statt. Clubdesk erhält sonst einen doppelten Termin.</p>
 <p class="knopfreihe"><a class="knopf" href="/schichten/${s.id}/ics?trotzdem=1">Trotzdem laden</a> <a class="knopf" href="/schichten/${s.id}">Abbrechen</a></p>`));
       return;
@@ -437,8 +457,7 @@ ${s.anzahl_schichten <= 1 ? html`<p class="meldung fehler">Das ist die einzige S
     const kx = k(res);
     const s = await ladeSchicht(db, leseId(req.params.sid));
     res.send(seite(kx, 'Termintext', 'einsaetze', html`
-<p><a href="/schichten/${s.id}">← ${s.name}</a></p>
-<h1>Text für den Clubdesk-Termin</h1>
+${seitenKopf({ pfad: schichtPfad(s, 'Termintext'), titel: 'Text für den Clubdesk-Termin' })}
 <div class="feld"><label for="titel">Titel</label><input id="titel" readonly value="${terminTitel(s)}"></div>
 <p><button type="button" class="knopf" data-kopieren="#titel">Titel kopieren</button></p>
 <div class="feld"><label for="termintext">Text</label><textarea id="termintext" readonly rows="10">${terminText(s)}</textarea></div>

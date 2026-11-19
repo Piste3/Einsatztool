@@ -16,7 +16,7 @@ import { feedStand } from '../domain/ical-abgleich.js';
 import { letzterLauf } from '../jobs/taeglich.js';
 import { html, Roh } from './html.js';
 import { k } from './kontext.js';
-import { formFelder, seite } from './views/layout.js';
+import { formFelder, seite, seitenKopf } from './views/layout.js';
 import { datumZeit, knopfPost, zeitraum } from './views/teile.js';
 import type { HochgeladeneDatei } from './multipart.js';
 
@@ -24,7 +24,7 @@ function vorschauSeite(kx: ReturnType<typeof k>, v: Vorschau, datei: string, dat
   const keineFehler = v.fehler.length === 0;
   const geloescht = auswahl ?? new Set(v.entferntOhneZukunft.map((e) => e.clubdesk_id));
   return html`
-<h1>Import-Vorschau</h1>
+${seitenKopf({ titel: 'Import-Vorschau' })}
 <p class="unter">Datei: ${dateiname}</p>
 ${meldung ? html`<div class="meldung fehler" role="alert">${meldung}</div>` : ''}
 ${v.fehler.length ? html`<div class="meldung fehler"><strong>Die Datei hat Fehler. Der Import ist abgebrochen.</strong><ul>${v.fehler.map((f) => html`<li>${f}</li>`)}</ul></div>` : ''}
@@ -78,7 +78,7 @@ export function registriereAdmin(app: Express, deps: Abhaengigkeiten): void {
     const kx = k(res);
     const letzte = await letzteImporte(db);
     res.send(seite(kx, 'Import', 'import', html`
-<h1>Clubdesk-Import</h1>
+${seitenKopf({ titel: 'Clubdesk-Import' })}
 <p>Lade die komplette CSV aus Clubdesk hoch. Das Tool zeigt zuerst eine Vorschau. Es ändert erst nach «Anwenden» etwas.</p>
 <form method="post" action="/admin/import" enctype="multipart/form-data" class="stapel">
   ${formFelder(kx)}
@@ -99,7 +99,7 @@ ${letzte.length ? html`<h2>Letzte Importe</h2><div class="rahmen"><table class="
       v = await erstelleVorschau(db, datei.inhalt);
     } catch (e) {
       if (e instanceof Eingabefehler) {
-        res.status(400).send(seite(kx, 'Import', 'import', html`<h1>Import abgebrochen</h1><div class="meldung fehler">${e.message}</div><p><a class="knopf" href="/admin/import">Zurück</a></p>`));
+        res.status(400).send(seite(kx, 'Import', 'import', html`${seitenKopf({ titel: 'Import abgebrochen' })}<div class="meldung fehler">${e.message}</div><p><a class="knopf" href="/admin/import">Zurück</a></p>`));
         return;
       }
       throw e;
@@ -133,7 +133,7 @@ ${letzte.length ? html`<h2>Letzte Importe</h2><div class="rahmen"><table class="
     loescheImportdatei(konfig.dataDir, name);
     const z = r.zusammenfassung;
     res.send(seite(kx, 'Import angewendet', 'import', html`
-<h1>Import angewendet</h1>
+${seitenKopf({ titel: 'Import angewendet' })}
 <div class="zahl-karten">
   <div class="zahl-karte"><span class="wert">${z.neu}</span><span class="titel">neu</span></div>
   <div class="zahl-karte"><span class="wert">${z.geaendert}</span><span class="titel">geändert</span></div>
@@ -156,7 +156,7 @@ ${z.unzugeordnet ? html`<p><a class="knopf" href="/anmeldungen/unbekannt">Unbeka
     const kopien = existsSync(backup) ? readdirSync(backup).filter((n) => n.endsWith('.sql')).sort().reverse() : [];
     const feed = feedStand();
     res.send(seite(kx, 'Export', 'export', html`
-<h1>Export und Mails</h1>
+${seitenKopf({ titel: 'Export und Mails' })}
 <section class="abschnitt">
   <h2>Tagesexport</h2>
   <p>Täglich um ${konfig.exportStunde}:00 Uhr. Ziel: ${konfig.exportDir}${konfig.sharepoint.siteId ? ` und SharePoint (${konfig.sharepoint.ordner})` : ' (SharePoint nicht eingerichtet)'}.</p>
@@ -195,7 +195,7 @@ ${z.unzugeordnet ? html`<p><a class="knopf" href="/anmeldungen/unbekannt">Unbeka
     const kx = k(res);
     const liste = await benutzerListe(db);
     res.send(seite(kx, 'Benutzer', 'benutzer', html`
-<h1>Benutzer</h1>
+${seitenKopf({ titel: 'Benutzer' })}
 <p class="unter">Benutzer entstehen beim ersten Login über Microsoft Entra. Die Rolle kommt aus Entra (Admin oder Aufgebot). Ein inaktiver Benutzer kommt nicht hinein.</p>
 <div class="rahmen"><table class="tabelle"><thead><tr><th>Name</th><th>E-Mail</th><th>Rolle</th><th>Aktiv</th></tr></thead><tbody>
 ${liste.map((b) => html`<tr><td>${b.name}</td><td>${b.email}</td><td>${b.rolle === 'admin' ? 'Admin' : 'Aufgebot'}</td>
@@ -217,7 +217,7 @@ ${liste.map((b) => html`<tr><td>${b.name}</td><td>${b.email}</td><td>${b.rolle =
     const ro = await rollen(db);
     const z = '/admin/einstellungen';
     res.send(seite(kx, 'Einstellungen', 'einstellungen', html`
-<h1>Einstellungen</h1>
+${seitenKopf({ titel: 'Einstellungen' })}
 <section class="abschnitt" id="raenge">
   <h2>Ränge</h2>
   <p class="unter">Der oberste Rang ist der höchste. Ein neuer Rang kommt ans Ende (tiefster Rang). Der Import ordnet den Rang über den Namen zu.</p>
@@ -285,7 +285,7 @@ ${liste.map((b) => html`<tr><td>${b.name}</td><td>${b.email}</td><td>${b.rolle =
     const kx = k(res);
     const u = deps.updater;
     if (!konfig.updateErlaubt || !u) {
-      res.send(seite(kx, 'Update', 'update', html`<h1>Update</h1><p>Das Update über diese Seite ist ausgeschaltet. Setze <code>UPDATE_ERLAUBT=1</code> in der Konfiguration.</p>`));
+      res.send(seite(kx, 'Update', 'update', html`${seitenKopf({ titel: 'Update' })}<p>Das Update über diese Seite ist ausgeschaltet. Setze <code>UPDATE_ERLAUBT=1</code> in der Konfiguration.</p>`));
       return;
     }
     const z = u.zustand;
@@ -295,7 +295,7 @@ ${liste.map((b) => html`<tr><td>${b.name}</td><td>${b.email}</td><td>${b.rolle =
     // Die Seite lädt sich während des Updates selbst neu (Header «Refresh», kein Skript nötig).
     if (z.laeuft || z.phase === 'fertig') res.setHeader('Refresh', '3');
     res.send(seite(kx, 'Update', 'update', html`
-<h1>Update</h1>
+${seitenKopf({ titel: 'Update' })}
 <p>Branch: <code>${konfig.updateBranch}</code>${z.aktuellerCommit ? html` · Aktueller Commit: <code>${z.aktuellerCommit}</code>` : ''}</p>
 <p class="meldung ${z.phase === 'fehler' ? 'fehler' : z.phase === 'fertig' ? 'ok' : 'hinweis'}">${phaseText[z.phase]}${z.zeit ? ` (${datumZeit(z.zeit.replace(/\.\d{3}Z$/, 'Z'))})` : ''}</p>
 ${z.schritte.length ? html`<ol class="schritte">${z.schritte.map((s) => html`<li class="${s.ok === null ? 'laeuft' : s.ok ? 'ok' : 'fehler'}"><strong>${s.ok === null ? '…' : s.ok ? '✔' : '✖'} ${s.text}</strong>${s.ausgabe ? html`<pre>${s.ausgabe}</pre>` : ''}</li>`)}</ol>` : ''}

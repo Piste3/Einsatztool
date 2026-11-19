@@ -22,7 +22,7 @@ export function statusMarke(status: Status | null): Roh {
 }
 
 export function statusText(status: Status): Roh {
-  return html`<span class="pille s-${status}">${STATUS_SYMBOL[status]} ${STATUS_TEXT[status]}</span>`;
+  return html`<span class="pille s-${status}"><span class="punkt-marke" aria-hidden="true"></span>${STATUS_TEXT[status]}</span>`;
 }
 
 export function legende(): Roh {
@@ -110,4 +110,14 @@ export function knopfPost(k: { csrf: string }, action: string, text: string, fel
     ${Object.entries(felder).map(([n, v]) => html`<input type="hidden" name="${n}" value="${v}">`)}
     <button type="submit" class="${klasse}">${text}</button>
   </form>`;
+}
+
+/** Kleine Marke mit farbigem Punkt, z. B. «Bestätigen» im Cockpit. */
+export function punktMarke(text: string, farbe: 'orange' | 'blau' | 'rot' | 'gruen' | 'grau'): Roh {
+  return html`<span class="pille punkt-${farbe}"><span class="punkt-marke" aria-hidden="true"></span>${text}</span>`;
+}
+
+/** Publiziert-Marke neben einem Titel. */
+export function publiziertMarke(publiziert: boolean): Roh {
+  return publiziert ? punktMarke('Publiziert', 'gruen') : punktMarke('Nicht publiziert', 'grau');
 }

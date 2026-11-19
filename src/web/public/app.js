@@ -12,6 +12,42 @@
     });
   }
 
+  // Darstellung wechseln: wie System → Hell → Dunkel.
+  var themaKnopf = document.querySelector('[data-thema]');
+  var themaText = { system: 'Darstellung: wie System', hell: 'Darstellung: Hell', dunkel: 'Darstellung: Dunkel' };
+  var themaLesen = function () {
+    try { return localStorage.getItem('thema') || 'system'; } catch (e) { return 'system'; }
+  };
+  var themaZeigen = function (t) {
+    var w = document.documentElement;
+    if (t === 'hell') w.setAttribute('data-theme', 'light');
+    else if (t === 'dunkel') w.setAttribute('data-theme', 'dark');
+    else w.removeAttribute('data-theme');
+    if (themaKnopf) {
+      themaKnopf.setAttribute('data-wahl', t);
+      themaKnopf.title = themaText[t];
+    }
+  };
+  if (themaKnopf) {
+    themaZeigen(themaLesen());
+    themaKnopf.addEventListener('click', function () {
+      var naechste = { system: 'hell', hell: 'dunkel', dunkel: 'system' }[themaLesen()] || 'system';
+      try { localStorage.setItem('thema', naechste); } catch (e) { /* kein Speicher */ }
+      themaZeigen(naechste);
+    });
+  }
+
+  // Menü «Mehr»: ein Klick daneben oder Escape schliesst es.
+  document.addEventListener('click', function (ev) {
+    document.querySelectorAll('details.menue[open]').forEach(function (m) {
+      if (!m.contains(ev.target)) m.open = false;
+    });
+  });
+  document.addEventListener('keydown', function (ev) {
+    if (ev.key !== 'Escape') return;
+    document.querySelectorAll('details.menue[open]').forEach(function (m) { m.open = false; });
+  });
+
   // Meldungen wie «Gespeichert» verschwinden nach einigen Sekunden.
   document.querySelectorAll('.meldung[data-verschwinden="1"]').forEach(function (m) {
     setTimeout(function () {
@@ -100,6 +136,8 @@
   if (hinweis && window.fetch) {
     var url = hinweis.getAttribute('data-stand-url');
     var stand = hinweis.getAttribute('data-stand');
+    var live = document.querySelector('[data-live]');
+    if (live) live.classList.add('an');
     var fertigGemeldet = false;
     var laufend = false;
     var uhr = null;
@@ -115,6 +153,11 @@
           if (d && typeof d.stand === 'string' && d.stand !== stand) {
             fertigGemeldet = true;
             hinweis.hidden = false;
+            if (live) {
+              live.classList.add('neu');
+              var lt = live.querySelector('.live-text');
+              if (lt) lt.textContent = 'Es gibt neue Daten';
+            }
           }
         })
         .catch(function () { /* Netz kurz weg: beim nächsten Mal erneut */ })
