@@ -6,7 +6,7 @@ import {
   aendereEinsatz, anzahlAnmeldungenEinsatz, einsatzListe, type EinsatzZeile, erstelleEinsatz, kopiereEinsatz, ladeEinsatz, loescheEinsatz, vorgabeKopie,
   type Einsatz,
 } from '../domain/einsatz.js';
-import { passtInTabelle, schichtenVonEinsatz, speichereSchichtTabelle, zeilenAbdruck, type SchichtZeile } from '../domain/schicht.js';
+import { anzeigeZeiten, passtInTabelle, schichtenVonEinsatz, speichereSchichtTabelle, zeilenAbdruck, type SchichtZeile } from '../domain/schicht.js';
 import { bestaetigeAlle, verlaufEinsatz } from '../domain/anmeldung.js';
 import { logText } from './routes-schichten.js';
 import { warnungenFuerSchichten } from '../domain/warnungen.js';
@@ -37,10 +37,12 @@ ${fehler ? html`<div class="meldung fehler" role="alert">${fehler}</div>` : ''}
   ${formFelder(kx)}${neu ? '' : html`<input type="hidden" name="version" value="${v('version')}">`}
   <div class="feld breit"><label for="name">Name</label><input id="name" name="name" required maxlength="255" value="${v('name')}"></div>
   ${neu ? html`
-  <div class="feld"><label for="start_datum">Start Datum</label><input id="start_datum" type="date" name="start_datum" required value="${v('start_datum')}"></div>
-  <div class="feld"><label for="start_zeit">Start Zeit</label><input id="start_zeit" type="time" name="start_zeit" required value="${v('start_zeit')}"></div>
-  <div class="feld"><label for="end_datum">Ende Datum</label><input id="end_datum" type="date" name="end_datum" required value="${v('end_datum')}"></div>
-  <div class="feld"><label for="end_zeit">Ende Zeit</label><input id="end_zeit" type="time" name="end_zeit" required value="${v('end_zeit')}"></div>` : ''}
+  <div class="breit zeit-raster">
+    <div class="feld"><label for="start_datum">Startdatum</label><input id="start_datum" type="date" name="start_datum" required value="${v('start_datum')}"></div>
+    <div class="feld"><label for="start_zeit">Beginn <span class="unter">(optional)</span></label><input id="start_zeit" type="time" name="start_zeit" value="${v('start_zeit')}"></div>
+    <div class="feld"><label for="end_datum">Enddatum <span class="unter">(optional)</span></label><input id="end_datum" type="date" name="end_datum" value="${v('end_datum')}"><small>Leer = gleicher Tag.</small></div>
+    <div class="feld"><label for="end_zeit">Ende <span class="unter">(optional)</span></label><input id="end_zeit" type="time" name="end_zeit" value="${v('end_zeit')}"><small>Leere Zeiten trägst du später in der Schicht nach.</small></div>
+  </div>` : ''}
   <div class="feld breit"><label for="ort">Ort (Antreten)</label><input id="ort" name="ort" maxlength="255" value="${v('ort')}"><small>Gilt für alle Schichten mit dem gleichen Ort.</small></div>
   ${neu ? '' : html`
   <div class="feld breit"><label for="abtreten_ort">Ort Abtreten</label><input id="abtreten_ort" name="abtreten_ort" maxlength="255" value="${v('abtreten_ort')}"><small>Leer = gleich wie Ort.</small></div>
@@ -214,6 +216,7 @@ ${e.bemerkung_extern ? html`<p class="bemerkung"><strong>Extern:</strong> ${mehr
         case 'unbestaetigt': return knopfPost(kx, `/einsaetze/${e.id}/alle-bestaetigen`, lage.unbestaetigt === 1 ? 'Bestätigen' : `Alle ${lage.unbestaetigt} bestätigen`, {}, 'knopf klein', hier);
         case 'offen': return html`<a class="knopf klein" href="/schichten/${p.schichtId}?status=${p.status}">Zeigen</a>`;
         case 'einsatzleitung': return html`<a class="knopf klein" href="/schichten/${p.schichtId}">Eintragen</a>`;
+        case 'zeit_offen': return html`<a class="knopf klein" href="/einsaetze/${e.id}/schichten">Zeiten eintragen</a>`;
         default: return html`<a class="knopf klein" href="/schichten/${p.schichtId}">Zeigen</a>`;
       }
     };
@@ -255,7 +258,7 @@ ${!schichten.length ? html`<p class="leer">Keine Schichten.</p>` : html`<div cla
       warnZahl.get(s.id) ? html`<span class="pille orange">⚠ ${warnZahl.get(s.id)}</span>` : '',
     ].filter((x) => x !== '');
     return html`<tr class="${s.end_zeit <= jetzt ? 'vergangen' : ''}">
-    <td><div class="schicht-name">${abgleichPunkt(ws.abgleich)} <a href="/schichten/${s.id}">${s.name}</a></div><div class="unter">${zeitraum(s.start_zeit, s.end_zeit)}${s.ort ? ` · ${s.ort}` : ''}</div></td>
+    <td><div class="schicht-name">${abgleichPunkt(ws.abgleich)} <a href="/schichten/${s.id}">${s.name}</a></div><div class="unter">${zeitraum(s.start_zeit, s.end_zeit, s.zeit_offen)}${s.ort ? ` · ${s.ort}` : ''}</div></td>
     <td>${belegung(z, s.soll_anzahl)}</td>
     <td>${pillen.length ? html`<span class="pillen">${pillen}</span>` : html`<span class="unter">–</span>`}</td>
     <td>${z.rollen.length ? html`<span class="pillen">${z.rollen.map((r) => html`<span class="pille ${r.ist >= r.soll ? 'gruen' : 'rot'}">${r.rolle} ${r.ist}/${r.soll}</span>`)}</span>` : html`<span class="unter">–</span>`}</td>
@@ -357,7 +360,7 @@ ${!schichten.length ? html`<p class="leer">Keine Schichten.</p>` : html`<div cla
   const zeigen = leute.slice(0, 12);
   return html`<article class="karte schicht-karte2${s.end_zeit <= jetzt ? ' vergangen' : ''}">
   <header>
-    <div><h3><a href="/schichten/${s.id}">${s.name}</a></h3><p class="unter">${zeitraum(s.start_zeit, s.end_zeit)}</p></div>
+    <div><h3><a href="/schichten/${s.id}">${s.name}</a></h3><p class="unter">${zeitraum(s.start_zeit, s.end_zeit, s.zeit_offen)}</p></div>
     <div class="karte-besetzung">
       <span class="unter">Besetzung</span>
       <span class="karte-zahl f-${sollFarbe(z.teilnehmende, s.soll_anzahl)}"><strong>${z.teilnehmende}${s.soll_anzahl ? ` / ${s.soll_anzahl}` : ''}</strong>${fehlt ? ` · ${fehlt} fehlen` : ''}</span>
@@ -386,7 +389,7 @@ ${!schichten.length ? html`<p class="leer">Keine Schichten.</p>` : html`<div cla
         : [];
       const werte = tabelle?.werte ?? {};
       const zeileAusDb = (s: (typeof schichten)[number]): SchichtZeile => ({
-        name: s.name, datum: lokalesDatum(s.start_zeit), beginn: lokaleZeit(s.start_zeit), ende: lokaleZeit(s.end_zeit),
+        name: s.name, datum: lokalesDatum(s.start_zeit), beginn: anzeigeZeiten(s).beginn, ende: anzeigeZeiten(s).ende,
         soll_anzahl: s.soll_anzahl ?? '', ort: s.ort ?? '', bemerkung_intern: s.bemerkung_intern ?? '',
         rollen: Object.fromEntries(bedarf.filter((b) => b.schicht_id === s.id).map((b) => [b.rolle, String(b.anzahl)])),
       });
@@ -416,7 +419,7 @@ ${tabelle ? html`<div class="meldung fehler" role="alert">${tabelle.fehler}</div
     ${schichten.map((s) => {
       const schluessel = `s${s.id}`;
       if (!passtInTabelle(s)) {
-        return html`<tr class="nur-lesen"><td>${s.name}</td><td colspan="${3 + rollen.length + 3}">${zeitraum(s.start_zeit, s.end_zeit)} <span class="unter">· dauert über den Folgetag hinaus</span></td><td><a class="knopf klein" href="/schichten/${s.id}/bearbeiten">Bearbeiten</a></td></tr>`;
+        return html`<tr class="nur-lesen"><td>${s.name}</td><td colspan="${3 + rollen.length + 3}">${zeitraum(s.start_zeit, s.end_zeit, s.zeit_offen)} <span class="unter">· dauert über den Folgetag hinaus</span></td><td><a class="knopf klein" href="/schichten/${s.id}/bearbeiten">Bearbeiten</a></td></tr>`;
       }
       const ausDb = zeileAusDb(s);
       const gesendet = werte[schluessel] as SchichtZeile | undefined;
@@ -465,8 +468,8 @@ ${seitenKopf({
   titel: e.name,
   marke: publiziertMarke(schichten.some((sc) => sc.publiziert)),
   angaben: [
-    schichten.length ? html`<strong>${zeitraum(schichten[0].start_zeit, ende)}</strong>` : '',
-    `Antreten ${schichten.length ? lokaleZeit(schichten[0].start_zeit) : ''}${e.ort ? ` · ${e.ort}` : ''}`,
+    schichten.length ? html`<strong>${zeitraum(schichten[0].start_zeit, ende, schichten[0].zeit_offen && schichten[schichten.length - 1].zeit_offen)}</strong>` : '',
+    `Antreten ${schichten.length ? anzeigeZeiten(schichten[0]).beginn || 'Zeit offen' : ''}${e.ort ? ` · ${e.ort}` : ''}`,
     elRolle ? html`Leitung ${leitung}` : '',
   ],
   aktionen: html`<a class="knopf haupt" href="/einsaetze/${e.id}/teilnehmerliste">Teilnehmerliste</a>
@@ -666,7 +669,7 @@ async function teilnehmerlisteDruck(deps: Abhaengigkeiten, e: Einsatz, auchAngem
     teile.push(`Total Essen ${total}`);
     bloecke.push(html`<section class="druck-block">
   <h2>${e.name}${schichten.length > 1 ? ` – ${s.name}` : ''}</h2>
-  <p class="unter">${zeitraum(s.start_zeit, s.end_zeit)}${s.ort ? ` · ${s.ort}` : ''}</p>
+  <p class="unter">${zeitraum(s.start_zeit, s.end_zeit, s.zeit_offen)}${s.ort ? ` · ${s.ort}` : ''}</p>
   <table class="tabelle druck-tabelle">
     <thead><tr><th>Rang</th><th>Name</th><th>Mobil</th><th>Rolle</th><th>Essen</th>${auchAngemeldet ? html`<th>Status</th>` : ''}</tr></thead>
     <tbody>${personen.map((p) => html`<tr>

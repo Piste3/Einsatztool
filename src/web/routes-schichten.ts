@@ -4,7 +4,7 @@ import type { Abhaengigkeiten } from './app.js';
 import { nurAufgebot, zurueck } from './app.js';
 import {
   aendereSchicht, anzahlAnmeldungenSchicht, erstelleSchicht, fremdabteilungen, ladeSchicht, loescheSchicht, rollenBedarf, setzePubliziert,
-  speichereFremdabteilung, schichtenVonEinsatz, type SchichtMitEinsatz,
+  speichereFremdabteilung, schichtenVonEinsatz, anzeigeZeiten, type SchichtMitEinsatz,
 } from '../domain/schicht.js';
 import { ladeEinsatz } from '../domain/einsatz.js';
 import { bestaetigeAlle, sammelstatus, setzeAnmeldung, verlauf } from '../domain/anmeldung.js';
@@ -86,9 +86,9 @@ ${fehler ? html`<div class="meldung fehler" role="alert">${fehler}</div>` : ''}
   ${formFelder(kx)}${neu ? '' : html`<input type="hidden" name="version" value="${v(e, 'version')}">`}
   <div class="feld breit"><label for="name">Name</label><input id="name" name="name" required maxlength="255" value="${v(e, 'name')}"></div>
   <div class="feld"><label for="start_datum">Start Datum</label><input id="start_datum" type="date" name="start_datum" required value="${v(e, 'start_datum')}"></div>
-  <div class="feld"><label for="start_zeit">Start Zeit</label><input id="start_zeit" type="time" name="start_zeit" required value="${v(e, 'start_zeit')}"></div>
+  <div class="feld"><label for="start_zeit">Start Zeit</label><input id="start_zeit" type="time" name="start_zeit" value="${v(e, 'start_zeit')}"></div>
   <div class="feld"><label for="end_datum">Ende Datum</label><input id="end_datum" type="date" name="end_datum" required value="${v(e, 'end_datum')}"></div>
-  <div class="feld"><label for="end_zeit">Ende Zeit</label><input id="end_zeit" type="time" name="end_zeit" required value="${v(e, 'end_zeit')}"></div>
+  <div class="feld"><label for="end_zeit">Ende Zeit</label><input id="end_zeit" type="time" name="end_zeit" value="${v(e, 'end_zeit')}"></div>
   ${neu ? html`<p class="breit unter">Ort, Ort Abtreten, Tenue und Hinweis übernimmt die Schicht vom Einsatz. Eine neue Schicht ist nicht publiziert.</p>` : html`
   <div class="feld breit"><label for="ort">Ort Antreten</label><input id="ort" name="ort" maxlength="255" value="${v(e, 'ort')}"><small>Eine Änderung gilt nur für diese Schicht.</small></div>
   <div class="feld breit"><label for="abtreten_ort">Ort Abtreten</label><input id="abtreten_ort" name="abtreten_ort" maxlength="255" value="${v(e, 'abtreten_ort')}"><small>Leer = gleich wie Ort Antreten.</small></div>
@@ -111,8 +111,8 @@ ${fehler ? html`<div class="meldung fehler" role="alert">${fehler}</div>` : ''}
 function schichtWerte(s: SchichtMitEinsatz): Record<string, unknown> {
   return {
     ...s,
-    start_datum: lokalesDatum(s.start_zeit), start_zeit: lokaleZeit(s.start_zeit),
-    end_datum: lokalesDatum(s.end_zeit), end_zeit: lokaleZeit(s.end_zeit),
+    start_datum: lokalesDatum(s.start_zeit), start_zeit: anzeigeZeiten(s).beginn,
+    end_datum: lokalesDatum(s.end_zeit), end_zeit: anzeigeZeiten(s).ende,
   };
 }
 
@@ -218,7 +218,7 @@ ${seitenKopf({
       <button type="submit" class="schalter${s.publiziert ? ' an' : ''}" aria-pressed="${s.publiziert ? 'true' : 'false'}" title="Nur die Schicht hat den Schalter «Publiziert».">${s.publiziert ? 'Publiziert' : 'Nicht publiziert'}</button>
     </form>`,
   angaben: [
-    html`<strong>${zeitraum(s.start_zeit, s.end_zeit)}</strong>`,
+    html`<strong>${zeitraum(s.start_zeit, s.end_zeit, s.zeit_offen)}</strong>`,
     s.ort ? `Antreten ${s.ort}` : '',
     s.min_alter !== null ? `ab ${s.min_alter} Jahren` : '',
     s.min_rang_name ? `ab ${s.min_rang_name}` : '',
@@ -407,7 +407,7 @@ ${s.anzahl_schichten <= 1 ? html`<p class="meldung fehler">Das ist die einzige S
 ${seitenKopf({
   pfad: schichtPfad(s, 'Anrufliste'),
   titel: 'Anrufliste',
-  angaben: [terminTitel(s), zeitraum(s.start_zeit, s.end_zeit)],
+  angaben: [terminTitel(s), zeitraum(s.start_zeit, s.end_zeit, s.zeit_offen)],
   aktionen: html`<button type="submit" form="sammel" class="knopf haupt">Nachricht gesendet (gewählte)</button>`,
 })}
 <div class="titelzeile filterzeile">

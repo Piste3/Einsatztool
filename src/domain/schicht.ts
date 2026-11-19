@@ -21,6 +21,8 @@ export interface Schicht {
   bemerkung_extern: string | null;
   publiziert: number;
   position: number;
+  /** 1 = Beginn oder Ende fehlt noch (gespeichert als 00:00 bzw. 23:59). */
+  zeit_offen: number;
   /** Zählt jede Änderung im Formular «Schicht bearbeiten». */
   version: number;
 }
@@ -101,8 +103,10 @@ async function speichereRollen(db: Db, schichtId: number, rollen: Record<string,
  */
 export async function erstelleSchicht(db: Db, einsatzId: number, e: SchichtEingabe): Promise<number> {
   const name = pflichtText(e.name, 'Name');
-  const start = zeitpunkt(e.start_datum, e.start_zeit, 'Start');
-  const ende = zeitpunkt(e.end_datum, e.end_zeit, 'Ende');
+  const leer = (w: unknown) => typeof w !== 'string' || !w.trim();
+  const offen = leer(e.start_zeit) || leer(e.end_zeit);
+  const start = zeitpunkt(e.start_datum, leer(e.start_zeit) ? OFFEN_BEGINN : e.start_zeit, 'Start');
+  const ende = zeitpunkt(e.end_datum, leer(e.end_zeit) ? OFFEN_ENDE : e.end_zeit, 'Ende');
   if (ende <= start) throw new Eingabefehler('Das Ende muss nach dem Start liegen.');
   return transaktion(db, async (c) => {
     const einsatz = await ladeEinsatz(c, einsatzId);
@@ -110,8 +114,8 @@ export async function erstelleSchicht(db: Db, einsatzId: number, e: SchichtEinga
     const r = await schreibe(
       c,
       `INSERT INTO schicht (einsatz_id, name, start_zeit, end_zeit, ort, abtreten_ort, tenue, aufgebot_hinweis,
-         min_alter, min_rang_id, soll_anzahl, bemerkung_intern, bemerkung_extern, publiziert, position)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0,
+         min_alter, min_rang_id, soll_anzahl, bemerkung_intern, bemerkung_extern, publiziert, zeit_offen, position)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ${offen ? 1 : 0},
          (SELECT COALESCE(MAX(x.position), 0) + 1 FROM schicht x WHERE x.einsatz_id = ?))`,
       [
         einsatzId, name, start, ende, einsatz.ort, einsatz.abtreten_ort, einsatz.tenue, einsatz.aufgebot_hinweis,
@@ -127,8 +131,11 @@ export async function erstelleSchicht(db: Db, einsatzId: number, e: SchichtEinga
 /** Schicht ändern, inklusive Rollenbedarf. Der Ort gilt nur für diese Schicht (13.3.3). */
 export async function aendereSchicht(db: Db, id: number, e: SchichtEingabe): Promise<void> {
   const name = pflichtText(e.name, 'Name');
-  const start = zeitpunkt(e.start_datum, e.start_zeit, 'Start');
-  const ende = zeitpunkt(e.end_datum, e.end_zeit, 'Ende');
+  // Leere Zeit = offen (00:00 bzw. 23:59), wie beim neuen Einsatz.
+  const leer = (w: unknown) => typeof w !== 'string' || !w.trim();
+  const offen = leer(e.start_zeit) || leer(e.end_zeit);
+  const start = zeitpunkt(e.start_datum, leer(e.start_zeit) ? OFFEN_BEGINN : e.start_zeit, 'Start');
+  const ende = zeitpunkt(e.end_datum, leer(e.end_zeit) ? OFFEN_ENDE : e.end_zeit, 'Ende');
   if (ende <= start) throw new Eingabefehler('Das Ende muss nach dem Start liegen.');
   await transaktion(db, async (c) => {
     const alt = await eine<{ version: number }>(c, 'SELECT version FROM schicht WHERE id = ? FOR UPDATE', [id]);
@@ -143,13 +150,13 @@ export async function aendereSchicht(db: Db, id: number, e: SchichtEingabe): Pro
       c,
       `UPDATE schicht SET name = ?, start_zeit = ?, end_zeit = ?, ort = ?, abtreten_ort = ?, tenue = ?,
          aufgebot_hinweis = ?, min_alter = ?, min_rang_id = ?, soll_anzahl = ?, bemerkung_intern = ?, bemerkung_extern = ?,
-         version = version + 1
+         zeit_offen = ?, version = version + 1
        WHERE id = ?`,
       [
         name, start, ende, text(e.ort, 'Ort Antreten'), text(e.abtreten_ort, 'Ort Abtreten'), text(e.tenue, 'Tenue'),
         text(e.aufgebot_hinweis, 'Hinweis Aufgebot', 2000), ganzzahl(e.min_alter, 'Mindestalter', 0, 120), minRang,
         ganzzahl(e.soll_anzahl, 'Soll-Anzahl', 0, 100000), text(e.bemerkung_intern, 'Bemerkung intern', 5000),
-        text(e.bemerkung_extern, 'Bemerkung extern', 5000), id,
+        text(e.bemerkung_extern, 'Bemerkung extern', 5000), offen ? 1 : 0, id,
       ],
     );
     if (r.affectedRows === 0) throw new NichtGefunden('Schicht nicht gefunden.');
@@ -192,14 +199,30 @@ export function passtInTabelle(s: { start_zeit: string; end_zeit: string }): boo
 }
 
 /** Start und Ende aus Datum, Beginn und Ende. Ende ≤ Beginn = Ende am Folgetag. */
-function zeitenAusZeile(z: SchichtZeile, feld: string): { start: string; ende: string } {
-  const start = zeitpunkt(z.datum, z.beginn, `${feld}: Beginn`);
-  const endeZeit = typeof z.ende === 'string' ? z.ende.trim() : '';
-  const beginnZeit = typeof z.beginn === 'string' ? z.beginn.trim() : '';
+function zeitenAusZeile(z: SchichtZeile, feld: string): { start: string; ende: string; offen: boolean } {
+  const beginnRoh = typeof z.beginn === 'string' ? z.beginn.trim() : '';
+  const endeRoh = typeof z.ende === 'string' ? z.ende.trim() : '';
+  // Leere Zeit = offen (Wunsch Yann): Beginn 00:00, Ende 23:59, später nachtragen.
+  const beginnZeit = beginnRoh || OFFEN_BEGINN;
+  const endeZeit = endeRoh || OFFEN_ENDE;
   const datum = typeof z.datum === 'string' ? z.datum.trim() : '';
-  const endDatum = endeZeit && endeZeit <= beginnZeit ? plusTage(datum, 1) : datum;
+  const start = zeitpunkt(datum, beginnZeit, `${feld}: Beginn`);
+  const endDatum = endeRoh && beginnRoh && endeRoh <= beginnRoh ? plusTage(datum, 1) : datum;
   const ende = zeitpunkt(endDatum, endeZeit, `${feld}: Ende`);
-  return { start, ende };
+  if (ende <= start) throw new Eingabefehler(`${feld}: Das Ende muss nach dem Beginn liegen.`);
+  return { start, ende, offen: !beginnRoh || !endeRoh };
+}
+
+/** Gespeicherte Zeiten für «Zeit offen». */
+export const OFFEN_BEGINN = '00:00';
+export const OFFEN_ENDE = '23:59';
+
+/** Beginn und Ende für die Anzeige: leer, wenn die Zeit offen ist und der Wert der Platzhalter ist. */
+export function anzeigeZeiten(s: { start_zeit: string; end_zeit: string; zeit_offen: number }): { beginn: string; ende: string } {
+  const beginn = lokaleZeit(s.start_zeit);
+  const ende = lokaleZeit(s.end_zeit);
+  if (!Number(s.zeit_offen)) return { beginn, ende };
+  return { beginn: beginn === OFFEN_BEGINN ? '' : beginn, ende: ende === OFFEN_ENDE ? '' : ende };
 }
 
 /**
@@ -225,7 +248,7 @@ export async function speichereSchichtTabelle(
       // Nicht angefasst: nichts schreiben, auch wenn ein anderer Benutzer die Schicht inzwischen geändert hat.
       if (typeof z.ursprung === 'string' && z.ursprung === zeilenAbdruck(z)) continue;
       const name = pflichtText(z.name, 'Name');
-      const { start, ende } = zeitenAusZeile(z, name);
+      const { start, ende, offen } = zeitenAusZeile(z, name);
       const soll = ganzzahl(z.soll_anzahl, `${name}: Soll`, 0, 100000);
       const ort = text(z.ort, `${name}: Antretensort`);
       const bemerkung = text(z.bemerkung_intern, `${name}: Interne Bemerkung`, 5000);
@@ -236,7 +259,7 @@ export async function speichereSchichtTabelle(
         if (n) neueRollen.set(rolle, n);
       }
       const rollenGleich = altRollen.size === neueRollen.size && [...neueRollen].every(([r, n]) => altRollen.get(r) === n);
-      const gleich = alt.name === name && alt.start_zeit === start && alt.end_zeit === ende && alt.soll_anzahl === soll
+      const gleich = alt.name === name && alt.start_zeit === start && alt.end_zeit === ende && Number(alt.zeit_offen) === (offen ? 1 : 0) && alt.soll_anzahl === soll
         && alt.ort === ort && alt.bemerkung_intern === bemerkung && rollenGleich;
       if (gleich) continue;
       pruefeVersion(
@@ -246,8 +269,8 @@ export async function speichereSchichtTabelle(
       );
       await schreibe(
         c,
-        `UPDATE schicht SET name = ?, start_zeit = ?, end_zeit = ?, soll_anzahl = ?, ort = ?, bemerkung_intern = ?, version = version + 1 WHERE id = ?`,
-        [name, start, ende, soll, ort, bemerkung, alt.id],
+        `UPDATE schicht SET name = ?, start_zeit = ?, end_zeit = ?, zeit_offen = ?, soll_anzahl = ?, ort = ?, bemerkung_intern = ?, version = version + 1 WHERE id = ?`,
+        [name, start, ende, offen ? 1 : 0, soll, ort, bemerkung, alt.id],
       );
       if (!rollenGleich) await speichereRollen(c, alt.id, z.rollen ?? {});
       geaendert++;
@@ -255,7 +278,7 @@ export async function speichereSchichtTabelle(
     let neuId: number | null = null;
     const neuName = typeof neu?.name === 'string' ? neu.name.trim() : '';
     if (neu && neuName) {
-      const { start, ende } = zeitenAusZeile(neu, neuName);
+      const { start, ende, offen } = zeitenAusZeile(neu, neuName);
       const sDatum = lokalesDatum(start);
       const eDatum = lokalesDatum(ende);
       neuId = await erstelleSchicht(c, einsatzId, {
@@ -265,6 +288,7 @@ export async function speichereSchichtTabelle(
       // Eine neue Schicht übernimmt den Ort vom Einsatz. Ein Ort in der Zeile gilt nur für diese Schicht.
       const ort = text(neu.ort, `${neuName}: Antretensort`);
       if (ort) await schreibe(c, 'UPDATE schicht SET ort = ? WHERE id = ?', [ort, neuId]);
+      if (offen) await schreibe(c, 'UPDATE schicht SET zeit_offen = 1 WHERE id = ?', [neuId]);
     }
     return { geaendert, neuId };
   });

@@ -3,7 +3,7 @@
 import type { SchichtZahlen } from './zaehlung.js';
 import type { Warnung } from './warnungen.js';
 
-export type ZuTunArt = 'fehlt' | 'kein_soll' | 'unbestaetigt' | 'offen' | 'warnung' | 'schicht_warnung' | 'einsatzleitung';
+export type ZuTunArt = 'zeit_offen' | 'fehlt' | 'kein_soll' | 'unbestaetigt' | 'offen' | 'warnung' | 'schicht_warnung' | 'einsatzleitung';
 
 export interface ZuTunPunkt {
   art: ZuTunArt;
@@ -20,7 +20,7 @@ export interface ZuTunPunkt {
 
 export interface LageEingabe {
   jetzt: string;
-  schichten: { id: number; name: string; end_zeit: string; soll_anzahl: number | null }[];
+  schichten: { id: number; name: string; end_zeit: string; soll_anzahl: number | null; zeit_offen?: number }[];
   zahlen: Map<number, SchichtZahlen>;
   /** Zahl der Warnungen bei Einträgen je Schicht. */
   warnZahl: Map<number, number>;
@@ -52,6 +52,12 @@ export function einsatzLage(e: LageEingabe): Lage {
   const vor = (s: { name: string }) => (mehrere ? `${s.name}: ` : '');
   const punkte: ZuTunPunkt[] = [];
   let unbestaetigt = 0;
+
+  // Wunsch Yann: Ein Einsatz entsteht auch ohne Zeiten. Die Zeiten trägt die Aufgebotsstelle später nach.
+  const ohneZeit = kommend.filter((s) => Number(s.zeit_offen));
+  if (ohneZeit.length) {
+    punkte.push({ art: 'zeit_offen', schichtId: ohneZeit[0].id, anzahl: 0, text: mehrere ? `Zeiten fehlen: ${ohneZeit.map((s) => s.name).join(', ')}.` : 'Beginn oder Ende fehlt noch.' });
+  }
 
   for (const s of kommend) {
     const z = e.zahlen.get(s.id);

@@ -53,8 +53,19 @@ export interface EinsatzNeu {
 export async function erstelleEinsatz(db: Db, e: EinsatzNeu, benutzerId: number | null): Promise<number> {
   const name = pflichtText(e.name, 'Name');
   const ort = text(e.ort, 'Ort');
-  const start = zeitpunkt(e.start_datum, e.start_zeit, 'Start');
-  const ende = zeitpunkt(e.end_datum, e.end_zeit, 'Ende');
+  // Wunsch Yann: Nur Name und Startdatum sind Pflicht. Enddatum leer = gleicher Tag.
+  // Zeit leer = offen (00:00 bzw. 23:59), bis jemand sie in der Schicht nachträgt.
+  const t = (w: unknown) => (typeof w === 'string' ? w.trim() : '');
+  const startDatum = t(e.start_datum);
+  if (!startDatum) throw new Eingabefehler('Start: Datum fehlt.');
+  const startZeit = t(e.start_zeit);
+  const endZeit = t(e.end_zeit);
+  const endDatumRoh = t(e.end_datum);
+  // Ohne Enddatum und mit Ende vor Beginn: Ende am Folgetag (Nachteinsatz).
+  const endDatum = endDatumRoh || (startZeit && endZeit && endZeit <= startZeit ? plusTage(startDatum, 1) : startDatum);
+  const zeitOffen = !startZeit || !endZeit;
+  const start = zeitpunkt(startDatum, startZeit || '00:00', 'Start');
+  const ende = zeitpunkt(endDatum, endZeit || '23:59', 'Ende');
   if (ende <= start) throw new Eingabefehler('Das Ende muss nach dem Start liegen.');
   return transaktion(db, async (c) => {
     const r = await schreibe(c, 'INSERT INTO einsatz (name, ort, erstellt_am, erstellt_von) VALUES (?, ?, ?, ?)', [
@@ -66,8 +77,8 @@ export async function erstelleEinsatz(db: Db, e: EinsatzNeu, benutzerId: number 
     const einsatzId = r.insertId;
     await schreibe(
       c,
-      'INSERT INTO schicht (einsatz_id, name, start_zeit, end_zeit, ort, publiziert, position) VALUES (?, ?, ?, ?, ?, 1, 0)',
-      [einsatzId, name, start, ende, ort],
+      'INSERT INTO schicht (einsatz_id, name, start_zeit, end_zeit, ort, publiziert, position, zeit_offen) VALUES (?, ?, ?, ?, ?, 1, 0, ?)',
+      [einsatzId, name, start, ende, ort, zeitOffen ? 1 : 0],
     );
     return einsatzId;
   });
@@ -206,11 +217,11 @@ export async function kopiereEinsatz(
       const rs = await schreibe(
         c,
         `INSERT INTO schicht (einsatz_id, name, start_zeit, end_zeit, ort, min_alter, min_rang_id, soll_anzahl,
-           abtreten_ort, tenue, aufgebot_hinweis, bemerkung_intern, bemerkung_extern, publiziert, position)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)`,
+           abtreten_ort, tenue, aufgebot_hinweis, bemerkung_intern, bemerkung_extern, publiziert, position, zeit_offen)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)`,
         [
           neuId, s.name, start, ende, s.ort, s.min_alter, s.min_rang_id, s.soll_anzahl, s.abtreten_ort, s.tenue,
-          s.aufgebot_hinweis, s.bemerkung_intern, s.bemerkung_extern, s.position,
+          s.aufgebot_hinweis, s.bemerkung_intern, s.bemerkung_extern, s.position, s.zeit_offen ?? 0,
         ],
       );
       await schreibe(

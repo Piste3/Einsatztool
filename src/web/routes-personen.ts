@@ -190,7 +190,7 @@ ${r.schichten.length === 0 ? html`<p class="leer">Keine kommenden Schichten im Z
   <header class="eintrag-kopf">
     <div>
       <h2>${p.rang_name ? html`<span class="rang">${p.rang_name}</span> ` : ''}${name}</h2>
-      <p class="unter">${s.einsatz_name}${s.einsatz_name === s.name ? '' : ` · ${s.name}`} · ${zeitraum(s.start_zeit, s.end_zeit)}</p>
+      <p class="unter">${s.einsatz_name}${s.einsatz_name === s.name ? '' : ` · ${s.name}`} · ${zeitraum(s.start_zeit, s.end_zeit, s.zeit_offen)}</p>
     </div>
     <button type="button" class="toast-zu" data-fenster-zu aria-label="Fenster schliessen">×</button>
   </header>
@@ -201,7 +201,7 @@ ${r.schichten.length === 0 ? html`<p class="leer">Keine kommenden Schichten im Z
     : html`<strong>Aktuell:</strong> nicht gefragt. Es gibt noch keinen Eintrag.`}</div>
   ${warnungen(wl)}
   ${andere.length ? html`<div class="eintrag-andere"><span class="unter">Andere Schichten dieses Einsatzes:</span>
-    <ul class="ohne-punkte">${andere.map((x) => { const st = statusIn(x.id); return html`<li>${st ? statusMarke(st) : statusMarke(null)} ${x.name} · ${zeitraum(x.start_zeit, x.end_zeit)}${gleicheZeit(x) ? html` <span class="pille rot">gleiche Zeit</span>` : ''}</li>`; })}</ul></div>` : ''}
+    <ul class="ohne-punkte">${andere.map((x) => { const st = statusIn(x.id); return html`<li>${st ? statusMarke(st) : statusMarke(null)} ${x.name} · ${zeitraum(x.start_zeit, x.end_zeit, x.zeit_offen)}${gleicheZeit(x) ? html` <span class="pille rot">gleiche Zeit</span>` : ''}</li>`; })}</ul></div>` : ''}
 
   <form method="post" action="${a ? `/anmeldungen/${a.id}` : `/schichten/${s.id}/anmeldungen`}" class="eintrag-form">
     ${formFelder(kx, ziel)}

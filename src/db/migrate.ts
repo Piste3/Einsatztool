@@ -47,6 +47,12 @@ const migrationen: { version: number; anweisungen: () => string[] }[] = [
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin`,
     ],
   },
+  // Version 4 (Wunsch Yann): Ein neuer Einsatz braucht nur das Datum. Fehlen Zeiten, ist die Zeit «offen».
+  // Das Tool speichert dann 00:00 bzw. 23:59 und zeigt «Zeit offen», bis jemand die Zeiten einträgt.
+  {
+    version: 4,
+    anweisungen: () => ['ALTER TABLE schicht ADD COLUMN zeit_offen TINYINT NOT NULL DEFAULT 0'],
+  },
 ];
 
 export async function migriere(db: Db): Promise<number> {

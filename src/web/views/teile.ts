@@ -5,7 +5,7 @@ import { hauptnummer, telLink, telefonText, whatsappNummer } from '../../domain/
 import { sollFarbe } from '../../domain/zaehlung.js';
 import type { Warnung } from '../../domain/warnungen.js';
 import type { AbgleichErgebnis } from '../../domain/ical-abgleich.js';
-import { datumChVonIso, lokaleZeit, zeitraumText } from '../../domain/zeit.js';
+import { datumChVonIso, lokalesDatum, lokaleZeit, wochentagKurz, zeitraumText } from '../../domain/zeit.js';
 
 /** Symbole je Status (Legende in Matrix und Rückmeldungen). */
 export const STATUS_SYMBOL: Record<Status, string> = {
@@ -85,8 +85,14 @@ export function telefon(p: { telefon: string | null; telefon_privat: string | nu
 
 export { telefonText, hauptnummer };
 
-export function zeitraum(start: string, ende: string): string {
-  return zeitraumText(start, ende);
+/** Zeitraum für die Anzeige. Mit «offen» (Schicht ohne Zeiten): nur die Daten und «Zeit offen». */
+export function zeitraum(start: string, ende: string, offen?: number | boolean): string {
+  if (!offen || !Number(offen)) return zeitraumText(start, ende);
+  const tag = (iso: string) => `${wochentagKurz(iso)} ${datumChVonIso(iso)}`;
+  const b = lokaleZeit(start) === '00:00' ? '' : lokaleZeit(start);
+  const e = lokaleZeit(ende) === '23:59' ? '' : lokaleZeit(ende);
+  const zeiten = b || e ? `${b || '?'}–${e || '?'} (Zeit offen)` : 'Zeit offen';
+  return lokalesDatum(start) === lokalesDatum(ende) ? `${tag(start)}, ${zeiten}` : `${tag(start)} – ${tag(ende)}, ${zeiten}`;
 }
 
 export function datumZeit(iso: string | null): string {

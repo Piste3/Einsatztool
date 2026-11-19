@@ -778,3 +778,6 @@ body.druck { background: var(--hg); padding: 1rem; }
 .schichten-bearbeiten, .tabelle-formular { min-width: 0; }
 .schichten-bearbeiten .rahmen { overflow-x: auto; max-width: 100%; }
 .einsatz-uebersicht, .einsatz-uebersicht > section { grid-template-columns: minmax(0, 1fr); }
+/* Neuer Einsatz: links die Daten, rechts die Zeiten (Wunsch Yann). */
+.zeit-raster { display: grid; grid-template-columns: 1fr 1fr; gap: 0 1rem; }
+.zeit-raster .feld label .unter { font-weight: 400; margin: 0; }
