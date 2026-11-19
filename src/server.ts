@@ -3,7 +3,8 @@ import type { Server } from 'node:http';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { existsSync, mkdirSync } from 'node:fs';
-import { ladeEnvDatei, leseKonfiguration } from './config.js';
+import { ausUmgebung, envDateiPfad, ladeEnvDatei, leseKonfiguration } from './config.js';
+import { erstelleQuelle } from './domain/konfiguration.js';
 import { erstellePool } from './db/db.js';
 import { migriere } from './db/migrate.js';
 import { schreibeSicherung } from './db/sicherung.js';
@@ -86,6 +87,8 @@ async function start(): Promise<void> {
     tagesexportJetzt: () => fuehreAus(db, exportJob, false),
     bestaetigungenJetzt: () => fuehreAus(db, bestaetigungJob, false),
     updater,
+    konfigQuelle: erstelleQuelle(envDateiPfad(), process.env, ausUmgebung),
+    neustart: () => beenden(NEUSTART_CODE),
   });
 
   server = app.listen(konfig.port, konfig.listenHost, () => {

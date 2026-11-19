@@ -218,6 +218,7 @@ ${liste.map((b) => html`<tr><td>${b.name}</td><td>${b.email}</td><td>${b.rolle =
     const z = '/admin/einstellungen';
     res.send(seite(kx, 'Einstellungen', 'einstellungen', html`
 <h1>Einstellungen</h1>
+<p>Server, Login, Mail, SharePoint und Datenbank: siehe <a href="/admin/konfiguration">Konfiguration</a>.</p>
 <section class="abschnitt" id="raenge">
   <h2>Ränge</h2>
   <p class="unter">Der oberste Rang ist der höchste. Ein neuer Rang kommt ans Ende (tiefster Rang). Der Import ordnet den Rang über den Namen zu.</p>
@@ -285,7 +286,7 @@ ${liste.map((b) => html`<tr><td>${b.name}</td><td>${b.email}</td><td>${b.rolle =
     const kx = k(res);
     const u = deps.updater;
     if (!konfig.updateErlaubt || !u) {
-      res.send(seite(kx, 'Update', 'update', html`<h1>Update</h1><p>Das Update über diese Seite ist ausgeschaltet. Setze <code>UPDATE_ERLAUBT=1</code> in der Konfiguration.</p>`));
+      res.send(seite(kx, 'Update', 'update', html`<h1>Update</h1><p>Das Update über diese Seite ist ausgeschaltet. Setze <code>UPDATE_ERLAUBT=1</code> in der <a href="/admin/konfiguration">Konfiguration</a> und starte den Server neu.</p>`));
       return;
     }
     const z = u.zustand;

@@ -111,7 +111,6 @@ Siehe Abschnitt 3 des Auftrags. Kurz: Seitenleiste dunkelblau, Startseite «Zu t
 | Rolle Einsatzleiter als Benutzerrolle | Entscheid Yann. Nur Admin und Aufgebot. |
 | Passwort-Login, Zwei-Faktor-Anmeldung | Login nur über Microsoft Entra. Das Tool speichert keine Passwörter. |
 | Anlegen von Personen | Nur der Import legt Personen an. |
-| Server-Einstellungen im Browser | Konfiguration nur über die `.env`-Datei. |
 | Ausblenden der Essenseinschränkungen nach dem Einsatz | Die Daten kommen aus Clubdesk und bleiben sichtbar. |
 | Eigene Handy-App | Kommt später als eigener Auftrag. |
 
@@ -157,3 +156,9 @@ Diese Liste ergänze ich beim Bauen. Jede Annahme aus Teil B des Konzepts steht 
 - 19.11.2026: `transaktion()` wiederholt einen Vorgang bei Deadlock oder Sperr-Wartezeit (höchstens 4 Versuche). Gleichzeitiges Anlegen desselben Eintrags führt zu einer Wiederholung statt zu einem Fehler.
 - 19.11.2026: Verbindungspool 20 Verbindungen. Ein täglicher Job läuft nie zweimal gleichzeitig (Sperre im Speicher).
 - 19.11.2026: Das Update ruft `npm ci --include=dev` auf. Grund: `start.cmd` setzt `NODE_ENV=production`. Ohne `--include=dev` fehlt TypeScript (`tsc`) beim Bauen.
+- 19.11.2026: Admin › Konfiguration zeigt und ändert alle Werte der `.env`-Datei (Wunsch Yann). Die Seite schreibt direkt in `ENV_FILE`. Grund: eine einzige Quelle, und bei einem falschen Wert hilft die Datei auf dem Server.
+- 19.11.2026: Änderungen an der Konfiguration wirken nach einem Neustart (Knopf «Neu starten», Exit-Code 75). Der alte Stand bleibt als `.vorher`.
+- 19.11.2026: Geheimnisse gehen nie an den Browser. Leeres Feld = unverändert. Das Protokoll `konfiguration_protokoll` (Migration 3) zeigt Geheimnisse nur als «(gesetzt)» oder «(leer)».
+- 19.11.2026: Werte aus echten Umgebungsvariablen sind auf der Seite gesperrt. `NODE_ENV` und `DEV_LOGIN` erscheinen nicht auf der Seite.
+- 19.11.2026: Neue Datenbank-Werte prüft das Tool vor dem Speichern. Ohne Verbindung speichert es nur mit «Trotzdem speichern» (Warnen statt verbieten).
+- 19.11.2026: Konfliktschutz über eine Prüfsumme der Datei. Ein Formular mit altem Stand speichert nichts.

@@ -32,6 +32,21 @@ const migrationen: { version: number; anweisungen: () => string[] }[] = [
       'ALTER TABLE anmeldung ADD COLUMN version INT NOT NULL DEFAULT 1',
     ],
   },
+  // Version 3: Protokoll der Konfiguration (Admin › Konfiguration). Geheimnisse stehen nie im Klartext darin.
+  {
+    version: 3,
+    anweisungen: () => [
+      `CREATE TABLE konfiguration_protokoll (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        zeit VARCHAR(30) NOT NULL,
+        benutzer_id INT,
+        schluessel VARCHAR(100) NOT NULL,
+        alt TEXT,
+        neu TEXT,
+        CONSTRAINT fk_konfig_benutzer FOREIGN KEY (benutzer_id) REFERENCES benutzer(id)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin`,
+    ],
+  },
 ];
 
 export async function migriere(db: Db): Promise<number> {

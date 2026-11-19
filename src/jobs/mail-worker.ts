@@ -32,18 +32,23 @@ export async function sendeFaellige(db: Db, versender: Versender, mailFrom: stri
   return n;
 }
 
+/** Verbindungsdaten für nodemailer. 465 = TLS, 587 = STARTTLS. */
+export function smtpOptionen(smtp: Konfiguration['smtp']) {
+  return {
+    host: smtp.host,
+    port: smtp.port,
+    secure: smtp.port === 465,
+    requireTLS: smtp.port === 587,
+    auth: smtp.user ? { user: smtp.user, pass: smtp.pass } : undefined,
+  };
+}
+
 export function starteMailWorker(db: Db, k: Konfiguration): () => void {
   if (!k.smtp.host) {
     log('warn', 'SMTP ist nicht eingerichtet. Mails bleiben in der Warteschlange.');
     return () => undefined;
   }
-  const transport = nodemailer.createTransport({
-    host: k.smtp.host,
-    port: k.smtp.port,
-    secure: k.smtp.port === 465,
-    requireTLS: k.smtp.port === 587,
-    auth: k.smtp.user ? { user: k.smtp.user, pass: k.smtp.pass } : undefined,
-  });
+  const transport = nodemailer.createTransport(smtpOptionen(k.smtp));
   const versender: Versender = { sende: (m) => transport.sendMail(m) };
   let laeuft = false;
   const t = setInterval(async () => {

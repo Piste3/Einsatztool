@@ -31,6 +31,14 @@ export function erstellePool(e: DbEinstellungen): Pool {
   });
 }
 
+/** Prüft, ob eine Verbindung mit diesen Werten möglich ist (Admin › Konfiguration). Wirft bei einem Fehler. */
+export async function testeVerbindung(e: DbEinstellungen): Promise<void> {
+  const c = await mysql.createConnection({
+    host: e.host, port: e.port, database: e.name, user: e.user, password: e.password, connectTimeout: 5000,
+  });
+  await c.end();
+}
+
 const inTransaktion = new WeakSet<object>();
 
 /**

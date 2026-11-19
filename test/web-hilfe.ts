@@ -3,7 +3,7 @@ import type { AddressInfo } from 'node:net';
 import type { Server } from 'node:http';
 import type { Pool } from 'mysql2/promise';
 import { leseKonfiguration, type Konfiguration } from '../src/config.js';
-import { erstelleApp, neueSitzung, csrfToken } from '../src/web/app.js';
+import { erstelleApp, neueSitzung, csrfToken, type Abhaengigkeiten } from '../src/web/app.js';
 import { schreibe } from '../src/db/db.js';
 
 export const SECRET = 'test-geheimnis-test-geheimnis-test-geheimnis';
@@ -14,7 +14,7 @@ export interface TestApp {
   stopp: () => Promise<void>;
 }
 
-export async function starteApp(db: Pool, env: Record<string, string> = {}): Promise<TestApp> {
+export async function starteApp(db: Pool, env: Record<string, string> = {}, extra: Partial<Abhaengigkeiten> = {}): Promise<TestApp> {
   const konfig = leseKonfiguration({
     SESSION_SECRET: SECRET,
     ENTRA_TENANT_ID: 'mandant-test',
@@ -30,6 +30,7 @@ export async function starteApp(db: Pool, env: Record<string, string> = {}): Pro
     tagesexportJetzt: async () => ({ ok: true, meldung: 'ok' }),
     bestaetigungenJetzt: async () => ({ ok: true, meldung: 'ok' }),
     updater: null,
+    ...extra,
   });
   const server: Server = await new Promise((ok) => {
     const s = app.listen(0, '127.0.0.1', () => ok(s));

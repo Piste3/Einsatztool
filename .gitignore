@@ -7,3 +7,7 @@ data/
 export/
 logs/
 *.sql.bak
+.env.vorher
+.env.neu
+*.env.vorher
+*.env.neu

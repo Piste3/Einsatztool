@@ -4,7 +4,7 @@ import type { Kontext } from '../kontext.js';
 
 export type Bereich =
   | 'start' | 'einsaetze' | 'rueckmeldungen' | 'personen' | 'unbekannt' | 'archiv'
-  | 'import' | 'export' | 'benutzer' | 'einstellungen' | 'update';
+  | 'import' | 'export' | 'benutzer' | 'einstellungen' | 'konfiguration' | 'update';
 
 function link(k: Kontext, bereich: Bereich, aktiv: Bereich | null, href: string, text: string, zaehler?: number): Roh {
   return html`<li><a href="${href}"${wenn(bereich === aktiv, new Roh(' aria-current="page" class="aktiv"'))}>
@@ -50,6 +50,7 @@ export function seite(k: Kontext, titel: string, aktiv: Bereich | null, inhalt: 
     ${link(k, 'export', aktiv, '/admin/export', 'Export')}
     ${link(k, 'benutzer', aktiv, '/admin/benutzer', 'Benutzer')}
     ${link(k, 'einstellungen', aktiv, '/admin/einstellungen', 'Einstellungen')}
+    ${link(k, 'konfiguration', aktiv, '/admin/konfiguration', 'Konfiguration')}
     ${link(k, 'update', aktiv, '/admin/update', 'Update')}
   </ul>`)}
   <div class="leiste-fuss">
