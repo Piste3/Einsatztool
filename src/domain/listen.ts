@@ -94,6 +94,7 @@ export interface RueckmeldungZelle {
   status: Status | null;
   geaendert_am: string | null;
   kanal: string | null;
+  bemerkung: string | null;
   passt: boolean;
 }
 
@@ -129,9 +130,9 @@ export async function rueckmeldungen(db: Db, o: RueckmeldungOptionen): Promise<{
   for (const s of schichten) s.summe = { an: 0, ab: 0, unsicher: 0, offen: 0 };
   let personen = await alle<PersonKurz>(db, PERSON_KURZ);
   const eintraege = schichten.length
-    ? await alle<{ schicht_id: number; person_id: number; status: Status; geaendert_am: string; kanal: string }>(
+    ? await alle<{ schicht_id: number; person_id: number; status: Status; geaendert_am: string; kanal: string; bemerkung: string | null }>(
         db,
-        'SELECT schicht_id, person_id, status, geaendert_am, kanal FROM anmeldung WHERE schicht_id IN (?) AND person_id IS NOT NULL',
+        'SELECT schicht_id, person_id, status, geaendert_am, kanal, bemerkung FROM anmeldung WHERE schicht_id IN (?) AND person_id IS NOT NULL',
         [schichten.map((s) => s.id)],
       )
     : [];
@@ -150,7 +151,7 @@ export async function rueckmeldungen(db: Db, o: RueckmeldungOptionen): Promise<{
       else if (status === 'abgemeldet') s.summe.ab++;
       else if (status === 'unsicher') s.summe.unsicher++;
       else if (passt) s.summe.offen++;
-      return { status, geaendert_am: e?.geaendert_am ?? null, kanal: e?.kanal ?? null, passt };
+      return { status, geaendert_am: e?.geaendert_am ?? null, kanal: e?.kanal ?? null, bemerkung: e?.bemerkung ?? null, passt };
     });
     return { ...p, zellen };
   });

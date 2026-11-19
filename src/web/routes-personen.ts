@@ -134,7 +134,7 @@ ${r.schichten.length === 0 ? html`<p class="leer">Keine kommenden Schichten im Z
   <thead><tr><th class="name-spalte">Person</th>${r.schichten.map((s) => html`<th><a href="/schichten/${s.id}"><span class="e">${s.einsatz_name}</span>${s.einsatz_name === s.name ? '' : html`<span class="s">${s.name}</span>`}<span class="d">${datumChVonIso(s.start_zeit)}</span></a>${s.publiziert ? '' : html`<span class="pille grau">intern</span>`}</th>`)}</tr></thead>
   <tbody>${r.personen.map((p) => html`<tr>
     <th class="name-spalte"><a href="/personen/${p.clubdesk_id}">${p.rang_name ? html`<span class="rang">${p.rang_name}</span> ` : ''}${p.nachname ?? ''} ${p.vorname ?? ''}</a></th>
-    ${p.zellen.map((c, i) => html`<td class="zelle-klick${c.passt ? '' : ' passt-nicht'}"><a href="/rueckmeldungen/eintrag?schicht=${r.schichten[i].id}&amp;person=${p.clubdesk_id}&amp;zurueck=${encodeURIComponent(hier)}" data-eintrag title="${c.status ? `${STATUS_TEXT[c.status]} · ${datumChVonIso(c.geaendert_am!)} ${lokaleZeit(c.geaendert_am!)} · ${KANAL_TEXT[c.kanal as Kanal]}` : c.passt ? 'nicht gefragt' : 'passt nicht zu Mindestalter oder Mindestrang'} – Klick zum Eintragen">${statusMarke(c.status)}${c.passt ? '' : html`<span class="sr">passt nicht</span>`}</a></td>`)}
+    ${p.zellen.map((c, i) => html`<td class="zelle-klick${c.passt ? '' : ' passt-nicht'}"><a href="/rueckmeldungen/eintrag?schicht=${r.schichten[i].id}&amp;person=${p.clubdesk_id}&amp;zurueck=${encodeURIComponent(hier)}" data-eintrag title="${c.status ? `${STATUS_TEXT[c.status]} · ${datumChVonIso(c.geaendert_am!)} ${lokaleZeit(c.geaendert_am!)} · ${KANAL_TEXT[c.kanal as Kanal]}${c.bemerkung ? ` · Bemerkung: ${c.bemerkung}` : ''}` : c.passt ? 'nicht gefragt' : 'passt nicht zu Mindestalter oder Mindestrang'} – Klick zum Eintragen">${statusMarke(c.status)}${c.bemerkung ? html`<span class="bemerkung-marke" aria-label="mit Bemerkung">✎</span>` : ''}${c.passt ? '' : html`<span class="sr">passt nicht</span>`}</a></td>`)}
   </tr>`)}</tbody>
   <tfoot>
     ${(['an', 'ab', 'unsicher', 'offen'] as const).map((n) => html`<tr><th class="name-spalte">${{ an: 'An', ab: 'Ab', unsicher: 'Unsicher', offen: 'Offen' }[n]}</th>${r.schichten.map((s) => html`<td>${s.summe[n]}</td>`)}</tr>`)}
@@ -191,7 +191,7 @@ ${r.schichten.length === 0 ? html`<p class="leer">Keine kommenden Schichten im Z
     <fieldset><legend>Kanal</legend>${wahl('kanal', kanaele, (w) => KANAL_TEXT[w as Kanal], vorgabeKanal)}</fieldset>
     <fieldset><legend>Ergebnis</legend>${wahl('status', reihenfolge, (w) => STATUS_TEXT[w as Status], vorgabeStatus)}</fieldset>
     <label class="feld">Rolle ${rolleAuswahl('rolle', rollenListe, a?.rolle ?? null)}</label>
-    ${a ? html`<label class="feld">Bemerkung <textarea name="bemerkung" rows="2" maxlength="5000">${a.bemerkung ?? ''}</textarea></label>` : ''}
+    <label class="feld">Bemerkung <textarea name="bemerkung" rows="2" maxlength="5000">${a?.bemerkung ?? ''}</textarea></label>
     <div class="eintrag-knoepfe">
       ${a ? html`<a class="knopf gefahr klein" href="/anmeldungen/${a.id}/loeschen?zurueck=${encodeURIComponent(ziel)}">Eintrag entfernen</a>` : html`<span></span>`}
       <span class="knopfreihe"><a class="knopf" href="${ziel}" data-fenster-zu>Abbrechen</a><button type="submit" class="knopf haupt">${a ? 'Speichern' : 'Eintragen'}</button></span>

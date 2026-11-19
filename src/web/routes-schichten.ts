@@ -253,6 +253,7 @@ ${s.bemerkung_intern ? html`<p class="bemerkung intern"><strong>Intern:</strong>
     <label>Kanal ${kanalAuswahl('kanal', 'telefon', true)}</label>
     <label>Status ${statusAuswahl('status', 'angemeldet')}</label>
     <label>Rolle ${rolleAuswahl('rolle', rollen, null)}</label>
+    <label class="wachsen">Bemerkung <input name="bemerkung" maxlength="5000" autocomplete="off"></label>
     <button type="submit" class="knopf haupt">Eintragen</button>
   </form>
 </section>
@@ -362,12 +363,15 @@ ${s.anzahl_schichten <= 1 ? html`<p class="meldung fehler">Das ist die einzige S
     sendeCsv(res, `essen-${dateiTeil(terminTitel(s))}.csv`, await essenslisteCsv(db, s.id));
   });
 
+  // Leere Bemerkung beim Eintragen: Eine vorhandene Bemerkung bleibt stehen (Regel 13.5.4 ändert den Eintrag).
+  const nichtLeer = (x: unknown) => (typeof x === 'string' && x.trim() !== '' ? x : undefined);
+
   // Person von Hand anmelden (Kanal wählen).
   app.post('/schichten/:sid/anmeldungen', nurAufgebot, async (req, res) => {
     const sid = leseId(req.params.sid);
     const personId = idAusAuswahl(req.body?.person);
     if (!personId) throw new Eingabefehler('Wähle eine Person aus der Liste.');
-    await setzeAnmeldung(db, { schichtId: sid, personId, status: req.body.status, kanal: req.body.kanal, rolle: req.body.rolle }, k(res).benutzer!.id);
+    await setzeAnmeldung(db, { schichtId: sid, personId, status: req.body.status, kanal: req.body.kanal, rolle: req.body.rolle, bemerkung: nichtLeer(req.body.bemerkung) }, k(res).benutzer!.id);
     zurueck(req, res, `/schichten/${sid}`, 'Eingetragen.');
   });
 

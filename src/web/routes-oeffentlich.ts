@@ -82,7 +82,7 @@ ${schichten.length === 0
     </div>`)}
   </fieldset>
   <div class="feld"><label for="essen">Essenseinschränkungen</label><input id="essen" name="essen" maxlength="500" value="${werte.essen ?? ''}"><small>Nur ausfüllen, wenn neu oder geändert.</small></div>
-  <div class="feld"><label for="bemerkung">Bemerkung</label><textarea id="bemerkung" name="bemerkung" maxlength="2000" rows="3">${werte.bemerkung ?? ''}</textarea></div>
+  <div class="feld"><label for="bemerkung">Bemerkung</label><textarea id="bemerkung" name="bemerkung" maxlength="2000" rows="3">${werte.bemerkung ?? ''}</textarea><small>Zum Beispiel: später da, früher weg, Fragen. Die Aufgebotsstelle liest die Bemerkung.</small></div>
   <button type="submit" class="knopf haupt">Anmelden</button>
 </form>`}`;
   res.status(status).type('html').send(formularSeite(inhalt));

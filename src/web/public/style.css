@@ -597,6 +597,7 @@ body.druck { background: var(--hg); padding: 1rem; }
 .rueck td.zelle-klick > a:hover .status.leer { color: var(--text); }
 .rueck td.zelle-klick > a:hover .status.leer::after { content: '+'; position: absolute; }
 .rueck td.zelle-klick > a .status.leer { position: relative; }
+.rueck td.zelle-klick > a .bemerkung-marke { margin-left: .2rem; font-size: .75rem; opacity: .7; }
 .fenster {
   border: 1px solid var(--linie); border-radius: 12px; padding: 0; width: min(560px, calc(100vw - 1.5rem)); max-height: calc(100vh - 2rem);
   background: var(--flaeche); color: var(--text); box-shadow: var(--schatten-menue);
