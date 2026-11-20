@@ -1,4 +1,4 @@
-// T38: Personen zwischen Schichten verschieben, Fenster «Bestätigen?», Dokumente im neuen Tab (Wünsche Yann 20.11.2026).
+// T39: Personen zwischen Schichten verschieben, Fenster «Bestätigen?», Dokumente im neuen Tab (Wünsche Yann 20.11.2026).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { einsatz, inTagen, neueDatenbank, person, zeilen } from './hilfe.js';
@@ -10,7 +10,7 @@ import { Eingabefehler } from '../src/domain/eingabe.js';
 import { lokalesDatum } from '../src/domain/zeit.js';
 import { schreibe } from '../src/db/db.js';
 
-test('T38 Verschieben: Status und Protokoll bleiben, Konflikte, neue Bestätigungsmail, Rückgängig', async () => {
+test('T39 Verschieben: Status und Protokoll bleiben, Konflikte, neue Bestätigungsmail, Rückgängig', async () => {
   const t = await neueDatenbank();
   try {
     const s = await einsatz(t.db, 'Herbstmesse', inTagen(20, 13), inTagen(20, 18), 'Claraplatz');
@@ -64,7 +64,7 @@ test('T38 Verschieben: Status und Protokoll bleiben, Konflikte, neue Bestätigun
   }
 });
 
-test('T38 im Web: Bereich «Personen verschieben», Route, Fenster «Bestätigen?», Dokumente im neuen Tab', async () => {
+test('T39 im Web: Bereich «Personen verschieben», Route, Fenster «Bestätigen?», Dokumente im neuen Tab', async () => {
   const t = await neueDatenbank();
   const app = await starteApp(t.db);
   try {

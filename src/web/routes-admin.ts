@@ -12,7 +12,10 @@ import {
   verschiebeRang, verschiebeRolle,
 } from '../domain/stammdaten.js';
 import { Eingabefehler, Konflikt, id as leseId, liste } from '../domain/eingabe.js';
-import { MAX_BETREFF, MAX_TEXT, PLATZHALTER, ladeVorlage, speichereVorlage } from '../domain/vorlagen.js';
+import { AENDERUNG_MELDEN, CLUBDESK_TERMIN, MAX_BETREFF, MAX_TEXT, MAX_TEXT_CLUBDESK, PLATZHALTER, istVorlage, ladeVorlage, speichereVorlage } from '../domain/vorlagen.js';
+import { BAUSTEINE, clubdeskText } from '../domain/clubdesk-text.js';
+import { eine } from '../db/db.js';
+import { jetztIso } from '../domain/zeit.js';
 import { feedStand } from '../domain/ical-abgleich.js';
 import { letzterLauf } from '../jobs/taeglich.js';
 import { html, Roh } from './html.js';
@@ -212,11 +215,23 @@ ${liste.map((b) => html`<tr><td>${b.name}</td><td>${b.email}</td><td>${b.rolle =
   });
 
   // ---------- Einstellungen: Ränge und Rollen ----------
-  const zeigeEinstellungen = async (res: Response, vz: { betreff?: string; text?: string; version?: number; fehler?: string } = {}) => {
+  const zeigeEinstellungen = async (res: Response, eingabe: { schluessel?: string; betreff?: string; text?: string; version?: number; fehler?: string } = {}) => {
     const kx = k(res);
     const r = await raenge(db);
     const ro = await rollen(db);
     const vo = await ladeVorlage(db);
+    const cv = await ladeVorlage(db, CLUBDESK_TERMIN);
+    // Eingaben nach einem Fehler gehören nur zum Formular, das gesendet hat.
+    const vz = eingabe.schluessel === AENDERUNG_MELDEN ? eingabe : {};
+    const cz = eingabe.schluessel === CLUBDESK_TERMIN ? eingabe : {};
+    // Vorschau: nächste kommende Schicht, sonst die zuletzt beendete.
+    const beispiel = await eine<{ id: number; titel: string }>(
+      db,
+      `SELECT s.id, CONCAT(e.name, ' – ', s.name) AS titel FROM schicht s JOIN einsatz e ON e.id = s.einsatz_id
+        ORDER BY (s.end_zeit < ?), CASE WHEN s.end_zeit < ? THEN '' ELSE s.start_zeit END, s.end_zeit DESC, s.id LIMIT 1`,
+      [jetztIso(), jetztIso()],
+    );
+    const vorschau = beispiel ? await clubdeskText(db, beispiel.id, konfig.baseUrl) : null;
     const z = '/admin/einstellungen';
     res.send(seite(kx, 'Einstellungen', 'einstellungen', html`
 ${seitenKopf({ titel: 'Einstellungen' })}
@@ -257,13 +272,37 @@ ${seitenKopf({ titel: 'Einstellungen' })}
   ${vz.fehler ? html`<div class="meldung fehler" role="alert">${vz.fehler}</div>` : ''}
   <form method="post" action="/admin/vorlage" class="stapel">
     ${formFelder(kx, `${z}#vorlage`)}
+    <input type="hidden" name="schluessel" value="${AENDERUNG_MELDEN}">
     <input type="hidden" name="version" value="${vz.version ?? vo.version}">
     <div class="feld breit"><label for="vorlage_betreff">Betreff</label><input id="vorlage_betreff" name="betreff" required maxlength="${MAX_BETREFF}" value="${vz.betreff ?? vo.betreff}"></div>
     <div class="feld breit"><label for="vorlage_text">Text</label><textarea id="vorlage_text" name="text" rows="16" required maxlength="${MAX_TEXT}">${vz.text ?? vo.text}</textarea>
       <small>Platzhalter: ${Object.entries(PLATZHALTER).map(([p, t], i) => html`${i ? ', ' : ''}<code>${p}</code> = ${t}`)}. Das Tool setzt die Werte der Person ein.</small></div>
     <div class="knopfreihe"><button type="submit" class="knopf haupt">Vorlage speichern</button></div>
   </form>
-  ${vo.version > 0 ? knopfPost(kx, '/admin/vorlage', 'Standardvorlage wiederherstellen', { standard: '1' }, 'knopf klein', `${z}#vorlage`) : ''}
+  ${vo.version > 0 ? knopfPost(kx, '/admin/vorlage', 'Standardvorlage wiederherstellen', { schluessel: AENDERUNG_MELDEN, standard: '1' }, 'knopf klein', `${z}#vorlage`) : ''}
+</section>
+<section class="abschnitt" id="clubdesk">
+  <h2>Text für den Clubdesk-Termin</h2>
+  <p class="unter">Diesen Titel und Text zeigt der Einsatz unter «Dokumente › Text für Clubdesk-Termin» zum Kopieren. Die Bausteine füllt das Tool je Schicht aus. Eine Zeile mit nur leeren Bausteinen entfällt. ${cv.version === 0 ? 'Zurzeit gilt die Standardvorlage.' : ''}</p>
+  ${cz.fehler ? html`<div class="meldung fehler" role="alert">${cz.fehler}</div>` : ''}
+  <div class="haupt-und-seite">
+    <form method="post" action="/admin/vorlage" class="stapel">
+      ${formFelder(kx, `${z}#clubdesk`)}
+      <input type="hidden" name="schluessel" value="${CLUBDESK_TERMIN}">
+      <input type="hidden" name="version" value="${cz.version ?? cv.version}">
+      <div class="feld breit"><label for="clubdesk_titel">Titel</label><input id="clubdesk_titel" name="betreff" required maxlength="${MAX_BETREFF}" value="${cz.betreff ?? cv.betreff}"></div>
+      <div class="feld breit"><label for="clubdesk_text">Text</label><textarea id="clubdesk_text" name="text" rows="16" required maxlength="${MAX_TEXT_CLUBDESK}">${cz.text ?? cv.text}</textarea></div>
+      <div class="knopfreihe"><button type="submit" class="knopf haupt">Vorlage speichern</button></div>
+    </form>
+    <aside class="karte bausteine" aria-labelledby="bausteine_titel">
+      <h3 id="bausteine_titel">Bausteine</h3>
+      <dl>${Object.entries(BAUSTEINE).map(([b, t]) => html`<dt><code>${b}</code></dt><dd>${t}</dd>`)}</dl>
+    </aside>
+  </div>
+  ${cv.version > 0 ? knopfPost(kx, '/admin/vorlage', 'Standardvorlage wiederherstellen', { schluessel: CLUBDESK_TERMIN, standard: '1' }, 'knopf klein', `${z}#clubdesk`) : ''}
+  ${vorschau ? html`<h3>Vorschau</h3>
+  <p class="unter">Gespeicherte Vorlage mit der Schicht «${beispiel!.titel}». Nach dem Speichern zeigt die Vorschau den neuen Text.</p>
+  <div class="karte vorschau-text"><strong>${vorschau.titel}</strong><pre>${vorschau.text}</pre></div>` : ''}
 </section>`));
   };
   const einstellungen = async (_req: Request, res: Response) => zeigeEinstellungen(res);
@@ -273,14 +312,18 @@ ${seitenKopf({ titel: 'Einstellungen' })}
 
   app.post('/admin/vorlage', nurAdmin, async (req, res) => {
     const b = req.body ?? {};
+    const schluessel = b.schluessel === undefined || b.schluessel === '' ? AENDERUNG_MELDEN : b.schluessel;
+    if (!istVorlage(schluessel)) throw new Eingabefehler('Unbekannte Vorlage.');
+    const anker = schluessel === CLUBDESK_TERMIN ? 'clubdesk' : 'vorlage';
     try {
-      const geaendert = await speichereVorlage(db, { betreff: b.betreff, text: b.text, version: b.version, standard: b.standard === '1' }, k(res).benutzer!.id);
-      zurueck(req, res, '/admin/einstellungen#vorlage', geaendert ? (b.standard === '1' ? 'Standardvorlage wiederhergestellt.' : 'Vorlage gespeichert.') : 'Keine Änderung.');
+      const geaendert = await speichereVorlage(db, { betreff: b.betreff, text: b.text, version: b.version, standard: b.standard === '1' }, k(res).benutzer!.id, schluessel);
+      zurueck(req, res, `/admin/einstellungen#${anker}`, geaendert ? (b.standard === '1' ? 'Standardvorlage wiederhergestellt.' : 'Vorlage gespeichert.') : 'Keine Änderung.');
     } catch (e) {
       if (!(e instanceof Eingabefehler)) throw e;
       // Die Eingaben bleiben stehen. Nach einem Konflikt überschreibt ein zweites Speichern bewusst.
       res.status(e instanceof Konflikt ? 409 : 400);
       await zeigeEinstellungen(res, {
+        schluessel,
         betreff: typeof b.betreff === 'string' ? b.betreff : undefined,
         text: typeof b.text === 'string' ? b.text : undefined,
         version: e instanceof Konflikt ? e.aktuelleVersion : undefined,
