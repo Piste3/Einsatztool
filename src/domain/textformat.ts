@@ -133,3 +133,13 @@ export function alsText(text: string): string {
 export function fuerVorschau(html: string): string {
   return html.replace(/ style="[^"]*"/g, '');
 }
+
+/** Eine Zeile mit Auszeichnung (z. B. Tenue) als HTML für eigene Seiten: ohne style-Attribute (CSP), mit Klassen. */
+export function zeileAlsHtml(text: string): string {
+  return fuerVorschau(inlineHtml(text));
+}
+
+/** Eine Zeile mit Auszeichnung als reiner Text (z. B. Tenue in CSV oder Mail). */
+export function zeileAlsText(text: string): string {
+  return inlineText(text);
+}

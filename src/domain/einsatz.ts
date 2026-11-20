@@ -1,6 +1,7 @@
 // Einsätze: erstellen, ändern mit Vererbung, kopieren, löschen, Archiv (13.1, 13.3, 13.9, 21).
 import { alle, eine, schreibe, transaktion, type Db } from '../db/db.js';
 import { Eingabefehler, NichtGefunden, pflichtText, pruefeVersion, text } from './eingabe.js';
+import { tenueMitVorlage } from './tenue.js';
 import {
   istDatum,
   istZeit,
@@ -100,6 +101,8 @@ export interface EinsatzAenderung {
   bemerkung_extern?: unknown;
   abtreten_ort?: unknown;
   tenue?: unknown;
+  /** Gewählte Tenue-Vorlage (ohne Skript). Ihr Text ersetzt «tenue». */
+  tenue_vorlage?: unknown;
   aufgebot_hinweis?: unknown;
   /** Version, die das Formular angezeigt hat. Leer = keine Prüfung. */
   version?: unknown;
@@ -110,13 +113,14 @@ export interface EinsatzAenderung {
  * ersetzt das Tool den Wert in allen Schichten mit genau A. Andere Schichten bleiben.
  */
 export async function aendereEinsatz(db: Db, id: number, a: EinsatzAenderung): Promise<void> {
+  const tenue = await tenueMitVorlage(db, a.tenue_vorlage, a.tenue);
   const neu = {
     name: pflichtText(a.name, 'Name'),
     ort: text(a.ort, 'Ort'),
     bemerkung_intern: text(a.bemerkung_intern, 'Bemerkung intern', 5000),
     bemerkung_extern: text(a.bemerkung_extern, 'Bemerkung extern', 5000),
     abtreten_ort: text(a.abtreten_ort, 'Ort Abtreten'),
-    tenue: text(a.tenue, 'Tenue'),
+    tenue: text(tenue, 'Tenue'),
     aufgebot_hinweis: text(a.aufgebot_hinweis, 'Hinweis Aufgebot', 2000),
   };
   await transaktion(db, async (c) => {

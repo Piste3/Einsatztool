@@ -1,6 +1,7 @@
 // Schichten: hinzufügen, ändern, publizieren, löschen, Fremdabteilungen (13.2, 13.4, 5.10).
 import { alle, eine, schreibe, transaktion, type Db } from '../db/db.js';
 import { Eingabefehler, NichtGefunden, ganzzahl, pflichtText, pruefeVersion, text } from './eingabe.js';
+import { tenueMitVorlage } from './tenue.js';
 import { zeitpunkt, ladeEinsatz } from './einsatz.js';
 import { jetztIso, lokalesDatum, lokaleZeit, plusTage } from './zeit.js';
 
@@ -65,6 +66,8 @@ export interface SchichtEingabe {
   ort?: unknown;
   abtreten_ort?: unknown;
   tenue?: unknown;
+  /** Gewählte Tenue-Vorlage (ohne Skript). Ihr Text ersetzt «tenue». */
+  tenue_vorlage?: unknown;
   aufgebot_hinweis?: unknown;
   min_alter?: unknown;
   min_rang_id?: unknown;
@@ -158,6 +161,7 @@ export async function aendereSchicht(db: Db, id: number, e: SchichtEingabe): Pro
       'Ein anderer Benutzer hat diese Schicht inzwischen geändert. Das Tool hat nichts gespeichert. Deine Eingaben stehen unten. Prüfe die aktuellen Werte in einem neuen Tab. Speichere dann erneut, wenn deine Werte gelten sollen.',
     );
     const minRang = await pruefeRang(c, e.min_rang_id);
+    const tenue = await tenueMitVorlage(c, e.tenue_vorlage, e.tenue);
     const r = await schreibe(
       c,
       `UPDATE schicht SET name = ?, start_zeit = ?, end_zeit = ?, ort = ?, abtreten_ort = ?, tenue = ?,
@@ -165,7 +169,7 @@ export async function aendereSchicht(db: Db, id: number, e: SchichtEingabe): Pro
          zeit_offen = ?, version = version + 1
        WHERE id = ?`,
       [
-        name, start, ende, text(e.ort, 'Ort Antreten'), text(e.abtreten_ort, 'Ort Abtreten'), text(e.tenue, 'Tenue'),
+        name, start, ende, text(e.ort, 'Ort Antreten'), text(e.abtreten_ort, 'Ort Abtreten'), text(tenue, 'Tenue'),
         text(e.aufgebot_hinweis, 'Hinweis Aufgebot', 2000), ganzzahl(e.min_alter, 'Mindestalter', 0, 120), minRang,
         ganzzahl(e.soll_anzahl, 'Soll-Anzahl', 0, 100000), text(e.bemerkung_intern, 'Bemerkung intern', 5000),
         text(e.bemerkung_extern, 'Bemerkung extern', 5000), offen ? 1 : 0, id,

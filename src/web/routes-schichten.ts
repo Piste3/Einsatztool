@@ -14,7 +14,7 @@ import { zahlenFuerSchichten } from '../domain/zaehlung.js';
 import { essenslisteCsv } from '../domain/export.js';
 import { erzeugeIcs, icsDateiname, icsVermerk, terminTitel, vermerkeIcsExport } from '../domain/ics.js';
 import { clubdeskText } from '../domain/clubdesk-text.js';
-import { fuerVorschau } from '../domain/textformat.js';
+import { fuerVorschau, zeileAlsHtml } from '../domain/textformat.js';
 import { aufgebotDaten } from '../domain/aufgebot-vorlage.js';
 import { FEST } from '../domain/aufgebot-vorlage.js';
 import { anrufliste, nachRangTiefZuerst } from '../domain/listen.js';
@@ -216,6 +216,7 @@ ${seitenKopf({ pfad: schichtPfad(s, 'Termintext'), titel: 'Text für den Clubdes
     const nur = typeof req.query.person === 'string' && /^\d+$/.test(req.query.person) ? Number(req.query.person) : null;
     const d = await aufgebotDaten(db, leseId(req.params.sid), nur);
     const zeile = (titel: string, wert: string | null) => (wert ? html`<tr><th>${titel}</th><td>${wert}</td></tr>` : '');
+    const tenueZeile = d.tenue ? html`<tr><th>Tenue</th><td>${new Roh(zeileAlsHtml(d.tenue))}</td></tr>` : '';
     const briefe = d.briefe.map((b) => html`
 <article class="brief">
   ${b.adresseFehlt ? html`<p class="brief-warnung nicht-drucken">Adresse fehlt</p>` : ''}
@@ -237,7 +238,7 @@ ${seitenKopf({ pfad: schichtPfad(s, 'Termintext'), titel: 'Text für den Clubdes
     ${zeile('Abtreten', d.abtreten)}
     ${d.hinweis ? html`<tr><th></th><td>${mehrzeilig(d.hinweis)}</td></tr>` : ''}
     ${d.einsatzleitung.length ? html`<tr><th>Einsatzleitung</th><td>${d.einsatzleitung.map((z, i) => html`${i ? html`<br>` : ''}${z}`)}</td></tr>` : ''}
-    ${zeile('Tenue', d.tenue)}
+    ${tenueZeile}
   </table>
   ${FEST.schluss.map((z) => html`<p>${z}</p>`)}
   <p>${FEST.gruss}</p>

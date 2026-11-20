@@ -16,6 +16,8 @@ import { teilnehmerlisteCsv } from '../domain/export.js';
 import { besetzenAnsicht, besetzenPfad } from './views/besetzen.js';
 import { besetzenDaten, type BesetzenFilter, type BesetzenZeile } from '../domain/besetzen.js';
 import { raenge as ladeRaenge, rollen as ladeRollen } from '../domain/stammdaten.js';
+import { tenueVorlagen, type TenueVorlage } from '../domain/tenue.js';
+import { zeileAlsHtml } from '../domain/textformat.js';
 import { Eingabefehler, Konflikt, KANAL_TEXT, STATUS_TEXT, id as leseId, type Kanal, type Status } from '../domain/eingabe.js';
 import { einsatzLage, type ZuTunPunkt } from '../domain/einsatz-lage.js';
 import { filterFuerListe } from '../domain/filter.js';
@@ -24,7 +26,7 @@ import { html, mehrzeilig, Roh } from './html.js';
 import { k, aktuellerPfad } from './kontext.js';
 import { druckseite, formFelder, mehrMenue, seite, seitenKopf, type Reiter } from './views/layout.js';
 import {
-  abgleichPunkt, datumZeit, istSoll, kachel, kachelLegende, KACHEL_TEXT, knopfPost, bestaetigenFrage, nameMitRang, publiziertMarke, punktMarke, statusText, warnungen, zeitraum, type KachelArt,
+  abgleichPunkt, datumZeit, tenueFeld, istSoll, kachel, kachelLegende, KACHEL_TEXT, knopfPost, bestaetigenFrage, nameMitRang, publiziertMarke, punktMarke, statusText, warnungen, zeitraum, type KachelArt,
 } from './views/teile.js';
 import { datumChVonIso, jetztIso, lokalesDatum, lokaleZeit, wochentagKurz } from '../domain/zeit.js';
 
@@ -33,7 +35,7 @@ const EINSATZLEITUNG = 'Einsatzleitung';
 import { telefonText, hauptnummer } from '../domain/personen.js';
 import { nachRangTiefZuerst } from '../domain/listen.js';
 
-function einsatzFormular(kx: ReturnType<typeof k>, ziel: string, e: Partial<Record<string, unknown>>, neu: boolean, fehler: string | null): Roh {
+function einsatzFormular(kx: ReturnType<typeof k>, ziel: string, e: Partial<Record<string, unknown>>, neu: boolean, fehler: string | null, vorlagen: TenueVorlage[] = []): Roh {
   const v = (n: string) => (e[n] === null || e[n] === undefined ? '' : String(e[n]));
   return html`
 ${fehler ? html`<div class="meldung fehler" role="alert">${fehler}</div>` : ''}
@@ -50,7 +52,7 @@ ${fehler ? html`<div class="meldung fehler" role="alert">${fehler}</div>` : ''}
   <div class="feld breit"><label for="ort">Ort (Antreten)</label><input id="ort" name="ort" maxlength="255" value="${v('ort')}"><small>Gilt für alle Schichten mit dem gleichen Ort.</small></div>
   ${neu ? '' : html`
   <div class="feld breit"><label for="abtreten_ort">Ort Abtreten</label><input id="abtreten_ort" name="abtreten_ort" maxlength="255" value="${v('abtreten_ort')}"><small>Leer = gleich wie Ort.</small></div>
-  <div class="feld breit"><label for="tenue">Tenue</label><input id="tenue" name="tenue" maxlength="255" value="${v('tenue')}"></div>
+  <div class="feld breit"><label for="tenue">Tenue</label>${tenueFeld('tenue', v('tenue'), vorlagen)}</div>
   <div class="feld breit"><label for="aufgebot_hinweis">Hinweis Aufgebot</label><textarea id="aufgebot_hinweis" name="aufgebot_hinweis" rows="2" maxlength="2000">${v('aufgebot_hinweis')}</textarea></div>
   <div class="feld breit"><label for="bemerkung_intern">Bemerkung intern</label><textarea id="bemerkung_intern" name="bemerkung_intern" rows="3" maxlength="5000">${v('bemerkung_intern')}</textarea><small>Nur für die Aufgebotsstelle.</small></div>
   <div class="feld breit"><label for="bemerkung_extern">Bemerkung extern</label><textarea id="bemerkung_extern" name="bemerkung_extern" rows="3" maxlength="5000">${v('bemerkung_extern')}</textarea><small>Sichtbar im Formular.</small></div>`}
@@ -182,7 +184,7 @@ ${liste.length === 0 ? html`<p class="leer">Keine Einsätze.</p>` : html`
     const steckbrief = html`<dl class="steckbrief">
   <div><dt>Antreten</dt><dd>${e.ort ?? leer}</dd></div>
   <div><dt>Abtreten</dt><dd>${e.abtreten_ort ?? (e.ort ? html`<span class="unter">wie Antreten</span>` : leer)}</dd></div>
-  <div><dt>Tenue</dt><dd>${e.tenue ?? leer}</dd></div>
+  <div><dt>Tenue</dt><dd>${e.tenue ? new Roh(zeileAlsHtml(e.tenue)) : leer}</dd></div>
   ${elRolle ? html`<div><dt>Einsatzleitung</dt><dd>${elEintraege.length
     ? [...new Map(elEintraege.map((a) => [a.person_id ?? `u${a.id}`, a])).values()].map((a, i) => html`${i ? ', ' : ''}${name(a)}${a.status === 'angemeldet' ? html` <span class="unter">(unbestätigt)</span>` : ''}`)
     : html`<span class="rot-text">fehlt</span>`}</dd></div>` : ''}
@@ -289,6 +291,7 @@ ${!schichten.length ? html`<p class="leer">Keine Schichten.</p>` : html`<div cla
     };
     // ---------- Reiter «Schichten»: eine Zeile zum Aufklappen je Schicht (Vorschlag Yann 20.11.2026) ----------
     const raengeListe = ansicht === 'schichten' ? await ladeRaenge(db) : [];
+    const tenueListe = ansicht === 'schichten' ? await tenueVorlagen(db) : [];
     const bedarf = ansicht === 'schichten' && ids.length
       ? await alle<{ schicht_id: number; rolle: string; anzahl: number }>(db, 'SELECT schicht_id, rolle, anzahl FROM schicht_rolle WHERE schicht_id IN (?)', [ids])
       : [];
@@ -353,7 +356,7 @@ ${!schichten.length ? html`<p class="leer">Keine Schichten.</p>` : html`<div cla
           <fieldset class="akk-gruppe"><legend>Wo und was</legend>
             ${feld('ort', 'Antreten', html`<input id="${id('ort')}" name="ort" maxlength="255" value="${v('ort')}" placeholder="${e.ort ?? ''}">`)}
             ${feld('abtreten_ort', 'Abtreten', html`<input id="${id('abtreten_ort')}" name="abtreten_ort" maxlength="255" value="${v('abtreten_ort')}" placeholder="wie Antreten">`)}
-            ${feld('tenue', 'Tenue', html`<input id="${id('tenue')}" name="tenue" maxlength="255" value="${v('tenue')}">`)}
+            ${feld('tenue', 'Tenue', tenueFeld(id('tenue'), v('tenue'), tenueListe))}
           </fieldset>
           <fieldset class="akk-gruppe"><legend>Texte</legend>
             ${feld('aufgebot_hinweis', 'Hinweis Aufgebot', textfeld('aufgebot_hinweis', 2000))}
@@ -546,7 +549,7 @@ ${ansicht === 'uebersicht' ? html`${steckbrief}${zuTun}${schichtTabelle}`
   app.get('/einsaetze/:id/bearbeiten', nurAufgebot, async (req, res) => {
     const kx = k(res);
     const e = await ladeEinsatz(db, leseId(req.params.id));
-    res.send(seite(kx, `${e.name} bearbeiten`, 'einsaetze', html`${seitenKopf({ pfad: [{ text: 'Einsätze', href: '/einsaetze' }, { text: e.name, href: `/einsaetze/${e.id}` }, { text: 'Bearbeiten' }], titel: 'Einsatz bearbeiten' })}${einsatzFormular(kx, `/einsaetze/${e.id}`, e as unknown as Record<string, unknown>, false, null)}`));
+    res.send(seite(kx, `${e.name} bearbeiten`, 'einsaetze', html`${seitenKopf({ pfad: [{ text: 'Einsätze', href: '/einsaetze' }, { text: e.name, href: `/einsaetze/${e.id}` }, { text: 'Bearbeiten' }], titel: 'Einsatz bearbeiten' })}${einsatzFormular(kx, `/einsaetze/${e.id}`, e as unknown as Record<string, unknown>, false, null, await tenueVorlagen(db))}`));
   });
 
   app.post('/einsaetze/:id', nurAufgebot, async (req, res) => {
@@ -562,7 +565,7 @@ ${ansicht === 'uebersicht' ? html`${steckbrief}${zuTun}${schichtTabelle}`
       const werte = konflikt ? { ...req.body, version: e.aktuelleVersion } : req.body;
       res.status(konflikt ? 409 : 400).send(seite(kx, 'Einsatz bearbeiten', 'einsaetze', html`${seitenKopf({ pfad: [{ text: 'Einsätze', href: '/einsaetze' }, { text: 'Bearbeiten' }], titel: 'Einsatz bearbeiten' })}${
         konflikt ? html`<p><a href="/einsaetze/${id}" target="_blank" rel="noopener">Aktuellen Stand in neuem Tab öffnen</a></p>` : ''
-      }${einsatzFormular(kx, `/einsaetze/${id}`, werte, false, e.message)}`));
+      }${einsatzFormular(kx, `/einsaetze/${id}`, werte, false, e.message, await tenueVorlagen(db))}`));
     }
   });
 
