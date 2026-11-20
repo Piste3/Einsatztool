@@ -9,7 +9,7 @@ import { ladeImportdatei, loescheImportdatei, speichereImportdatei } from '../do
 import { bestaetigungenOhneAdresse, mailsMitFehler } from '../domain/bestaetigung.js';
 import {
   benenneRangUm, benutzerListe, legeRangAn, legeRolleAn, loescheRang, loescheRolle, raenge, rollen, setzeBenutzerAktiv, setzeRolleZaehlt,
-  verschiebeRang, verschiebeRolle,
+  ordneRaenge, ordneRollen, verschiebeRang, verschiebeRolle,
 } from '../domain/stammdaten.js';
 import { Eingabefehler, Konflikt, id as leseId, liste } from '../domain/eingabe.js';
 import { AENDERUNG_MELDEN, CLUBDESK_TERMIN, MAX_BETREFF, MAX_TEXT, MAX_TEXT_CLUBDESK, PLATZHALTER, istVorlage, ladeVorlage, speichereVorlage } from '../domain/vorlagen.js';
@@ -73,6 +73,23 @@ ${v.vieleAustritte ? html`<div class="banner rot">Ungewöhnlich viele Austritte.
     <a class="knopf" href="/admin/import">Abbrechen</a>
   </div>
 </form>`;
+}
+
+/**
+ * Unsichtbares Formular für das Ziehen mit der Maus. app.js füllt «reihenfolge» in der neuen Reihenfolge und sendet es.
+ */
+function ordnenForm(kx: ReturnType<typeof k>, action: string, zurueck: string, liste: string): Roh {
+  return html`<form method="post" action="${action}" class="ordnen-form" data-ordnen-form="${liste}" hidden>${formFelder(kx, zurueck)}<input type="hidden" name="aktion" value="ordnen"></form>`;
+}
+
+/** Menü ⋮ für Handy, Tastatur und ohne Skript: einen Platz nach oben oder unten. */
+function ordnenMenue(kx: ReturnType<typeof k>, action: string, name: string, hoch: Record<string, string> | null, runter: Record<string, string> | null, zurueck: string): Roh {
+  if (!hoch && !runter) return html``;
+  return html`<details class="zieh-menue ordnen-menue"><summary title="Reihenfolge ändern" aria-label="${name} verschieben">⋮</summary>
+    <div class="ordnen-menue-inhalt">
+      ${hoch ? knopfPost(kx, action, '↑ Nach oben', hoch, 'knopf klein', zurueck) : ''}
+      ${runter ? knopfPost(kx, action, '↓ Nach unten', runter, 'knopf klein', zurueck) : ''}
+    </div></details>`;
 }
 
 export function registriereAdmin(app: Express, deps: Abhaengigkeiten): void {
@@ -225,14 +242,15 @@ ${liste.map((b) => html`<tr><td>${b.name}</td><td>${b.email}</td><td>${b.rolle =
     res.send(einstellungenSeite(deps, kx, 'stammdaten', html`
 <section class="abschnitt" id="raenge">
   <h2>Ränge</h2>
-  <p class="unter">Der oberste Rang ist der höchste. Ein neuer Rang kommt ans Ende (tiefster Rang). Der Import ordnet den Rang über den Namen zu.</p>
-  <div class="rahmen"><table class="tabelle"><thead><tr><th>Rang</th><th>Personen</th><th>Schichten</th><th></th></tr></thead><tbody>
-  ${r.map((x, i) => html`<tr>
+  <p class="unter">Der oberste Rang ist der höchste. Zieh einen Rang am Griff ⠿ an die richtige Stelle. Auf dem Handy: ⋮ antippen. Ein neuer Rang kommt ans Ende (tiefster Rang). Der Import ordnet den Rang über den Namen zu.</p>
+  ${ordnenForm(kx, '/admin/raenge', z, 'ranglisten')}
+  <div class="rahmen"><table class="tabelle"><thead><tr><th class="ordnen-griff-kopf"><span class="sr">Ziehen</span></th><th>Rang</th><th>Personen</th><th>Schichten</th><th></th></tr></thead><tbody data-ordnen="ranglisten">
+  ${r.map((x, i) => html`<tr class="ordnen-zeile" data-ordnen-wert="${x.id}">
+    <td class="ordnen-griff" title="Ziehen, um die Reihenfolge zu ändern" aria-hidden="true">⠿</td>
     <td><form method="post" action="/admin/raenge" class="zeilen-form">${formFelder(kx, z)}<input type="hidden" name="aktion" value="umbenennen"><input type="hidden" name="id" value="${x.id}"><input name="name" value="${x.name}" required maxlength="100" aria-label="Name"><button class="knopf klein" type="submit">Umbenennen</button></form></td>
     <td>${x.personen}</td><td>${x.schichten}</td>
     <td class="knopfreihe">
-      ${i > 0 ? knopfPost(kx, '/admin/raenge', 'Höher', { aktion: 'hoeher', id: String(x.id) }, 'knopf klein', z) : ''}
-      ${i < r.length - 1 ? knopfPost(kx, '/admin/raenge', 'Tiefer', { aktion: 'tiefer', id: String(x.id) }, 'knopf klein', z) : ''}
+      ${ordnenMenue(kx, '/admin/raenge', x.name, i > 0 ? { aktion: 'hoeher', id: String(x.id) } : null, i < r.length - 1 ? { aktion: 'tiefer', id: String(x.id) } : null, z)}
       ${Number(x.personen) + Number(x.schichten) === 0 ? knopfPost(kx, '/admin/raenge', 'Löschen', { aktion: 'loeschen', id: String(x.id) }, 'knopf klein gefahr', z) : ''}
     </td></tr>`)}
   </tbody></table></div>
@@ -240,14 +258,16 @@ ${liste.map((b) => html`<tr><td>${b.name}</td><td>${b.email}</td><td>${b.rolle =
 </section>
 <section class="abschnitt" id="rollen">
   <h2>Rollen</h2>
-  <p class="unter">Rollen ohne Teilnehmerzählung (z. B. Sektorchef) zählen beim Essen, aber nicht als Teilnehmende. Umbenennen geht nicht.</p>
-  <div class="rahmen"><table class="tabelle"><thead><tr><th>Rolle</th><th>Zählt als Teilnehmer</th><th>Gebraucht</th><th></th></tr></thead><tbody>
-  ${ro.map((x, i) => html`<tr><td>${x.name}</td>
+  <p class="unter">Zieh eine Rolle am Griff ⠿ an die richtige Stelle. Auf dem Handy: ⋮ antippen. Rollen ohne Teilnehmerzählung (z. B. Sektorchef) zählen beim Essen, aber nicht als Teilnehmende. Umbenennen geht nicht.</p>
+  ${ordnenForm(kx, '/admin/rollen', z, 'rollenliste')}
+  <div class="rahmen"><table class="tabelle"><thead><tr><th class="ordnen-griff-kopf"><span class="sr">Ziehen</span></th><th>Rolle</th><th>Zählt als Teilnehmer</th><th>Gebraucht</th><th></th></tr></thead><tbody data-ordnen="rollenliste">
+  ${ro.map((x, i) => html`<tr class="ordnen-zeile" data-ordnen-wert="${x.name}">
+    <td class="ordnen-griff" title="Ziehen, um die Reihenfolge zu ändern" aria-hidden="true">⠿</td>
+    <td>${x.name}</td>
     <td>${knopfPost(kx, '/admin/rollen', x.zaehlt_teilnehmer ? 'ja' : 'nein', { aktion: 'zaehlt', name: x.name, zaehlt: x.zaehlt_teilnehmer ? '0' : '1' }, `schalter${x.zaehlt_teilnehmer ? ' an' : ''}`, z)}</td>
     <td>${x.nutzung}</td>
     <td class="knopfreihe">
-      ${i > 0 ? knopfPost(kx, '/admin/rollen', 'Hoch', { aktion: 'hoch', name: x.name }, 'knopf klein', z) : ''}
-      ${i < ro.length - 1 ? knopfPost(kx, '/admin/rollen', 'Runter', { aktion: 'runter', name: x.name }, 'knopf klein', z) : ''}
+      ${ordnenMenue(kx, '/admin/rollen', x.name, i > 0 ? { aktion: 'hoch', name: x.name } : null, i < ro.length - 1 ? { aktion: 'runter', name: x.name } : null, z)}
       ${Number(x.nutzung) === 0 ? knopfPost(kx, '/admin/rollen', 'Löschen', { aktion: 'loeschen', name: x.name }, 'knopf klein gefahr', z) : ''}
     </td></tr>`)}
   </tbody></table></div>
@@ -348,6 +368,7 @@ ${liste.map((b) => html`<tr><td>${b.name}</td><td>${b.email}</td><td>${b.rolle =
       case 'hoeher': await verschiebeRang(db, leseId(b.id), 'hoeher'); break;
       case 'tiefer': await verschiebeRang(db, leseId(b.id), 'tiefer'); break;
       case 'loeschen': await loescheRang(db, leseId(b.id)); break;
+      case 'ordnen': await ordneRaenge(db, liste(b.reihenfolge).map((x) => leseId(x))); break;
       default: throw new Eingabefehler('Unbekannte Aktion.');
     }
     zurueck(req, res, '/admin/einstellungen');
@@ -362,6 +383,7 @@ ${liste.map((b) => html`<tr><td>${b.name}</td><td>${b.email}</td><td>${b.rolle =
       case 'hoch': await verschiebeRolle(db, name, 'hoch'); break;
       case 'runter': await verschiebeRolle(db, name, 'runter'); break;
       case 'loeschen': await loescheRolle(db, name); break;
+      case 'ordnen': await ordneRollen(db, liste(b.reihenfolge)); break;
       default: throw new Eingabefehler('Unbekannte Aktion.');
     }
     zurueck(req, res, '/admin/einstellungen');
