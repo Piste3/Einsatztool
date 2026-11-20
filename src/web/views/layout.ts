@@ -4,6 +4,7 @@ import { html, Roh, wenn } from '../html.js';
 import type { Kontext } from '../kontext.js';
 import { symbol, type SymbolName } from './symbole.js';
 import { aenderungsStand } from '../../db/aenderungen.js';
+import { letzteAktion } from '../../domain/rueckgaengig.js';
 
 export type Bereich =
   | 'start' | 'einsaetze' | 'rueckmeldungen' | 'personen' | 'unbekannt' | 'archiv'
@@ -51,6 +52,7 @@ ${kopfDaten(`${titel} · Einsatzplaner`)}
 <header class="kopf-mobil">
   <button type="button" class="knopf-menue" aria-controls="leiste" aria-expanded="false" aria-label="Menü öffnen">${symbol('menue')}</button>
   <span class="marke-klein">Einsatzplaner</span>
+  ${rueckgaengigLeiste(k, 'mobil')}
 </header>
 <nav id="leiste" class="leiste" aria-label="Hauptmenü">
   <a class="marke" href="/">
@@ -74,6 +76,7 @@ ${kopfDaten(`${titel} · Einsatzplaner`)}
     ${link('konfiguration', aktiv, '/admin/konfiguration', 'Konfiguration', 'datei')}
     ${link('update', aktiv, '/admin/update', 'Update', 'update')}
   </ul>`)}
+  ${rueckgaengigLeiste(k, 'leiste')}
   <div class="leiste-fuss">
     <span class="avatar" aria-hidden="true">${initialen(b.name)}</span>
     <span class="benutzer"><span class="benutzer-name">${b.name}</span><small>${istAdmin ? 'Admin' : 'Aufgebotsstelle'}</small></span>
@@ -117,6 +120,33 @@ function rueckgaengigKnopf(k: Kontext, schluessel: string): Roh {
       <input type="hidden" name="schluessel" value="${schluessel}">
       <button type="submit" class="toast-rueckgaengig">Rückgängig</button>
     </form>`;
+}
+
+/**
+ * Knopf «Rückgängig» in der Navigation (Wunsch Yann, 20.11.2026). Er ist auf jeder Seite da.
+ * Er macht die neueste eigene Aktion rückgängig, nie die eines anderen Benutzers.
+ * Ohne eigene Aktion ist er grau. Tastatur: Ctrl+Z ausserhalb von Eingabefeldern (app.js).
+ */
+function rueckgaengigLeiste(k: Kontext, ort: 'leiste' | 'mobil'): Roh {
+  const a = letzteAktion(k.benutzer!.id);
+  const titel = a ? `Rückgängig: ${a.beschreibung} (${zeitVor(a.zeit)})` : 'Keine eigene Änderung zum Rückgängigmachen';
+  const knopf = ort === 'leiste'
+    ? html`<button type="submit" class="rueckgaengig-knopf" title="${titel}"${a ? new Roh(' aria-keyshortcuts="Control+Z"') : new Roh(' disabled')}>
+        ${symbol('rueckgaengig')}<span class="rueckgaengig-text">Rückgängig<small>${a ? a.beschreibung : 'Nichts zum Rückgängigmachen'}</small></span>
+      </button>`
+    : html`<button type="submit" class="rueckgaengig-mobil" title="${titel}" aria-label="${titel}"${a ? '' : new Roh(' disabled')}>${symbol('rueckgaengig')}</button>`;
+  return html`<form method="post" action="/rueckgaengig" class="rueckgaengig-form ${ort}"${a && ort === 'leiste' ? new Roh(' data-rueckgaengig') : ''}>
+    ${formFelder(k)}
+    ${a ? html`<input type="hidden" name="schluessel" value="${a.schluessel}">` : ''}
+    ${knopf}
+  </form>`;
+}
+
+function zeitVor(ms: number): string {
+  const min = Math.floor((Date.now() - ms) / 60000);
+  if (min < 1) return 'gerade eben';
+  if (min < 60) return `vor ${min} Min.`;
+  return `vor ${Math.floor(min / 60)} Std.`;
 }
 
 /** Druckansicht ohne Seitenleiste. */

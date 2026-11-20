@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { einsatz, inTagen, neueDatenbank, person, zeilen } from './hilfe.js';
 import { anmelden, starteApp } from './web-hilfe.js';
 import { aendereAnmeldung, bestaetigeAlle, loescheAnmeldung, ordneZu, setzeAnmeldung } from '../src/domain/anmeldung.js';
-import { macheRueckgaengig, mitRueckgaengig, _paketeFuerTests } from '../src/domain/rueckgaengig.js';
+import { letzteAktion, macheRueckgaengig, mitRueckgaengig, _paketeFuerTests } from '../src/domain/rueckgaengig.js';
 import { schreibe } from '../src/db/db.js';
 
 test('T36 Rückgängig: Status, Eintragen, Entfernen, Bestätigen, Zuordnen, Konflikt', async () => {
@@ -81,7 +81,7 @@ test('T36 Rückgängig: Status, Eintragen, Entfernen, Bestätigen, Zuordnen, Kon
     const [unbekannt] = await zeilen(t.db, 'SELECT person_id, name_text FROM anmeldung WHERE id = ?', [z.insertId]);
     assert.deepEqual([unbekannt.person_id, unbekannt.name_text], [null, 'Lea Mayer']);
 
-    // 8. Nach 10 Minuten gilt ein Schlüssel nicht mehr.
+    // 8. Nach 12 Stunden gilt ein Schlüssel nicht mehr.
     const alt = await mitRueckgaengig(t.db, ich, () => aendereAnmeldung(t.db, id2, { status: 'unsicher' }, ich));
     _paketeFuerTests().get(alt.schluessel!)!.ablauf = Date.now() - 1;
     await assert.rejects(macheRueckgaengig(t.db, alt.schluessel, ich), /zu alt/);
@@ -125,7 +125,7 @@ test('T36 Rückgängig im Browser: Toast zeigt den Knopf, ein Klick setzt zurüc
     assert.equal(r2.status, 303);
     assert.equal(r2.headers.get('location'), ziel);
     const html2 = await toastNach(r2);
-    assert.match(html2, /Rückgängig gemacht\./);
+    assert.match(html2, /Rückgängig gemacht: Lea Meier eingetragen/);
     assert.doesNotMatch(html2, /data-toast-aktion/);
     assert.equal((await zeilen(t.db, 'SELECT id FROM anmeldung')).length, 0);
 
@@ -135,6 +135,106 @@ test('T36 Rückgängig im Browser: Toast zeigt den Knopf, ein Klick setzt zurüc
     // Ein ungültiger Schlüssel ebenso.
     const r4 = await post('/rueckgaengig', { schluessel: '<script>', zurueck: `/schichten/${s.schichtId}` });
     assert.match(await toastNach(r4), /Rückgängig geht nicht mehr/);
+  } finally {
+    await app.stopp();
+    await t.ende();
+  }
+});
+
+// Wunsch Yann (20.11.2026): Der Knopf ist immer da und gilt nur für eigene Änderungen.
+test('T36 Rückgängig in der Navigation: nur eigene Aktionen, neueste zuerst, dann die davor', async () => {
+  const t = await neueDatenbank();
+  // Benutzer-Nummern beginnen in jeder Test-Datenbank bei 1: alte Pakete vergessen.
+  _paketeFuerTests().clear();
+  try {
+    const { benutzerId: ich } = await anmelden(t.db, 'admin');
+    const { benutzerId: andere } = await anmelden(t.db, 'aufgebot');
+    await person(t.db, 1, { vorname: 'Lea', nachname: 'Meier' });
+    await person(t.db, 2, { vorname: 'Tim', nachname: 'Graf' });
+    const s = await einsatz(t.db, 'Herbstmesse', inTagen(5, 12), inTagen(5, 18));
+
+    assert.equal(letzteAktion(ich), null);
+    // Aktion eines anderen Benutzers: Mein Knopf bleibt leer.
+    await mitRueckgaengig(t.db, andere, () => setzeAnmeldung(t.db, { schichtId: s.schichtId, personId: 2, status: 'angemeldet', kanal: 'telefon' }, andere));
+    assert.equal(letzteAktion(ich), null);
+    assert.ok(letzteAktion(andere));
+
+    // Drei eigene Aktionen auf demselben Eintrag: A eintragen, B bestätigen, C Bemerkung.
+    const a = await mitRueckgaengig(t.db, ich, () => setzeAnmeldung(t.db, { schichtId: s.schichtId, personId: 1, status: 'angemeldet', kanal: 'telefon' }, ich));
+    const id = a.ergebnis;
+    await mitRueckgaengig(t.db, ich, () => aendereAnmeldung(t.db, id, { status: 'bestaetigt' }, ich));
+    await mitRueckgaengig(t.db, ich, () => aendereAnmeldung(t.db, id, { bemerkung: 'Kommt später' }, ich));
+    let l = letzteAktion(ich)!;
+    assert.equal(l.anzahl, 3);
+    assert.equal(l.beschreibung, 'Lea Meier geändert');
+
+    // Neueste zuerst: Bemerkung weg.
+    await macheRueckgaengig(t.db, l.schluessel, ich);
+    l = letzteAktion(ich)!;
+    assert.equal(l.beschreibung, 'Lea Meier: angemeldet → bestätigt');
+    assert.equal((await zeilen(t.db, 'SELECT bemerkung FROM anmeldung WHERE id = ?', [id]))[0].bemerkung, null);
+    // Dann die Aktion davor: Die Version passt trotz des ersten Rückgängig.
+    await macheRueckgaengig(t.db, l.schluessel, ich);
+    assert.equal((await zeilen(t.db, 'SELECT status FROM anmeldung WHERE id = ?', [id]))[0].status, 'angemeldet');
+    l = letzteAktion(ich)!;
+    assert.match(l.beschreibung, /Lea Meier eingetragen/);
+    await macheRueckgaengig(t.db, l.schluessel, ich);
+    assert.equal((await zeilen(t.db, 'SELECT id FROM anmeldung WHERE id = ?', [id])).length, 0);
+    assert.equal(letzteAktion(ich), null);
+    // Der Eintrag des anderen Benutzers bleibt.
+    assert.equal((await zeilen(t.db, 'SELECT id FROM anmeldung WHERE person_id = 2')).length, 1);
+
+    // Ändert ein anderer Benutzer meinen Eintrag danach, überschreibt Rückgängig seine Änderung nicht.
+    const idTim = (await zeilen(t.db, 'SELECT id FROM anmeldung WHERE person_id = 2'))[0].id;
+    await mitRueckgaengig(t.db, ich, () => aendereAnmeldung(t.db, idTim, { status: 'unsicher' }, ich));
+    await aendereAnmeldung(t.db, idTim, { status: 'abgemeldet' }, andere);
+    await assert.rejects(macheRueckgaengig(t.db, letzteAktion(ich)!.schluessel, ich), /inzwischen geändert/);
+    assert.equal((await zeilen(t.db, 'SELECT status FROM anmeldung WHERE id = ?', [idTim]))[0].status, 'abgemeldet');
+    // Die blockierte Aktion verschwindet aus dem Knopf.
+    assert.equal(letzteAktion(ich), null);
+  } finally {
+    await t.ende();
+  }
+});
+
+test('T36 Rückgängig in der Navigation: Knopf auf jeder Seite, grau ohne eigene Aktion', async () => {
+  const t = await neueDatenbank();
+  // Benutzer-Nummern beginnen in jeder Test-Datenbank bei 1: alte Pakete vergessen.
+  _paketeFuerTests().clear();
+  const app = await starteApp(t.db);
+  try {
+    await person(t.db, 1, { vorname: 'Lea', nachname: 'Meier' });
+    const s = await einsatz(t.db, 'Herbstmesse', inTagen(5, 12), inTagen(5, 18));
+    const { cookie, csrf } = await anmelden(t.db);
+    const seite = async (pfad: string) => (await fetch(`${app.url}${pfad}`, { headers: { cookie } })).text();
+
+    let html = await seite('/einsaetze');
+    assert.match(html, /class="rueckgaengig-knopf"[^>]* disabled/);
+    assert.match(html, /Nichts zum Rückgängigmachen/);
+
+    const r1 = await fetch(`${app.url}/schichten/${s.schichtId}/anmeldungen`, {
+      method: 'POST', redirect: 'manual',
+      headers: { cookie, 'content-type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ _csrf: csrf, person: '1', status: 'angemeldet', kanal: 'telefon' }),
+    });
+    assert.equal(r1.status, 303);
+    // Auf einer anderen Seite ist der Knopf da und nennt die Aktion.
+    html = await seite('/personen');
+    assert.match(html, /data-rueckgaengig/);
+    assert.match(html, /Lea Meier eingetragen \(angemeldet\)/);
+    assert.match(html, /aria-keyshortcuts="Control\+Z"/);
+    const schluessel = html.match(/name="schluessel" value="([A-Za-z0-9_-]+)"/)?.[1];
+    assert.ok(schluessel);
+
+    // Der Knopf führt auf die Seite zurück, von der er kommt.
+    const r2 = await fetch(`${app.url}/rueckgaengig`, {
+      method: 'POST', redirect: 'manual',
+      headers: { cookie, referer: `${app.url}/personen`, 'content-type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ _csrf: csrf, schluessel: schluessel! }),
+    });
+    assert.equal(r2.headers.get('location'), '/personen');
+    assert.equal((await zeilen(t.db, 'SELECT id FROM anmeldung')).length, 0);
+    assert.match(await seite('/personen'), /class="rueckgaengig-knopf"[^>]* disabled/);
   } finally {
     await app.stopp();
     await t.ende();

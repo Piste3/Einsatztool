@@ -153,6 +153,24 @@ hr { border: 0; border-top: 1px solid var(--linie); margin: 1rem 0; }
 .link-knopf:hover { color: var(--text); text-decoration: underline; }
 .kopf-mobil { display: none; }
 
+/* Knopf «Rückgängig» in der Navigation: immer da, grau ohne eigene Änderung. */
+.rueckgaengig-form { margin: 0; }
+.rueckgaengig-form.leiste { margin-top: auto; padding: .6rem 0 .4rem; flex: none; }
+.leiste-fuss { flex: none; }
+.rueckgaengig-knopf {
+  width: 100%; display: flex; align-items: flex-start; gap: .6rem; text-align: left; cursor: pointer;
+  background: var(--flaeche); color: var(--text); border: 1px solid var(--linie); border-radius: var(--radius-klein);
+  padding: .35rem .55rem; font: inherit; font-size: .88rem; font-weight: 600; line-height: 1.25;
+}
+.rueckgaengig-knopf .symbol { flex: none; margin-top: .05rem; }
+.rueckgaengig-knopf:hover:not(:disabled), .rueckgaengig-knopf:focus-visible { background: var(--grau-hg); }
+.rueckgaengig-knopf:disabled, .rueckgaengig-mobil:disabled { color: var(--gedämpft); cursor: default; opacity: .7; }
+.rueckgaengig-text { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.rueckgaengig-text small { font-weight: 400; font-size: .76rem; color: var(--gedämpft); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rueckgaengig-form.leiste + .leiste-fuss { margin-top: 0; }
+.rueckgaengig-form.mobil { margin-left: auto; }
+.rueckgaengig-mobil { background: var(--flaeche); color: var(--text); border: 1px solid var(--linie); border-radius: var(--radius-klein); padding: .35rem .45rem; display: inline-flex; cursor: pointer; }
+
 .inhalt { padding: 1.4rem 2rem 3rem; max-width: 1240px; width: 100%; min-width: 0; }
 .inhalt.breit { max-width: none; }
 .inhalt.schmal { max-width: 520px; margin: 3rem auto; }
