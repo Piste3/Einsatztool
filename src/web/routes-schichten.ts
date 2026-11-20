@@ -14,6 +14,7 @@ import { zahlenFuerSchichten } from '../domain/zaehlung.js';
 import { essenslisteCsv } from '../domain/export.js';
 import { erzeugeIcs, icsDateiname, icsVermerk, terminTitel, vermerkeIcsExport } from '../domain/ics.js';
 import { clubdeskText } from '../domain/clubdesk-text.js';
+import { fuerVorschau } from '../domain/textformat.js';
 import { aufgebotDaten } from '../domain/aufgebot-vorlage.js';
 import { FEST } from '../domain/aufgebot-vorlage.js';
 import { anrufliste, nachRangTiefZuerst } from '../domain/listen.js';
@@ -185,21 +186,29 @@ ${seitenKopf({ pfad: schichtPfad(s, 'ICS-Export'), titel: 'ICS-Export' })}
     await vermerkeIcsExport(db, s.id, kx.benutzer!.id);
     res.setHeader('Content-Type', 'text/calendar; charset=utf-8');
     res.setHeader('Content-Disposition', `attachment; filename="${icsDateiname(s)}"`);
-    res.send(erzeugeIcs(s, undefined, await clubdeskText(db, s.id, konfig.baseUrl)));
+    res.send(erzeugeIcs(s, undefined, await clubdeskText(db, s.id, { baseUrl: konfig.baseUrl, aufgebotMail: konfig.mailFrom, benutzer: k(res).benutzer })));
   });
 
   app.get('/schichten/:sid/termintext', nurAufgebot, async (req, res) => {
     const kx = k(res);
     const s = await ladeSchicht(db, leseId(req.params.sid));
-    const t = await clubdeskText(db, s.id, konfig.baseUrl);
+    // Das Tool baut den Text aus der Vorlage. Formatierung (fett, Farbe, Tabelle) geht als HTML in die Zwischenablage.
+    const t = await clubdeskText(db, s.id, { baseUrl: konfig.baseUrl, aufgebotMail: konfig.mailFrom, benutzer: kx.benutzer });
     const zeilen = Math.min(30, Math.max(8, t.text.split('\n').length + 1));
     res.send(seite(kx, 'Termintext', 'einsaetze', html`
 ${seitenKopf({ pfad: schichtPfad(s, 'Termintext'), titel: 'Text für den Clubdesk-Termin' })}
-<p class="unter">Das Tool füllt die Vorlage mit den Angaben dieser Schicht. ${kx.benutzer?.rolle === 'admin' ? html`Die Vorlage bearbeitest du in <a href="/admin/einstellungen/vorlagen#clubdesk">Admin › Einstellungen</a>.` : 'Die Vorlage bearbeitet ein Admin in den Einstellungen.'}</p>
+<p class="unter">Das Tool füllt die Vorlage mit den Angaben dieser Schicht. «Kopieren» übernimmt Fett, Farbe und Tabelle in den Editor von Clubdesk. ${kx.benutzer?.rolle === 'admin' ? html`Die Vorlage bearbeitest du in <a href="/admin/einstellungen/vorlagen#clubdesk">Admin › Einstellungen</a>.` : 'Die Vorlage bearbeitet ein Admin in den Einstellungen.'}</p>
 <div class="feld"><label for="titel">Titel</label><input id="titel" readonly value="${t.titel}"></div>
 <p><button type="button" class="knopf" data-kopieren="#titel">Titel kopieren</button></p>
-<div class="feld"><label for="termintext">Text</label><textarea id="termintext" readonly rows="${zeilen}">${t.text}</textarea></div>
-<p><button type="button" class="knopf haupt" data-kopieren="#termintext">Kopieren</button></p>`));
+<h2>Text</h2>
+<div class="karte cd-vorschau" id="cd_vorschau">${new Roh(fuerVorschau(t.html))}</div>
+<p class="knopfreihe">
+  <button type="button" class="knopf haupt" data-kopieren-html="#cd_html" data-kopieren-text="#termintext" data-kopieren-auswahl="#cd_vorschau">Kopieren</button>
+  <button type="button" class="knopf" data-kopieren="#cd_html">HTML kopieren</button>
+  <button type="button" class="knopf" data-kopieren="#termintext">Nur Text kopieren</button>
+</p>
+<details class="gruppe"><summary>Nur Text</summary><div class="feld"><label for="termintext">Text ohne Formatierung</label><textarea id="termintext" readonly rows="${zeilen}">${t.text}</textarea></div></details>
+<details class="gruppe"><summary>HTML-Quelltext</summary><div class="feld"><label for="cd_html">HTML für die Quelltext-Ansicht von Clubdesk</label><textarea id="cd_html" readonly rows="10">${t.html}</textarea></div></details>`));
   });
 
   // Regel 20: Druckansicht des Aufgebots. Ein Brief je bestätigter Person, je Brief eine A4-Seite.

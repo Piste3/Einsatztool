@@ -42,15 +42,26 @@ export const CLUBDESK_TERMIN = 'clubdesk_termin';
 export const STANDARD_CLUBDESK: Omit<Vorlage, 'version'> = {
   betreff: '{titel}',
   text: [
-    'Einsatz: {einsatz}',
-    'Schicht: {schicht}',
-    'Zeit: {zeit}',
-    'Ort: {ort}',
-    'Abtreten: {abtreten}',
-    'Tenue: {tenue}',
-    'Mindestalter: {mindestalter}',
-    'Bemerkung: {bemerkung}',
-    '{einsatz_bemerkung}',
+    '**Anmerkung**: Das unten angezeigte Aufgebot zählt nur für Dich, wenn Du Dich in der Teilnehmer:innenliste oben wiederfindest.',
+    '',
+    '# {einsatz} - {schicht}',
+    '',
+    'Du hast Dich für folgenden Einsatz angemeldet. Schon im Voraus herzlichen Dank! Nachstehend findest Du alle nötigen Informationen:',
+    '',
+    '| **Antreten** | {antreten_text} |',
+    '| **Abtreten** | {abtreten_text} \\\\ {hinweis} |',
+    '| **Einsatzleitung** | EL: {einsatzleitung_telefon} |',
+    '| **Tenue** | {tenue} |',
+    '| **Mindestalter** | {mindestalter} |',
+    '',
+    'Deine Teilnahme ist [rot]definitiv[/rot]. Falls Du am Einsatz nicht teilnehmen kannst, musst du dich umgehend per Mail an {aufgebot_mail} wenden. Bei krankheitsbedingten Absagen weniger als drei Tage vor dem Einsatz, melde dich bitte direkt telefonisch bei der Einsatzleitung.',
+    'Bei allfälligen Fragen stehe ich dir gerne zur Verfügung.',
+    '',
+    'Liebe Grüsse',
+    '',
+    '{absender}',
+    'Aufgebotsstelle',
+    '{aufgebot_mail}',
   ].join('\n'),
 };
 
@@ -67,7 +78,7 @@ export const PLATZHALTER: Record<string, string> = {
 export const MAX_TEXT = 1500;
 export const MAX_BETREFF = 200;
 /** Der Clubdesk-Text geht nicht über einen mailto-Link. Darum ist er länger erlaubt. */
-export const MAX_TEXT_CLUBDESK = 4000;
+export const MAX_TEXT_CLUBDESK = 8000;
 
 interface Art {
   standard: Omit<Vorlage, 'version'>;

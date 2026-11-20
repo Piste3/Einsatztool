@@ -14,6 +14,7 @@ import {
 import { Eingabefehler, Konflikt, id as leseId, liste } from '../domain/eingabe.js';
 import { AENDERUNG_MELDEN, CLUBDESK_TERMIN, MAX_BETREFF, MAX_TEXT, MAX_TEXT_CLUBDESK, PLATZHALTER, istVorlage, ladeVorlage, speichereVorlage } from '../domain/vorlagen.js';
 import { BAUSTEINE, clubdeskText } from '../domain/clubdesk-text.js';
+import { AUSZEICHNUNG, fuerVorschau } from '../domain/textformat.js';
 import { eine } from '../db/db.js';
 import { jetztIso } from '../domain/zeit.js';
 import { feedStand } from '../domain/ical-abgleich.js';
@@ -290,7 +291,7 @@ ${liste.map((b) => html`<tr><td>${b.name}</td><td>${b.email}</td><td>${b.rolle =
         ORDER BY (s.end_zeit < ?), CASE WHEN s.end_zeit < ? THEN '' ELSE s.start_zeit END, s.end_zeit DESC, s.id LIMIT 1`,
       [jetztIso(), jetztIso()],
     );
-    const vorschau = beispiel ? await clubdeskText(db, beispiel.id, konfig.baseUrl) : null;
+    const vorschau = beispiel ? await clubdeskText(db, beispiel.id, { baseUrl: konfig.baseUrl, aufgebotMail: konfig.mailFrom, benutzer: kx.benutzer }) : null;
     const z = '/admin/einstellungen/vorlagen';
     res.send(einstellungenSeite(deps, kx, 'vorlagen', html`
 <section class="abschnitt" id="vorlage">
@@ -318,18 +319,21 @@ ${liste.map((b) => html`<tr><td>${b.name}</td><td>${b.email}</td><td>${b.rolle =
       <input type="hidden" name="schluessel" value="${CLUBDESK_TERMIN}">
       <input type="hidden" name="version" value="${cz.version ?? cv.version}">
       <div class="feld breit"><label for="clubdesk_titel">Titel</label><input id="clubdesk_titel" name="betreff" required maxlength="${MAX_BETREFF}" value="${cz.betreff ?? cv.betreff}"></div>
-      <div class="feld breit"><label for="clubdesk_text">Text</label><textarea id="clubdesk_text" name="text" rows="16" required maxlength="${MAX_TEXT_CLUBDESK}">${cz.text ?? cv.text}</textarea></div>
+      <div class="feld breit"><label for="clubdesk_text">Text</label><textarea id="clubdesk_text" name="text" rows="26" required maxlength="${MAX_TEXT_CLUBDESK}">${cz.text ?? cv.text}</textarea></div>
       <div class="knopfreihe"><button type="submit" class="knopf haupt">Vorlage speichern</button></div>
     </form>
     <aside class="karte bausteine" aria-labelledby="bausteine_titel">
       <h3 id="bausteine_titel">Bausteine</h3>
       <dl>${Object.entries(BAUSTEINE).map(([b, t]) => html`<dt><code>${b}</code></dt><dd>${t}</dd>`)}</dl>
+      <h3>Formatierung</h3>
+      <dl>${AUSZEICHNUNG.map(([b, t]) => html`<dt><code>${b}</code></dt><dd>${t}</dd>`)}</dl>
+      <p class="unter">Eine Tabellenzeile mit nur leeren Bausteinen entfällt ganz.</p>
     </aside>
   </div>
   ${cv.version > 0 ? knopfPost(kx, '/admin/vorlage', 'Standardvorlage wiederherstellen', { schluessel: CLUBDESK_TERMIN, standard: '1' }, 'knopf klein', `${z}#clubdesk`) : ''}
   ${vorschau ? html`<h3>Vorschau</h3>
   <p class="unter">Gespeicherte Vorlage mit der Schicht «${beispiel!.titel}». Nach dem Speichern zeigt die Vorschau den neuen Text.</p>
-  <div class="karte vorschau-text"><strong>${vorschau.titel}</strong><pre>${vorschau.text}</pre></div>` : ''}
+  <div class="karte vorschau-text"><p><strong>Titel:</strong> ${vorschau.titel}</p><div class="cd-vorschau">${new Roh(fuerVorschau(vorschau.html))}</div></div>` : ''}
 </section>`));
   };
   const einstellungen = async (_req: Request, res: Response) => zeigeStammdaten(res);

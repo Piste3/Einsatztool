@@ -74,6 +74,38 @@
   // Kopieren in die Zwischenablage, Drucken
   document.addEventListener('click', function (ev) {
     if (!ev.target.closest) return;
+    // Kopieren mit Formatierung (Clubdesk-Text): HTML und reiner Text zusammen in die Zwischenablage.
+    var r = ev.target.closest('[data-kopieren-html]');
+    if (r) {
+      var htmlQ = document.querySelector(r.getAttribute('data-kopieren-html'));
+      var textQ = document.querySelector(r.getAttribute('data-kopieren-text'));
+      var auswahlQ = document.querySelector(r.getAttribute('data-kopieren-auswahl'));
+      var gemeldet = function () {
+        var alt = r.textContent;
+        r.textContent = 'Kopiert';
+        setTimeout(function () { r.textContent = alt; }, 2000);
+      };
+      // Ohne ClipboardItem: den angezeigten Text markieren und kopieren. Der Browser nimmt die Formatierung mit.
+      var ueberAuswahl = function () {
+        if (!auswahlQ) return;
+        var bereich = document.createRange();
+        bereich.selectNodeContents(auswahlQ);
+        var sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(bereich);
+        try { if (document.execCommand('copy')) gemeldet(); } catch (e) { /* Auswahl bleibt zum Kopieren von Hand */ }
+      };
+      if (htmlQ && window.ClipboardItem && navigator.clipboard && navigator.clipboard.write) {
+        var daten = {
+          'text/html': new Blob([htmlQ.value], { type: 'text/html' }),
+          'text/plain': new Blob([textQ ? textQ.value : htmlQ.value], { type: 'text/plain' })
+        };
+        navigator.clipboard.write([new ClipboardItem(daten)]).then(gemeldet, ueberAuswahl);
+      } else {
+        ueberAuswahl();
+      }
+      return;
+    }
     var k = ev.target.closest('[data-kopieren]');
     if (k) {
       var quelle = document.querySelector(k.getAttribute('data-kopieren'));
