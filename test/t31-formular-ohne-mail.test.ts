@@ -10,13 +10,15 @@ test('T31 Formular: keine E-Mail, kein Essen, eine Bemerkung je Einsatz', async 
   const app = await starteApp(t.db);
   try {
     await person(t.db, 7, { vorname: 'Nina', nachname: 'Baumann' });
-    const a = await einsatz(t.db, 'Herbstmesse', inTagen(5, 12), inTagen(5, 18));
+    const a = await einsatz(t.db, 'Herbstmesse', inTagen(5, 12), inTagen(5, 18), 'Treffpunkt Messeplatz');
     const b = await einsatz(t.db, 'Stadtlauf', inTagen(6, 12), inTagen(6, 18));
 
     // Das Formular fragt weder E-Mail noch Essenseinschränkungen. Jeder Einsatz hat ein eigenes Feld «Bemerkung».
     const formular = await (await fetch(`${app.url}/anmeldung`)).text();
     assert.doesNotMatch(formular, /name="email"/);
     assert.doesNotMatch(formular, /name="essen"/);
+    // Der Antretensort erscheint nicht im Formular (Wunsch Yann 20.11.2026).
+    assert.doesNotMatch(formular, /Treffpunkt Messeplatz/);
     assert.match(formular, new RegExp(`name="bemerkung_${a.einsatzId}"`));
     assert.match(formular, new RegExp(`name="bemerkung_${b.einsatzId}"`));
 

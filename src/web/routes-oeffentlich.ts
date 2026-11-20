@@ -111,7 +111,6 @@ ${schichten.length === 0
         <span class="schicht-text">
           <strong>${s.name}</strong>
           <span class="zeit">${zeitraumText(s.start_zeit, s.end_zeit)}</span>
-          ${s.ort ? html`<span class="ort">${s.ort}</span>` : ''}
           ${hinweisVorgaben(s) ? html`<span class="vorgabe">${hinweisVorgaben(s)}</span>` : ''}
           ${s.bemerkung_extern ? html`<span class="bemerkung">${mehrzeilig(s.bemerkung_extern)}</span>` : ''}
         </span>
