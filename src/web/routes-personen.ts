@@ -5,6 +5,7 @@ import { nurAufgebot } from './app.js';
 import { ladeVorlage } from '../domain/vorlagen.js';
 import { aenderungMailText, aenderungMailto, alterHeute, ladePerson, personenListe, telefonText } from '../domain/personen.js';
 import { personUebersicht, rueckmeldungen, type RueckmeldungOptionen } from '../domain/listen.js';
+import { filterFuerListe } from '../domain/filter.js';
 import { anmeldungVonPerson, verlauf } from '../domain/anmeldung.js';
 import { ladeSchicht, schichtenVonEinsatz } from '../domain/schicht.js';
 import { passtZuSchicht, warnungenFuerSchicht } from '../domain/warnungen.js';
@@ -108,7 +109,8 @@ ${p.geloescht_am ? html`<p class="meldung hinweis">Die Personendaten sind gelös
 
   app.get('/rueckmeldungen', nurAufgebot, async (req, res) => {
     const kx = k(res);
-    const q = req.query;
+    // Filter je Benutzer: Adresse mit Filtern speichert sie, Adresse ohne Filter nimmt die gespeicherten.
+    const { werte: q, gespeichert } = await filterFuerListe(db, kx.benutzer!.id, 'rueckmeldungen', req.query, ['monate', 'offen', 'unpubliziert', 'suche', 'sort'], req.get('x-live-abfrage') !== '1');
     const monate = ([1, 3, 6, 12] as const).find((m) => String(m) === q.monate) ?? 3;
     const o: RueckmeldungOptionen = {
       monate,
@@ -144,6 +146,7 @@ ${seitenKopf({ titel: 'Rückmeldungen', angaben: ['Wer hat sich wofür gemeldet:
   <label class="haken"><input type="checkbox" name="unpubliziert" value="1"${o.unpublizierte ? new Roh(' checked') : ''}> Unpublizierte zeigen</label>
   <input type="search" name="suche" value="${o.suche}" placeholder="Name …" aria-label="Name suchen">
   <button type="submit" class="knopf">Anzeigen</button>
+  ${gespeichert ? html`<a class="link-knopf" href="/rueckmeldungen?zuruecksetzen=1" title="Gespeicherte Filter löschen">Filter zurücksetzen</a>` : ''}
 </form>
 ${kachelLegende()}
 <p class="unter">Klick auf ein Feld: Person eintragen oder Status ändern. Grau = passt nicht zu Mindestalter oder Mindestrang. Eintragen geht trotzdem.</p>
@@ -160,7 +163,7 @@ ${r.schichten.length === 0 ? html`<p class="leer">Keine kommenden Schichten im Z
   <tfoot>
     ${(['an', 'ab', 'unsicher', 'offen'] as const).map((n) => html`<tr><th class="name-spalte">${{ an: 'An', ab: 'Ab', unsicher: 'Unsicher', offen: 'Offen' }[n]}</th>${r.schichten.map((s, i) => html`<td${gruppenStart.has(i) ? new Roh(' class="gruppe-start"') : ''}>${s.summe[n]}</td>`)}</tr>`)}
   </tfoot>
-</table></div>`}`, { breit: true }));
+</table></div>`}`, { breit: true, fest: true }));
   });
   // Rückmeldungen: Fenster für ein Feld (Person × Schicht). Eintragen oder ändern über die bestehenden Routen.
   // Mit Header «X-Fragment: 1» nur der Inhalt (für das Fenster), sonst eine ganze Seite (ohne Skript).

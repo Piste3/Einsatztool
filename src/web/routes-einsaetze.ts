@@ -18,6 +18,7 @@ import { besetzenDaten, type BesetzenFilter, type BesetzenZeile } from '../domai
 import { raenge as ladeRaenge, rollen as ladeRollen } from '../domain/stammdaten.js';
 import { Eingabefehler, Konflikt, KANAL_TEXT, STATUS_TEXT, id as leseId, type Kanal, type Status } from '../domain/eingabe.js';
 import { einsatzLage, type ZuTunPunkt } from '../domain/einsatz-lage.js';
+import { filterFuerListe } from '../domain/filter.js';
 import { alle } from '../db/db.js';
 import { html, mehrzeilig, Roh } from './html.js';
 import { k, aktuellerPfad } from './kontext.js';
@@ -63,7 +64,8 @@ export function registriereEinsaetze(app: Express, deps: Abhaengigkeiten): void 
   app.get('/einsaetze', nurAufgebot, async (req, res) => {
     const kx = k(res);
     const archiv = req.query.ansicht === 'archiv';
-    const q = req.query;
+    // Filter je Benutzer, getrennt für «Kommend» und «Archiv».
+    const { werte: q, gespeichert } = await filterFuerListe(db, kx.benutzer!.id, archiv ? 'archiv' : 'einsaetze', req.query, ['status', 'von', 'bis'], req.get('x-live-abfrage') !== '1');
     const datum = (w: unknown) => (typeof w === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(w) ? w : null);
     const status = q.status === 'publiziert' || q.status === 'entwurf' ? q.status : 'alle';
     const filter = { status, von: datum(q.von), bis: datum(q.bis) } as const;
@@ -95,7 +97,7 @@ ${seitenKopf({
   <label>von <input type="date" name="von" value="${filter.von ?? ''}"></label>
   <label>bis <input type="date" name="bis" value="${filter.bis ?? ''}"></label>
   <button type="submit" class="knopf">Anzeigen</button>
-  ${filter.von || filter.bis || status !== 'alle' ? html`<a class="link-knopf" href="/einsaetze${archiv ? '?ansicht=archiv' : ''}">Filter löschen</a>` : ''}
+  ${gespeichert && (filter.von || filter.bis || status !== 'alle') ? html`<a class="link-knopf" href="/einsaetze?${archiv ? 'ansicht=archiv&amp;' : ''}zuruecksetzen=1">Filter löschen</a>` : ''}
 </form>
 ${liste.length === 0 ? html`<p class="leer">Keine Einsätze.</p>` : html`
 <div class="rahmen"><table class="tabelle filterbar einsatz-liste">

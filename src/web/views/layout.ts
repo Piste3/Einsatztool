@@ -40,8 +40,9 @@ function kopfDaten(titel: string): Roh {
 /**
  * Seite mit Navigation. Die Seite aktualisiert sich live (data-live-nr, siehe app.js).
  * ohneLive: Die Seite lädt normal neu, z. B. Admin › Update mit dem Header «Refresh».
+ * fest: Die Seite selbst scrollt nicht, nur ihre Tabelle (z. B. Rückmeldungen). Gilt nicht auf dem Handy.
  */
-export function seite(k: Kontext, titel: string, aktiv: Bereich | null, inhalt: Roh, extra: { breit?: boolean; ohneLive?: boolean } = {}): string {
+export function seite(k: Kontext, titel: string, aktiv: Bereich | null, inhalt: Roh, extra: { breit?: boolean; ohneLive?: boolean; fest?: boolean } = {}): string {
   const b = k.benutzer!;
   const istAdmin = b.rolle === 'admin';
   return `<!doctype html>${html`<html lang="de">
@@ -89,7 +90,7 @@ ${kopfDaten(`${titel} · Einsatzplaner`)}
     </span>
   </div>
 </nav>
-<main class="inhalt${extra.breit ? ' breit' : ''}">
+<main class="inhalt${extra.breit ? ' breit' : ''}${extra.fest ? ' fest' : ''}">
   ${k.meldung ? toast(k.meldung.art, k.meldung.text, k.meldung.rueckgaengig ? rueckgaengigKnopf(k, k.meldung.rueckgaengig) : undefined) : ''}
   ${inhalt}
 </main>

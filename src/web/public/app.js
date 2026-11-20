@@ -307,7 +307,14 @@
     if (neuMobil && altMobil) altMobil.replaceWith(document.importNode(neuMobil, true));
     themaZeigen(themaLesen());
     altMain.className = neuMain.className;
+    // Tabellen mit eigenem Scrollbereich behalten ihre Position (z. B. Rückmeldungen nach einem Eintrag).
+    var scrollStand = Array.prototype.map.call(altMain.querySelectorAll('.rahmen'), function (r) { return [r.scrollTop, r.scrollLeft]; });
+    var seitenScroll = window.scrollY;
     altMain.replaceChildren.apply(altMain, Array.prototype.slice.call(neuMain.childNodes));
+    altMain.querySelectorAll('.rahmen').forEach(function (r, i) {
+      if (scrollStand[i]) { r.scrollTop = scrollStand[i][0]; r.scrollLeft = scrollStand[i][1]; }
+    });
+    if (window.scrollY !== seitenScroll) window.scrollTo(0, seitenScroll);
     if (neu.title) document.title = neu.title;
     var nr = neu.body && neu.body.getAttribute('data-live-nr');
     if (nr !== null && nr !== undefined) liveNr = nr;

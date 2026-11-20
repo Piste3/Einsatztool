@@ -69,6 +69,20 @@ const migrationen: { version: number; anweisungen: () => string[] }[] = [
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin`,
     ],
   },
+  // Version 6 (Wunsch Yann): Jeder Benutzer behält seine Filter je Liste (z. B. Rückmeldungen, Einsätze).
+  {
+    version: 6,
+    anweisungen: () => [
+      `CREATE TABLE benutzer_filter (
+        benutzer_id INT NOT NULL,
+        liste VARCHAR(50) NOT NULL,
+        werte TEXT NOT NULL,
+        geaendert_am VARCHAR(30) NOT NULL,
+        PRIMARY KEY (benutzer_id, liste),
+        CONSTRAINT fk_filter_benutzer FOREIGN KEY (benutzer_id) REFERENCES benutzer(id) ON DELETE CASCADE
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin`,
+    ],
+  },
 ];
 
 export async function migriere(db: Db): Promise<number> {
