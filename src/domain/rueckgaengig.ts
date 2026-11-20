@@ -156,6 +156,18 @@ export async function macheRueckgaengig(db: Db, schluessel: unknown, benutzerId:
           ]);
         }
       }
+      if (jetzt.schicht_id !== v.schicht_id) {
+        // Verschoben: zurück in die alte Schicht, wenn es sie noch gibt und die Person dort keinen Eintrag hat.
+        const alt = await eine<{ name: string }>(c, 'SELECT name FROM schicht WHERE id = ?', [v.schicht_id]);
+        const doppelt = v.person_id === null
+          ? null
+          : await eine(c, 'SELECT id FROM anmeldung WHERE schicht_id = ? AND person_id = ? AND id <> ?', [v.schicht_id, v.person_id, s.id]);
+        if (!alt || doppelt) throw new Eingabefehler(KONFLIKT);
+        const neu = await eine<{ name: string }>(c, 'SELECT name FROM schicht WHERE id = ?', [jetzt.schicht_id]);
+        await schreibe(c, 'INSERT INTO status_log (anmeldung_id, zeit, benutzer_id, aktion, alt_wert, neu_wert) VALUES (?, ?, ?, ?, ?, ?)', [
+          s.id, zeit, benutzerId, 'verschoben', neu?.name ?? null, alt.name,
+        ]);
+      }
       if (jetzt.person_id !== v.person_id) {
         await schreibe(c, 'INSERT INTO status_log (anmeldung_id, zeit, benutzer_id, aktion, alt_wert, neu_wert) VALUES (?, ?, ?, ?, ?, ?)', [
           s.id, zeit, benutzerId, 'zuordnung_aufgehoben', `${jetzt.name_text}${jetzt.person_id !== null ? ` (${jetzt.person_id})` : ''}`,
@@ -164,9 +176,9 @@ export async function macheRueckgaengig(db: Db, schluessel: unknown, benutzerId:
       }
       await schreibe(
         c,
-        `UPDATE anmeldung SET person_id = ?, name_text = ?, email_text = ?, status = ?, rolle = ?, kanal = ?, bemerkung = ?,
+        `UPDATE anmeldung SET schicht_id = ?, person_id = ?, name_text = ?, email_text = ?, status = ?, rolle = ?, kanal = ?, bemerkung = ?,
            mail_gesendet_am = ?, geaendert_am = ?, version = version + 1 WHERE id = ?`,
-        [v.person_id, v.name_text, v.email_text, v.status, v.rolle, v.kanal, v.bemerkung, v.mail_gesendet_am, zeit, s.id],
+        [v.schicht_id, v.person_id, v.name_text, v.email_text, v.status, v.rolle, v.kanal, v.bemerkung, v.mail_gesendet_am, zeit, s.id],
       );
     }
     return p.schritte.length;

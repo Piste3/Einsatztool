@@ -2,7 +2,7 @@
 // Jede Änderung schreibt in derselben Transaktion einen Eintrag in status_log.
 import type { PoolConnection } from 'mysql2/promise';
 import { alle, eine, schreibe, transaktion, Wiederholen, type Db } from '../db/db.js';
-import { Eingabefehler, NichtGefunden, STATUS, KANAELE, auswahl, pruefeVersion, text, type Kanal, type Status } from './eingabe.js';
+import { Eingabefehler, NichtGefunden, STATUS, STATUS_TEXT, KANAELE, auswahl, pruefeVersion, text, type Kanal, type Status } from './eingabe.js';
 import { jetztIso, lokalesDatum, lokaleZeit } from './zeit.js';
 import { merkeNeu, merkeVorEntfernen, merkeVorher } from './rueckgaengig.js';
 
@@ -231,6 +231,56 @@ export async function loescheAnmeldung(db: Db, id: number): Promise<number> {
     await merkeVorEntfernen(c, a);
     await schreibe(c, 'DELETE FROM anmeldung WHERE id = ?', [id]);
     return a.schicht_id;
+  });
+}
+
+/**
+ * Eintrag in eine andere Schicht desselben Einsatzes verschieben (Wunsch Yann 20.11.2026, Reiter «Schichten»).
+ * Status, Rolle, Kanal, Bemerkung und Statusprotokoll bleiben. Das Protokoll erhält die Aktion «verschoben».
+ * Hat die Person in der Zielschicht schon einen Eintrag, ändert das Tool nichts (eine Person, ein Eintrag je Schicht).
+ * Ein bestätigter Eintrag erhält im nächsten Tageslauf eine neue Bestätigungsmail, weil sich Zeit und Ort ändern können.
+ * Gibt die alte und die neue Schicht zurück. Gleiche Schicht = keine Änderung.
+ */
+export async function verschiebeAnmeldung(
+  db: Db,
+  id: number,
+  zielSchichtId: number,
+  version: unknown,
+  benutzerId: number | null,
+): Promise<{ von: number; nach: number; name: string; geaendert: boolean }> {
+  return transaktion(db, async (c) => {
+    const a = await eine<Anmeldung>(c, 'SELECT * FROM anmeldung WHERE id = ? FOR UPDATE', [id]);
+    if (!a) throw new NichtGefunden('Eintrag nicht gefunden. Ein anderer Benutzer hat ihn vielleicht entfernt.');
+    pruefeVersion(version, a.version, await konfliktText(c, a));
+    if (a.schicht_id === zielSchichtId) return { von: a.schicht_id, nach: a.schicht_id, name: a.name_text, geaendert: false };
+    const schichten = await alle<{ id: number; einsatz_id: number; name: string }>(
+      c, 'SELECT id, einsatz_id, name FROM schicht WHERE id IN (?, ?)', [a.schicht_id, zielSchichtId],
+    );
+    const von = schichten.find((x) => x.id === a.schicht_id)!;
+    const nach = schichten.find((x) => x.id === zielSchichtId);
+    if (!nach) throw new Eingabefehler('Die Zielschicht gibt es nicht mehr.');
+    if (nach.einsatz_id !== von.einsatz_id) throw new Eingabefehler('Verschieben geht nur innerhalb desselben Einsatzes.');
+    if (a.person_id !== null) {
+      const doppelt = await eine<{ status: Status }>(c, 'SELECT status FROM anmeldung WHERE schicht_id = ? AND person_id = ?', [zielSchichtId, a.person_id]);
+      if (doppelt) {
+        throw new Eingabefehler(`${a.name_text} hat in «${nach.name}» schon einen Eintrag (${STATUS_TEXT[doppelt.status]}). Das Tool hat nichts verschoben.`);
+      }
+    }
+    const zeit = jetztIso();
+    merkeVorher(a);
+    try {
+      await schreibe(
+        c,
+        `UPDATE anmeldung SET schicht_id = ?, geaendert_am = ?, version = version + 1,
+           mail_gesendet_am = ${a.status === 'bestaetigt' ? 'NULL' : 'mail_gesendet_am'} WHERE id = ?`,
+        [zielSchichtId, zeit, id],
+      );
+    } catch (fehler) {
+      if ((fehler as { code?: string }).code === 'ER_DUP_ENTRY') throw new Wiederholen('Eintrag gleichzeitig angelegt.');
+      throw fehler;
+    }
+    await schreibeLog(c, id, benutzerId, 'verschoben', von.name, nach.name, zeit);
+    return { von: von.id, nach: zielSchichtId, name: a.name_text, geaendert: true };
   });
 }
 

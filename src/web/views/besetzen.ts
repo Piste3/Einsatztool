@@ -15,7 +15,7 @@ import { html, Roh } from '../html.js';
 import type { k } from '../kontext.js';
 import { formFelder } from './layout.js';
 import {
-  kachel, kachelLegende, KACHEL_TEXT, kanalAuswahl, knopfPost, rolleAuswahl, statusAuswahl, statusText, telefon, warnungen, zeitraum, type KachelArt,
+  bestaetigenFrage, kachel, kachelLegende, KACHEL_TEXT, kanalAuswahl, knopfPost, rolleAuswahl, statusAuswahl, statusText, telefon, warnungen, zeitraum, type KachelArt,
 } from './teile.js';
 
 type Kx = ReturnType<typeof k>;
@@ -92,6 +92,7 @@ ${gewaehlt.bemerkung_intern ? html`<p class="bemerkung intern"><strong>Intern:</
     .filter((f) => f !== 'warnung' || zahl.warnung > 0 || filter === 'warnung')
     .map((f) => html`<a class="f-${f}" href="${pfad(f)}"${filter === f ? new Roh(' aria-current="page"') : ''}>${BESETZEN_FILTER_TEXT[f]} ${zahl[f]}</a>`)}</p>`;
   const hinweis: Record<BesetzenFilter, string> = {
+    an: 'Angemeldet oder bestätigt.',
     neu: 'Angemeldet, noch nicht bestätigt.',
     offen: 'Unsicher oder Nachricht ohne Antwort.',
     nicht: gewaehlt ? 'Personen ohne Eintrag in dieser Schicht.' : 'Personen ohne Eintrag in diesem Einsatz.',
@@ -102,7 +103,7 @@ ${gewaehlt.bemerkung_intern ? html`<p class="bemerkung intern"><strong>Intern:</
       ? html` Alle Personen sichtbar. <a href="${pfad('nicht')}">Unpassende ausblenden</a>`
       : html` ${zahl.unpassend} ${zahl.unpassend === 1 ? 'Person passt' : 'Personen passen'} nicht zu Mindestalter oder Mindestrang. <a href="${pfad('nicht', schichtWert, true)}">Einblenden</a>`
     : '';
-  const alleBestaetigen = filter === 'neu' && zahl.neu > 0
+  const alleBestaetigen = (filter === 'neu' || filter === 'an') && zahl.neu > 0
     ? knopfPost(kx, gewaehlt ? `/schichten/${gewaehlt.id}/alle-bestaetigen` : `/einsaetze/${einsatzId}/alle-bestaetigen`, zahl.neu === 1 ? 'Bestätigen' : `Alle ${zahl.neu} bestätigen`, {}, 'knopf haupt klein', hier)
     : '';
 
@@ -150,7 +151,7 @@ ${gewaehlt.bemerkung_intern ? html`<p class="bemerkung intern"><strong>Intern:</
       ? `${STATUS_TEXT[a.status]}${a.rolle ? ` · ${a.rolle}` : ''}${a.bemerkung ? ` · Bemerkung: ${a.bemerkung}` : ''}${nWarn ? ` · ${nWarn} Warnung` : ''}`
       : art ? KACHEL_TEXT[art as 'gleich' | 'moeglich'] : 'nicht gefragt';
     const innen = html`<span class="kachel-huelle">${kachel(art)}${nWarn ? html`<span class="warn-marke" aria-hidden="true">!</span>` : ''}${a?.bemerkung ? html`<span class="bemerkung-marke" aria-hidden="true">✎</span>` : ''}</span>${a?.rolle ? html`<small class="rolle">${a.rolle}</small>` : ''}<span class="sr">${titel}</span>`;
-    if (z.personId !== null) return html`<td class="zelle-klick"><a href="${eintragLink(s.id, z.personId)}" data-eintrag title="${titel} – Klick zum Eintragen">${innen}</a></td>`;
+    if (z.personId !== null) return html`<td class="zelle-klick"><a href="${eintragLink(s.id, z.personId)}" data-eintrag${bestaetigenFrage(a, z.name)} title="${titel} – Klick zum Eintragen">${innen}</a></td>`;
     if (a) return html`<td class="zelle-klick"><a href="${pfad('alle', s.id)}" title="${titel} – in der Schicht bearbeiten">${innen}</a></td>`;
     return html`<td></td>`;
   };

@@ -167,3 +167,13 @@ export function kachelLegende(): Roh {
   const arten: (Status | 'gleich' | 'moeglich' | 'offen')[] = ['angemeldet', 'bestaetigt', 'abgemeldet', 'nachricht_gesendet', 'unsicher', 'offen', 'gleich', 'moeglich'];
   return html`<p class="legende kachel-legende"><strong>Legende</strong>${arten.map((a) => html`<span>${kachel(a === 'offen' ? null : a)} ${KACHEL_TEXT[a]}</span>`)}</p>`;
 }
+
+/**
+ * Attribute für das Fenster «Bestätigen?» (Wunsch Yann 20.11.2026).
+ * Ein Klick auf eine Kachel mit «angemeldet» fragt zuerst, ob das Tool bestätigen soll. Enter bestätigt nur in diesem Fenster.
+ * Ohne Skript öffnet der Link wie bisher das Fenster bzw. die Seite zum Eintragen.
+ */
+export function bestaetigenFrage(a: { id: number | null; version: number | null; status: Status | null } | undefined, name: string): Roh {
+  if (!a || a.id === null || a.status !== 'angemeldet') return new Roh('');
+  return html` data-bestaetigen="${a.id}" data-version="${a.version ?? ''}" data-name="${name}"`;
+}
