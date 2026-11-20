@@ -1055,9 +1055,9 @@ tr.ordnen-zeile.zieht { opacity: .45; }
 
 /* Clubdesk-Text: Vorschau wie im Clubdesk-Editor. Farben über Klassen, weil die CSP keine Inline-Styles anzeigt. */
 .cd-vorschau { background: #fff; color: #222; font-family: Arial, Helvetica, sans-serif; font-size: 13px; line-height: 1.5; }
-.cd-vorschau p { margin: 0 0 1em; }
-.cd-vorschau h3 { font-size: 15px; margin: 1em 0; }
-.cd-vorschau table { border-collapse: collapse; margin: 0 0 1em; }
+.cd-vorschau p { margin: 0; }
+.cd-vorschau h3 { font-size: 15px; margin: 0; }
+.cd-vorschau table { border-collapse: collapse; margin: 0; }
 .cd-vorschau td { border: 1px solid #222; padding: 6px 8px; vertical-align: middle; min-width: 8rem; }
 .cd-vorschau .text-rot { color: #e00000; }
 .cd-vorschau .text-blau { color: #0055cc; }

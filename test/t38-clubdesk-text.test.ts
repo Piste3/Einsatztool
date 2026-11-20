@@ -74,7 +74,10 @@ test('T38d Formatierung: fett, Farbe, Titel, Tabelle, neue Zeile in der Zelle. T
   assert.match(h, /^<h3>Titel &lt;x&gt;<\/h3>\n<p>Du bist <strong>dabei<\/strong> und <span class="text-rot" style="color:#e00000">definitiv<\/span> &amp; <span class="text-blau"[^>]*>froh<\/span>\.<br>Zweite Zeile<\/p>/);
   assert.match(h, /<tr><td><strong>A<\/strong><\/td><td>eins<br>zwei<\/td><\/tr><tr><td><strong>B<\/strong><\/td><td>drei<\/td><\/tr><tr><td colspan="2">nur<\/td><\/tr>/);
   assert.match(h, /<p>Ende \[lila\]x\[\/lila\]<\/p>$/);
-  assert.equal(alsText(v), 'Titel <x>\n\nDu bist dabei und definitiv & froh.\nZweite Zeile\n\nA: eins, zwei\nB: drei\nnur\n\nEnde [lila]x[/lila]');
+  assert.equal(alsText(v), 'Titel <x>\nDu bist dabei und definitiv & froh.\nZweite Zeile\n\nA: eins, zwei\nB: drei\nnur\n\nEnde [lila]x[/lila]');
+  // Eine Leerzeile wird ein leerer Absatz (Clubdesk zeigt Absätze ohne Abstand). Mehrere Leerzeilen zählen einmal.
+  assert.equal(alsHtml('A\n\n\nB\n\n'), '<p>A</p>\n<p>&nbsp;</p>\n<p>B</p>');
+  assert.equal(alsText('A\n\n\nB\n\n'), 'A\n\nB');
   // Ein Wert mit Zeilenumbruch bleibt in seiner Tabellenzelle.
   assert.equal(fuelleClubdeskVorlage('| S | {schichten} |', { schichten: 'Früh\nSpät' }), '| S | Früh \\\\ Spät |');
 });

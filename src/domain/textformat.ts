@@ -60,7 +60,7 @@ function zellen(zeile: string): string[] {
     .map((z) => z.trim().replace(/^(\\\\\s*)+|(\s*\\\\)+$/g, '').trim());
 }
 
-type Block = { art: 'absatz'; zeilen: string[] } | { art: 'titel'; text: string } | { art: 'tabelle'; zeilen: string[][] };
+type Block = { art: 'leer' } | { art: 'absatz'; zeilen: string[] } | { art: 'titel'; text: string } | { art: 'tabelle'; zeilen: string[][] };
 
 function bloecke(text: string): Block[] {
   const ergebnis: Block[] = [];
@@ -68,6 +68,8 @@ function bloecke(text: string): Block[] {
   for (const roh of text.replace(/\r\n?/g, '\n').split('\n')) {
     const zeile = roh.replace(/\s+$/, '');
     if (!zeile.trim()) {
+      // Eine Leerzeile wird ein leerer Absatz. Grund: Der Editor von Clubdesk zeigt Absätze ohne Abstand.
+      if (ergebnis.length && ergebnis[ergebnis.length - 1].art !== 'leer') ergebnis.push({ art: 'leer' });
       aktuell = null;
       continue;
     }
@@ -91,6 +93,7 @@ function bloecke(text: string): Block[] {
     }
     aktuell.zeilen.push(zeile);
   }
+  while (ergebnis.length && ergebnis[ergebnis.length - 1].art === 'leer') ergebnis.pop();
   return ergebnis;
 }
 
@@ -98,6 +101,7 @@ function bloecke(text: string): Block[] {
 export function alsHtml(text: string): string {
   return bloecke(text)
     .map((b) => {
+      if (b.art === 'leer') return '<p>&nbsp;</p>';
       if (b.art === 'titel') return `<h3>${inlineHtml(b.text)}</h3>`;
       if (b.art === 'absatz') return `<p>${b.zeilen.map(inlineHtml).join('<br>')}</p>`;
       const breite = Math.max(...b.zeilen.map((z) => z.length));
@@ -117,6 +121,7 @@ export function alsHtml(text: string): string {
 export function alsText(text: string): string {
   return bloecke(text)
     .map((b) => {
+      if (b.art === 'leer') return '';
       if (b.art === 'titel') return inlineText(b.text);
       if (b.art === 'absatz') return b.zeilen.map(inlineText).join('\n');
       return b.zeilen
@@ -126,7 +131,7 @@ export function alsText(text: string): string {
         })
         .join('\n');
     })
-    .join('\n\n');
+    .join('\n');
 }
 
 /** HTML für die eigene Vorschau. Ohne style-Attribute (CSP). Die Klassen zeigen Farbe und Rahmen. */
