@@ -14,7 +14,8 @@ import {
 import { Eingabefehler, Konflikt, id as leseId, liste } from '../domain/eingabe.js';
 import { AENDERUNG_MELDEN, CLUBDESK_TERMIN, MAX_BETREFF, MAX_TEXT, MAX_TEXT_CLUBDESK, PLATZHALTER, istVorlage, ladeVorlage, speichereVorlage } from '../domain/vorlagen.js';
 import { BAUSTEINE, clubdeskText } from '../domain/clubdesk-text.js';
-import { AUSZEICHNUNG, fuerVorschau } from '../domain/textformat.js';
+import { AUSZEICHNUNG, fuerVorschau, zeileAlsHtml } from '../domain/textformat.js';
+import { aendereTenueVorlage, legeTenueVorlageAn, loescheTenueVorlage, ordneTenueVorlagen, tenueVorlagen, verschiebeTenueVorlage } from '../domain/tenue.js';
 import { eine } from '../db/db.js';
 import { jetztIso } from '../domain/zeit.js';
 import { feedStand } from '../domain/ical-abgleich.js';
@@ -239,6 +240,7 @@ ${liste.map((b) => html`<tr><td>${b.name}</td><td>${b.email}</td><td>${b.rolle =
     const kx = k(res);
     const r = await raenge(db);
     const ro = await rollen(db);
+    const tv = await tenueVorlagen(db);
     const z = '/admin/einstellungen';
     res.send(einstellungenSeite(deps, kx, 'stammdaten', html`
 <section class="abschnitt" id="raenge">
@@ -273,6 +275,22 @@ ${liste.map((b) => html`<tr><td>${b.name}</td><td>${b.email}</td><td>${b.rolle =
     </td></tr>`)}
   </tbody></table></div>
   <form method="post" action="/admin/rollen" class="zeilen-form">${formFelder(kx, z)}<input type="hidden" name="aktion" value="anlegen"><input name="name" required maxlength="100" placeholder="Neue Rolle" aria-label="Neue Rolle"><label class="haken"><input type="checkbox" name="zaehlt" value="1" checked> zählt als Teilnehmer</label><button class="knopf" type="submit">Rolle anlegen</button></form>
+</section>
+<section class="abschnitt" id="tenue">
+  <h2>Tenue-Vorlagen</h2>
+  <p class="unter">In Schicht und Einsatz wählst du eine Vorlage neben dem Feld «Tenue». Das Tool kopiert den Text ins Feld. Danach kannst du ihn ändern. Ändern oder Löschen einer Vorlage ändert keine Schicht. <code>**fett**</code> ergibt Fettdruck. Zieh eine Vorlage am Griff ⠿ an die richtige Stelle.</p>
+  ${tv.length ? html`${ordnenForm(kx, '/admin/tenue', `${z}#tenue`, 'tenueliste')}
+  <div class="rahmen"><table class="tabelle"><thead><tr><th class="ordnen-griff-kopf"><span class="sr">Ziehen</span></th><th>Name und Text</th><th>Vorschau</th><th></th></tr></thead><tbody data-ordnen="tenueliste">
+  ${tv.map((x, i) => html`<tr class="ordnen-zeile" data-ordnen-wert="${x.id}">
+    <td class="ordnen-griff" title="Ziehen, um die Reihenfolge zu ändern" aria-hidden="true">⠿</td>
+    <td><form method="post" action="/admin/tenue" class="zeilen-form tenue-form">${formFelder(kx, `${z}#tenue`)}<input type="hidden" name="aktion" value="aendern"><input type="hidden" name="id" value="${x.id}"><input name="name" value="${x.name}" required maxlength="100" aria-label="Name" class="tenue-name"><input name="text" value="${x.text}" required maxlength="255" aria-label="Text" class="tenue-text"><button class="knopf klein" type="submit">Speichern</button></form></td>
+    <td class="formatiert">${new Roh(zeileAlsHtml(x.text))}</td>
+    <td class="knopfreihe">
+      ${ordnenMenue(kx, '/admin/tenue', x.name, i > 0 ? { aktion: 'hoch', id: String(x.id) } : null, i < tv.length - 1 ? { aktion: 'runter', id: String(x.id) } : null, `${z}#tenue`)}
+      <form method="post" action="/admin/tenue" class="inline" data-bestaetigen="Vorlage «${x.name}» löschen? Schichten behalten ihr Tenue.">${formFelder(kx, `${z}#tenue`)}<input type="hidden" name="aktion" value="loeschen"><input type="hidden" name="id" value="${x.id}"><button type="submit" class="knopf klein gefahr">Löschen</button></form>
+    </td></tr>`)}
+  </tbody></table></div>` : html`<p class="unter">Noch keine Vorlage.</p>`}
+  <form method="post" action="/admin/tenue" class="zeilen-form tenue-form">${formFelder(kx, `${z}#tenue`)}<input type="hidden" name="aktion" value="anlegen"><input name="name" required maxlength="100" placeholder="Name, z. B. Orange" aria-label="Name der neuen Vorlage" class="tenue-name"><input name="text" required maxlength="255" placeholder="Text, z. B. Orange, VD-Material, **VD-Jacke zwingend!**" aria-label="Text der neuen Vorlage" class="tenue-text"><button class="knopf" type="submit">Vorlage anlegen</button></form>
 </section>`));
   };
 
@@ -391,6 +409,21 @@ ${liste.map((b) => html`<tr><td>${b.name}</td><td>${b.email}</td><td>${b.rolle =
       default: throw new Eingabefehler('Unbekannte Aktion.');
     }
     zurueck(req, res, '/admin/einstellungen');
+  });
+
+  app.post('/admin/tenue', nurAdmin, async (req, res) => {
+    const b = req.body ?? {};
+    let meldung = 'Gespeichert.';
+    switch (b.aktion) {
+      case 'anlegen': await legeTenueVorlageAn(db, b.name, b.text); meldung = 'Vorlage angelegt.'; break;
+      case 'aendern': await aendereTenueVorlage(db, leseId(b.id), b.name, b.text); break;
+      case 'hoch': await verschiebeTenueVorlage(db, leseId(b.id), 'hoch'); break;
+      case 'runter': await verschiebeTenueVorlage(db, leseId(b.id), 'runter'); break;
+      case 'loeschen': await loescheTenueVorlage(db, leseId(b.id)); meldung = 'Vorlage gelöscht.'; break;
+      case 'ordnen': await ordneTenueVorlagen(db, liste(b.reihenfolge).map((x) => leseId(x))); break;
+      default: throw new Eingabefehler('Unbekannte Aktion.');
+    }
+    zurueck(req, res, '/admin/einstellungen#tenue', meldung);
   });
 
   // ---------- Update ----------

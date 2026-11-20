@@ -117,9 +117,22 @@ const migrationen: { version: number; anweisungen: () => string[] }[] = [
           WHERE a.kanal = 'formular'`,
     ],
   },
+  // Version 8 (Wunsch Yann 20.11.2026): Tenue-Vorlagen. Schicht und Einsatz kopieren den Text, sie verweisen nicht darauf.
+  {
+    version: 8,
+    anweisungen: () => [
+      `CREATE TABLE tenue_vorlage (
+        id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        name VARCHAR(100) NOT NULL,
+        text VARCHAR(255) NOT NULL,
+        reihenfolge INT NOT NULL DEFAULT 0,
+        UNIQUE KEY uq_tenue_vorlage_name (name)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin`,
+    ],
+  },
   {
     // Einstellung je Einsatz: Im Formular mehrere Schichten wählbar (1) oder nur eine (0).
-    version: 8,
+    version: 9,
     anweisungen: () => ['ALTER TABLE einsatz ADD COLUMN formular_mehrere TINYINT NOT NULL DEFAULT 1'],
   },
 ];

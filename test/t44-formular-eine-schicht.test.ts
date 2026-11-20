@@ -1,4 +1,4 @@
-// T43: Einstellung je Einsatz «Im Formular mehrere Schichten wählbar» (Wunsch Yann 20.11.2026).
+// T44: Einstellung je Einsatz «Im Formular mehrere Schichten wählbar» (Wunsch Yann 20.11.2026).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { einsatz, inTagen, neueDatenbank, person, zeilen } from './hilfe.js';
@@ -10,7 +10,7 @@ import { erstelleSchicht, setzePubliziert } from '../src/domain/schicht.js';
 import { Eingabefehler } from '../src/domain/eingabe.js';
 import { lokalesDatum } from '../src/domain/zeit.js';
 
-test('T43 Nur eine Schicht im Formular: Auswahlknöpfe, Prüfung auf dem Server, Eintragen von Hand frei', async () => {
+test('T44 Nur eine Schicht im Formular: Auswahlknöpfe, Prüfung auf dem Server, Eintragen von Hand frei', async () => {
   const t = await neueDatenbank();
   const app = await starteApp(t.db);
   try {

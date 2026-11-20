@@ -1064,3 +1064,18 @@ tr.ordnen-zeile.zieht { opacity: .45; }
 .cd-vorschau .text-gruen { color: #008a00; }
 .cd-vorschau .text-orange { color: #e07000; }
 .bausteine h3 + dl + h3, .bausteine dl + h3 { margin-top: 1rem; }
+
+/* Tenue-Vorlagen (Wunsch Yann 20.11.2026): Feld und Auswahl nebeneinander, auf dem Handy untereinander. */
+.tenue-feld { display: flex; gap: .5rem; align-items: center; }
+.tenue-feld input { flex: 1 1 auto; min-width: 0; }
+.tenue-feld select { flex: 0 0 auto; max-width: 11rem; }
+.tenue-form .tenue-name { width: 10rem; }
+.tenue-form .tenue-text { flex: 1 1 20rem; min-width: 12rem; }
+.formatiert .text-rot { color: #e00000; }
+.formatiert .text-blau { color: #0055cc; }
+.formatiert .text-gruen { color: #008a00; }
+.formatiert .text-orange { color: #e07000; }
+@media (max-width: 640px) {
+  .tenue-feld { flex-wrap: wrap; }
+  .tenue-feld select { max-width: none; flex: 1 1 100%; }
+}

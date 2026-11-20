@@ -489,6 +489,20 @@
     if (liste && liste.querySelector('option[value="nachricht_gesendet"]')) liste.value = 'nachricht_gesendet';
   });
 
+  // Tenue-Vorlage gewählt: Der Text ersetzt das Feld «Tenue» (Wunsch Yann 20.11.2026).
+  // Die Auswahl springt zurück auf leer. So sendet das Formular den Text im Feld, auch nach einer Änderung von Hand.
+  document.addEventListener('change', function (ev) {
+    var auswahl = ev.target;
+    if (!auswahl || auswahl.name !== 'tenue_vorlage' || !auswahl.value) return;
+    var ziel = document.getElementById(auswahl.getAttribute('data-tenue-ziel'));
+    var option = auswahl.options[auswahl.selectedIndex];
+    if (!ziel || !option) return;
+    ziel.value = option.getAttribute('data-text') || '';
+    auswahl.value = '';
+    ziel.dispatchEvent(new Event('input', { bubbles: true }));
+    ziel.focus();
+  });
+
   // ---------- Reiter «Schichten»: Personen verschieben (Wunsch Yann 20.11.2026) ----------
   // Ziehen einer Karte in eine andere Spalte wählt die Schicht im Menü ⇄ und sendet dessen Formular.
   // Ohne Ziehen (Handy, Tastatur, ohne Skript) geht dasselbe über das Menü ⇄.
