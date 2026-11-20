@@ -65,7 +65,8 @@ export function icsZeit(iso: string): string {
   return new Date(iso).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z');
 }
 
-export function erzeugeIcs(s: TerminSchicht, jetzt = jetztIso()): string {
+/** termin: Titel und Text aus der Vorlage «Clubdesk-Termin». Ohne Angabe gilt Regel 17.1. */
+export function erzeugeIcs(s: TerminSchicht, jetzt = jetztIso(), termin?: { titel: string; text: string }): string {
   const zeilen = [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
@@ -77,10 +78,10 @@ export function erzeugeIcs(s: TerminSchicht, jetzt = jetztIso()): string {
     `DTSTAMP:${icsZeit(jetzt)}`,
     `DTSTART:${icsZeit(s.start_zeit)}`,
     `DTEND:${icsZeit(s.end_zeit)}`,
-    `SUMMARY:${maskiereIcs(terminTitel(s))}`,
+    `SUMMARY:${maskiereIcs(termin?.titel || terminTitel(s))}`,
   ];
   if (s.ort) zeilen.push(`LOCATION:${maskiereIcs(s.ort)}`);
-  zeilen.push(`DESCRIPTION:${maskiereIcs(terminText(s))}`);
+  zeilen.push(`DESCRIPTION:${maskiereIcs(termin ? termin.text : terminText(s))}`);
   zeilen.push('END:VEVENT', 'END:VCALENDAR');
   return zeilen.map(falte).join('\r\n') + '\r\n';
 }

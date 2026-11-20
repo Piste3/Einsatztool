@@ -12,7 +12,8 @@ import { mitRueckgaengig } from '../domain/rueckgaengig.js';
 import { warnungenFuerSchicht } from '../domain/warnungen.js';
 import { zahlenFuerSchichten } from '../domain/zaehlung.js';
 import { essenslisteCsv } from '../domain/export.js';
-import { erzeugeIcs, icsDateiname, icsVermerk, terminText, terminTitel, vermerkeIcsExport } from '../domain/ics.js';
+import { erzeugeIcs, icsDateiname, icsVermerk, terminTitel, vermerkeIcsExport } from '../domain/ics.js';
+import { clubdeskText } from '../domain/clubdesk-text.js';
 import { aufgebotDaten } from '../domain/aufgebot-vorlage.js';
 import { FEST } from '../domain/aufgebot-vorlage.js';
 import { anrufliste, nachRangTiefZuerst } from '../domain/listen.js';
@@ -82,7 +83,7 @@ function v(e: Record<string, unknown>, n: string): string {
 }
 
 export function registriereSchichten(app: Express, deps: Abhaengigkeiten): void {
-  const { db } = deps;
+  const { db, konfig } = deps;
 
   // Konzept «Bedienung im Einsatz» (OK Yann 20.11.2026): Die Arbeit mit Personen liegt im Reiter «Besetzen».
   // Alte Adressen der Schicht führen dorthin. Der Filter «status» wird auf die Filter von «Besetzen» abgebildet.
@@ -183,17 +184,20 @@ ${seitenKopf({ pfad: schichtPfad(s, 'ICS-Export'), titel: 'ICS-Export' })}
     await vermerkeIcsExport(db, s.id, kx.benutzer!.id);
     res.setHeader('Content-Type', 'text/calendar; charset=utf-8');
     res.setHeader('Content-Disposition', `attachment; filename="${icsDateiname(s)}"`);
-    res.send(erzeugeIcs(s));
+    res.send(erzeugeIcs(s, undefined, await clubdeskText(db, s.id, konfig.baseUrl)));
   });
 
   app.get('/schichten/:sid/termintext', nurAufgebot, async (req, res) => {
     const kx = k(res);
     const s = await ladeSchicht(db, leseId(req.params.sid));
+    const t = await clubdeskText(db, s.id, konfig.baseUrl);
+    const zeilen = Math.min(30, Math.max(8, t.text.split('\n').length + 1));
     res.send(seite(kx, 'Termintext', 'einsaetze', html`
 ${seitenKopf({ pfad: schichtPfad(s, 'Termintext'), titel: 'Text für den Clubdesk-Termin' })}
-<div class="feld"><label for="titel">Titel</label><input id="titel" readonly value="${terminTitel(s)}"></div>
+<p class="unter">Das Tool füllt die Vorlage mit den Angaben dieser Schicht. ${kx.benutzer?.rolle === 'admin' ? html`Die Vorlage bearbeitest du in <a href="/admin/einstellungen#clubdesk">Admin › Einstellungen</a>.` : 'Die Vorlage bearbeitet ein Admin in den Einstellungen.'}</p>
+<div class="feld"><label for="titel">Titel</label><input id="titel" readonly value="${t.titel}"></div>
 <p><button type="button" class="knopf" data-kopieren="#titel">Titel kopieren</button></p>
-<div class="feld"><label for="termintext">Text</label><textarea id="termintext" readonly rows="10">${terminText(s)}</textarea></div>
+<div class="feld"><label for="termintext">Text</label><textarea id="termintext" readonly rows="${zeilen}">${t.text}</textarea></div>
 <p><button type="button" class="knopf haupt" data-kopieren="#termintext">Kopieren</button></p>`));
   });
 

@@ -115,7 +115,7 @@ Seit 19.11.2026 (Entscheid Yann): Aussehen und Bedienung folgen dem Handbuch des
 | Automatisches Aktualisieren von Clubdesk-Terminen | Es gibt keinen gemeinsamen Schlüssel zwischen Tool und Clubdesk. |
 | Status «nicht erreicht» | Eine Person ohne Status ist die Restmenge. Mehr Status verwirren die Nutzer. |
 | Weitere Status (Warteliste, Rückfrage, ungültig) | Entscheid Yann. Gleiche Begründung wie oben. |
-| Oberfläche zum Bearbeiten der Vorlagen (Aufgebot, Bestätigungsmail, Kalender) | Version 1. Änderungen am Text laufen über einen Commit. Ausnahme: die Vorlage «Änderung melden» (siehe Abschnitt 5). |
+| Oberfläche zum Bearbeiten der Vorlagen (Aufgebot, Bestätigungsmail, Kalender) | Version 1. Änderungen am Text laufen über einen Commit. Ausnahmen: die Vorlagen «Änderung melden» und «Clubdesk-Termin» (siehe Abschnitt 5). |
 | Getrennte Publikationsschalter für Einsatz und Schicht | Ein Schalter je Schicht genügt. Der Einsatz ist sichtbar, wenn eine Schicht sichtbar ist. |
 | Automatische Zuteilung von Personen zu Schichten | Die Aufgebotsstelle teilt von Hand zu. |
 | Erfassung von Telefonkanälen und Erreichbarkeitszeiten | Nicht nötig. Der Kanal je Anmeldung genügt. |
@@ -214,3 +214,6 @@ Diese Liste ergänze ich beim Bauen. Jede Annahme aus Teil B des Konzepts steht 
 - 20.11.2026: Fehler und Konflikt beim Speichern einer Schicht erscheinen in ihrer Zeile. Die Eingaben bleiben, die Version ist die neue (zweites Speichern überschreibt bewusst).
 - 20.11.2026: «Schicht kopieren» (`kopiereSchicht()`): gleiche Angaben und Rollenbedarf, Name «… (Kopie)», nicht publiziert, ohne Einträge und Fremdabteilungen.
 - 20.11.2026 (Wunsch Yann): Besetzungsbalken überall grün. Bestätigt dunkelgrün (`--balken-bestaetigt`), angemeldet hellgrün (`--balken-angemeldet`). Ist / Soll zeigt weiter die Zahl in Grün, Orange oder Rot.
+- 20.11.2026 (Wunsch Yann): Der Admin bearbeitet Titel und Text für den Clubdesk-Termin in Admin › Einstellungen. Tabelle `vorlage`, Schlüssel `clubdesk_termin`, gleicher Konfliktschutz und gleiches Protokoll wie «Änderung melden». Die Liste der Bausteine steht neben dem Feld.
+- 20.11.2026: Bausteine in `src/domain/clubdesk-text.ts` (`BAUSTEINE`), je Schicht ausgefüllt. Eine Zeile mit Bausteinen, die alle leer sind, entfällt. Unbekannte Bausteine bleiben stehen. Die Standardvorlage entspricht Regel 17.1 plus Abtreten und Tenue. Text höchstens 4000 Zeichen.
+- 20.11.2026: «Dokumente › Text für Clubdesk-Termin» zeigt den fertigen Text zum Kopieren. Der ICS-Export übernimmt Titel und Text derselben Vorlage. Die Einstellungen zeigen eine Vorschau mit der nächsten Schicht (Test T38).
