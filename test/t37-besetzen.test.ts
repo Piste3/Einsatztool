@@ -48,10 +48,11 @@ test('T37 Besetzen: Filter je Schicht und über alle Schichten, Mindestalter, Vo
     assert.deepEqual(namen(filtereBesetzen(d.zeilen, ids, 'neu')), ['Ana Neu']);
     assert.deepEqual(namen(filtereBesetzen(d.zeilen, ids, 'alle')), ['Ana Neu', 'Ben Bestätigt', 'Ugo Unsicher']);
 
-    // Vorgabe: Neue zuerst, dann alle Einträge, sonst «Nicht gefragt».
-    assert.equal(vorgabeFilter(zaehleBesetzen(d.zeilen, ids)), 'neu');
-    assert.equal(vorgabeFilter(zahlAbend), 'alle');
-    assert.equal(vorgabeFilter({ ...zahlAbend, alle: 0 }), 'nicht');
+    // Vorgabe (Wunsch Yann 20.11.2026): «Neu + Bestätigt», sonst alle Einträge, sonst «Nicht gefragt».
+    assert.deepEqual(namen(filtereBesetzen(d.zeilen, ids, 'an')), ['Ana Neu', 'Ben Bestätigt']);
+    assert.equal(vorgabeFilter(zaehleBesetzen(d.zeilen, ids)), 'an');
+    assert.equal(vorgabeFilter({ ...zahlAbend, an: 0 }), 'alle');
+    assert.equal(vorgabeFilter({ ...zahlAbend, an: 0, alle: 0 }), 'nicht');
   } finally {
     await t.ende();
   }
@@ -89,9 +90,9 @@ test('T37 Besetzen im Web: Antwort-Knopf legt Eintrag an, alte Adressen, Dokumen
     const [log] = await zeilen(t.db, 'SELECT COUNT(*) AS n FROM status_log WHERE anmeldung_id = ?', [a.id]);
     assert.ok(Number(log.n) >= 1);
 
-    // Danach: Vorgabe «Neu» mit «Bestätigen» in der Zeile.
+    // Danach: Vorgabe «Neu + Bestätigt» mit «Bestätigen» in der Zeile.
     const neu = await (await hole(pfad)).text();
-    assert.match(neu, /aria-current="page">Neu 1/);
+    assert.match(neu, /aria-current="page">Neu \+ Bestätigt 1/);
     assert.match(neu, new RegExp(`action="/anmeldungen/${a.id}"[\\s\\S]*?value="bestaetigt"`));
 
     // Alte Adressen führen auf «Besetzen».

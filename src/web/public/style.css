@@ -879,3 +879,47 @@ body.druck { background: var(--hg); padding: 1rem; }
   .neue-schicht { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .neue-schicht .feld:first-of-type { grid-column: 1 / -1; }
 }
+
+/* ---------- Personen verschieben (Reiter «Schichten», Wunsch Yann 20.11.2026) ---------- */
+.verschieben { margin-top: 1.6rem; }
+.verschieben > .unter { margin: .2rem 0 .7rem; font-size: .82rem; }
+.zieh-spalten { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(15rem, 1fr); gap: .75rem; overflow-x: auto; padding-bottom: .4rem; align-items: start; }
+.zieh-spalte { background: var(--flaeche-2); border: 1px solid var(--linie); border-radius: 10px; display: grid; min-width: 0; transition: border-color .1s, background .1s; }
+.zieh-spalte > header { padding: .6rem .7rem; border-bottom: 1px solid var(--linie); display: grid; gap: .3rem; }
+.zieh-spalte > header .unter { font-size: .76rem; }
+.zieh-spalte.ziel-aktiv { border-color: var(--akzent); background: var(--flaeche); box-shadow: inset 0 0 0 1px var(--akzent); }
+.zieh-liste { list-style: none; margin: 0; padding: .45rem; display: grid; gap: .35rem; min-height: 3.2rem; max-height: 32rem; overflow-y: auto; }
+.zieh-leer { color: var(--gedämpft); font-size: .8rem; padding: .6rem .3rem; text-align: center; border: 1px dashed var(--linie-stark); border-radius: 8px; }
+.zieh-karte { background: var(--flaeche); border: 1px solid var(--linie); border-radius: 8px; cursor: grab; }
+.zieh-karte[hidden] { display: none; }
+.zieh-karte.zieht { opacity: .45; }
+.zieh-form { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; gap: .2rem .45rem; align-items: center; padding: .35rem .45rem; margin: 0; }
+.zieh-griff { color: var(--gedämpft); font-size: .75rem; letter-spacing: -.15em; user-select: none; }
+.zieh-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .86rem; }
+.zieh-form .pille { font-size: .7rem; }
+.zieh-menue > summary { list-style: none; cursor: pointer; padding: .1rem .4rem; border-radius: 6px; color: var(--gedämpft); border: 1px solid transparent; }
+.zieh-menue > summary::-webkit-details-marker { display: none; }
+.zieh-menue > summary:hover, .zieh-menue[open] > summary { border-color: var(--linie-stark); color: var(--text); }
+.zieh-menue[open] { grid-column: 1 / -1; grid-row: 2; display: contents; }
+.zieh-menue[open] > summary { grid-column: 4; grid-row: 1; }
+.zieh-menue-inhalt { grid-column: 1 / -1; display: flex; gap: .4rem; align-items: center; padding-top: .3rem; font-size: .8rem; }
+.zieh-menue-inhalt select { flex: 1; min-width: 0; }
+@media (max-width: 760px) {
+  .zieh-spalten { grid-auto-flow: row; grid-auto-columns: auto; overflow-x: visible; }
+  .zieh-liste { max-height: none; }
+  .zieh-karte { cursor: default; }
+  .zieh-griff { display: none; }
+  .zieh-form { grid-template-columns: minmax(0, 1fr) auto auto; }
+  .zieh-menue[open] > summary { grid-column: 3; }
+}
+@media (prefers-reduced-motion: reduce) { .zieh-spalte { transition: none; } }
+.zieh-kachel { display: inline-flex; border-radius: 6px; }
+.zieh-kachel .kachel { width: 1.6rem; height: 1.6rem; }
+.zieh-kachel:focus-visible { outline: 2px solid var(--akzent); outline-offset: 1px; }
+
+/* Fenster «Bestätigen?» (Wunsch Yann 20.11.2026) */
+.frage-fenster { max-width: min(26rem, calc(100vw - 2rem)); }
+.frage-form { display: grid; gap: .6rem; padding: 1.1rem 1.2rem; margin: 0; }
+.frage-titel { margin: 0; font-size: 1.05rem; font-weight: 600; }
+.frage-form .unter { margin: 0; font-size: .8rem; }
+.frage-form .knopfreihe { display: flex; flex-wrap: wrap; gap: .4rem; }

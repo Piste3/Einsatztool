@@ -14,7 +14,7 @@ import { warnungenFuerSchichten } from '../domain/warnungen.js';
 import { sollFarbe, zahlenFuerSchichten } from '../domain/zaehlung.js';
 import { teilnehmerlisteCsv } from '../domain/export.js';
 import { besetzenAnsicht, besetzenPfad } from './views/besetzen.js';
-import type { BesetzenFilter } from '../domain/besetzen.js';
+import { besetzenDaten, type BesetzenFilter, type BesetzenZeile } from '../domain/besetzen.js';
 import { raenge as ladeRaenge, rollen as ladeRollen } from '../domain/stammdaten.js';
 import { Eingabefehler, Konflikt, KANAL_TEXT, STATUS_TEXT, id as leseId, type Kanal, type Status } from '../domain/eingabe.js';
 import { einsatzLage, type ZuTunPunkt } from '../domain/einsatz-lage.js';
@@ -23,7 +23,7 @@ import { html, mehrzeilig, Roh } from './html.js';
 import { k, aktuellerPfad } from './kontext.js';
 import { druckseite, formFelder, mehrMenue, seite, seitenKopf, type Reiter } from './views/layout.js';
 import {
-  abgleichPunkt, datumZeit, istSoll, kachel, kachelLegende, KACHEL_TEXT, knopfPost, publiziertMarke, punktMarke, statusText, warnungen, zeitraum, type KachelArt,
+  abgleichPunkt, datumZeit, istSoll, kachel, kachelLegende, KACHEL_TEXT, knopfPost, bestaetigenFrage, nameMitRang, publiziertMarke, punktMarke, statusText, warnungen, zeitraum, type KachelArt,
 } from './views/teile.js';
 import { datumChVonIso, jetztIso, lokalesDatum, lokaleZeit, wochentagKurz } from '../domain/zeit.js';
 
@@ -290,6 +290,7 @@ ${!schichten.length ? html`<p class="leer">Keine Schichten.</p>` : html`<div cla
     const bedarf = ansicht === 'schichten' && ids.length
       ? await alle<{ schicht_id: number; rolle: string; anzahl: number }>(db, 'SELECT schicht_id, rolle, anzahl FROM schicht_rolle WHERE schicht_id IN (?)', [ids])
       : [];
+    const besetzung = ansicht === 'schichten' && schichten.length > 1 ? await besetzenDaten(db, e.id) : null;
     const offenId = String(req.query.offen ?? '');
     const schichtZeile = (s: (typeof schichten)[number]) => {
       const f = fehler && fehler.sid === s.id ? fehler : null;
@@ -374,6 +375,49 @@ ${!schichten.length ? html`<p class="leer">Keine Schichten.</p>` : html`<div cla
     const fn = fehler && fehler.sid === 'neu' ? fehler : null;
     const nv = (n: string) => (fn && fn.werte[n] !== undefined && fn.werte[n] !== null ? String(fn.werte[n]) : '');
     const tagVorgabe = schichten.length ? lokalesDatum(schichten[schichten.length - 1].start_zeit) : '';
+    // Personen zwischen Schichten verschieben (Wunsch Yann 20.11.2026). Ziehen mit der Maus, sonst Menü ⇄ mit Auswahl der Schicht.
+    // Nur Einträge mit «angemeldet» oder «bestätigt». Ohne Skript sendet das Menü ein normales Formular.
+    const verschiebenBereich = () => {
+      if (!besetzung) return '';
+      const ziel = `/einsaetze/${e.id}/schichten#verschieben`;
+      const karte = (zeile: BesetzenZeile, s: (typeof schichten)[number]) => {
+        const a = zeile.zellen.get(s.id)!;
+        const n = zeile.warnungen.get(s.id) ?? 0;
+        const andere = schichten.filter((x) => x.id !== s.id);
+        return html`<li class="zieh-karte" draggable="true" data-zieh="${a.id}" data-suche="${zeile.name.toLowerCase()}">
+  <form method="post" action="/anmeldungen/${a.id}/verschieben" class="zieh-form" id="zieh-${a.id}">
+    ${formFelder(kx, ziel)}<input type="hidden" name="version" value="${a.version}">
+    <span class="zieh-griff" aria-hidden="true">⋮⋮</span>
+    <span class="zieh-name">${zeile.personId !== null ? nameMitRang(zeile) : zeile.name}${n ? html` <span class="warn-marke" title="${n === 1 ? '1 Warnung' : `${n} Warnungen`}">⚠</span>` : ''}</span>
+    ${zeile.personId !== null
+      ? html`<a class="zieh-kachel" href="/rueckmeldungen/eintrag?schicht=${s.id}&amp;person=${zeile.personId}&amp;zurueck=${encodeURIComponent(ziel)}" data-eintrag${bestaetigenFrage(a, zeile.name)} title="${STATUS_TEXT[a.status]} – Klick zum ${a.status === 'angemeldet' ? 'Bestätigen' : 'Eintragen'}" draggable="false">${kachel(a.status)}<span class="sr">${STATUS_TEXT[a.status]}</span></a>`
+      : statusText(a.status)}
+    <details class="zieh-menue"><summary title="In andere Schicht verschieben" aria-label="${zeile.name} verschieben">⇄</summary>
+      <div class="zieh-menue-inhalt">
+        <label for="zs-${a.id}">Nach</label>
+        <select id="zs-${a.id}" name="schicht">${andere.map((x) => html`<option value="${x.id}">${x.name}</option>`)}</select>
+        <button type="submit" class="knopf klein">Verschieben</button>
+      </div>
+    </details>
+  </form>
+</li>`;
+      };
+      return html`<section class="verschieben" id="verschieben" aria-labelledby="verschieben-titel">
+<div class="titelzeile filterzeile"><h2 id="verschieben-titel">Personen verschieben</h2><input type="search" class="suche" data-filter=".zieh-karte" placeholder="Name suchen …" aria-label="Personen suchen"></div>
+<p class="unter">Zieh eine Person in eine andere Schicht. Auf dem Handy: ⇄ antippen und die Schicht wählen. Es zählen «angemeldet» und «bestätigt».</p>
+<div class="zieh-spalten">${schichten.map((s) => {
+  const liste = besetzung.zeilen.filter((z) => {
+    const st = z.zellen.get(s.id)?.status;
+    return st === 'angemeldet' || st === 'bestaetigt';
+  });
+  const z = zahlen.get(s.id)!;
+  return html`<section class="zieh-spalte" data-ziel-schicht="${s.id}" aria-label="${s.name}">
+  <header><strong>${s.name}</strong> <span class="unter">${zeitraum(s.start_zeit, s.end_zeit, s.zeit_offen)}</span>${belegung(z, s.soll_anzahl)}</header>
+  <ul class="zieh-liste">${liste.length ? liste.map((zeile) => karte(zeile, s)) : html`<li class="zieh-leer">Noch niemand. Zieh eine Person hierher.</li>`}</ul>
+</section>`;
+})}</div>
+</section>`;
+    };
     const schichtenAnsicht = () => html`<section aria-labelledby="akk-titel" class="schichten-akk">
 <h2 id="akk-titel" class="sr">Schichten</h2>
 ${schichten.map(schichtZeile)}
@@ -387,7 +431,8 @@ ${schichten.map(schichtZeile)}
   <button type="submit" class="knopf">Hinzufügen</button>
 </form>
 <p class="unter">Eine neue Schicht übernimmt Ort, Abtreten, Tenue und Hinweis vom Einsatz. Sie ist zuerst nicht publiziert. Leere Zeiten = «Zeit offen».</p>
-</section>`;
+</section>
+${verschiebenBereich()}`;
 
     // ---------- Reiter «Verlauf» ----------
     const verlaufAnsicht = async () => {
@@ -596,14 +641,14 @@ export function einsatzReiter(einsatzId: number, aktiv: Ansicht, zahlen: { beset
 /** Menü «Dokumente»: alles zum Drucken und Exportieren, nach Schicht gegliedert. */
 function dokumenteMenue(einsatzId: number, schichten: { id: number; name: string }[]): Roh {
   const jeSchicht = (s: { id: number; name: string }) => [
-    html`<a href="/schichten/${s.id}/aufgebot">Aufgebot (Briefe)</a>`,
+    html`<a href="/schichten/${s.id}/aufgebot" target="_blank" rel="noopener">Aufgebot (Briefe)</a>`,
     html`<a href="/schichten/${s.id}/essensliste.csv">Essensliste (CSV)</a>`,
     html`<a href="/schichten/${s.id}/ics">Kalendertermin (ICS)</a>`,
-    html`<a href="/schichten/${s.id}/termintext">Text für Clubdesk-Termin</a>`,
+    html`<a href="/schichten/${s.id}/termintext" target="_blank" rel="noopener">Text für Clubdesk-Termin</a>`,
   ];
   return mehrMenue([
     html`<div class="menue-titel">Ganzer Einsatz</div>`,
-    html`<a href="/einsaetze/${einsatzId}/teilnehmerliste">Teilnehmerliste drucken</a>`,
+    html`<a href="/einsaetze/${einsatzId}/teilnehmerliste" target="_blank" rel="noopener">Teilnehmerliste drucken</a>`,
     html`<a href="/einsaetze/${einsatzId}/export.csv">Teilnehmerliste als CSV</a>`,
     ...schichten.flatMap((s) => [html`<div class="menue-trenner"></div><div class="menue-titel">${schichten.length > 1 ? s.name : 'Schicht'}</div>`, ...jeSchicht(s)]),
   ], 'Dokumente');

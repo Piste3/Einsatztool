@@ -94,6 +94,9 @@ export interface RueckmeldungSchicht {
 }
 
 export interface RueckmeldungZelle {
+  /** Eintrag (ID und Version) für das Fenster «Bestätigen?». Leer = kein Eintrag. */
+  id: number | null;
+  version: number | null;
   status: Status | null;
   geaendert_am: string | null;
   kanal: string | null;
@@ -142,9 +145,9 @@ export async function rueckmeldungen(db: Db, o: RueckmeldungOptionen): Promise<{
   }
   let personen = await alle<PersonKurz>(db, PERSON_KURZ);
   const eintraege = schichten.length
-    ? await alle<{ schicht_id: number; person_id: number; status: Status; geaendert_am: string; kanal: string; bemerkung: string | null }>(
+    ? await alle<{ id: number; version: number; schicht_id: number; person_id: number; status: Status; geaendert_am: string; kanal: string; bemerkung: string | null }>(
         db,
-        'SELECT schicht_id, person_id, status, geaendert_am, kanal, bemerkung FROM anmeldung WHERE schicht_id IN (?) AND person_id IS NOT NULL',
+        'SELECT id, version, schicht_id, person_id, status, geaendert_am, kanal, bemerkung FROM anmeldung WHERE schicht_id IN (?) AND person_id IS NOT NULL',
         [schichten.map((s) => s.id)],
       )
     : [];
@@ -173,7 +176,7 @@ export async function rueckmeldungen(db: Db, o: RueckmeldungOptionen): Promise<{
           andere = 'moeglich';
         }
       }
-      return { status, geaendert_am: e?.geaendert_am ?? null, kanal: e?.kanal ?? null, bemerkung: e?.bemerkung ?? null, passt, andere };
+      return { id: e?.id ?? null, version: e?.version ?? null, status, geaendert_am: e?.geaendert_am ?? null, kanal: e?.kanal ?? null, bemerkung: e?.bemerkung ?? null, passt, andere };
     });
     return { ...p, zellen };
   });

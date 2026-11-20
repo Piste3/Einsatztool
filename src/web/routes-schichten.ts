@@ -54,6 +54,7 @@ const AKTION_TEXT: Record<string, string> = {
   bestaetigungsmail: 'Bestätigungsmail',
   mail_ohne_adresse: 'Keine Mail-Adresse',
   personendaten_geloescht: 'Personendaten gelöscht',
+  verschoben: 'Verschoben',
 };
 
 function wertText(aktion: string, w: string | null): string {

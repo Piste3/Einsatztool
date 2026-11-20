@@ -323,11 +323,7 @@
   // bestehenden Routen (Konfliktschutz, Warnungen, Live, Toast). Ohne Skript öffnet der Link eine Seite.
   var fenster = null;
   var fensterZu = function () { if (fenster && fenster.open) fenster.close(); };
-  document.addEventListener('click', function (ev) {
-    var link = ev.target && ev.target.closest ? ev.target.closest('a[data-eintrag]') : null;
-    if (link) {
-      if (ev.button !== 0 || ev.ctrlKey || ev.metaKey || ev.shiftKey || !window.fetch || !window.HTMLDialogElement) return;
-      ev.preventDefault();
+  var oeffneFenster = function (link) {
       // Die Rücksprung-Adresse ist immer die aktuelle Ansicht (Filter bleiben).
       var url = new URL(link.href);
       url.searchParams.set('zurueck', location.pathname + location.search);
@@ -347,6 +343,69 @@
           if (erstes) erstes.focus();
         })
         .catch(function () { location.assign(link.href); });
+  };
+
+  // Fenster «Bestätigen?» (Wunsch Yann 20.11.2026): Ein Klick auf eine Kachel mit «angemeldet» fragt zuerst.
+  // Der Knopf «Bestätigen» hat den Fokus. Enter bestätigt nur in diesem Fenster. «Menü öffnen» zeigt das normale Fenster.
+  var frage = null;
+  var csrfWert = function () {
+    var f = document.querySelector('input[name="_csrf"]');
+    return f ? f.value : '';
+  };
+  var feld = function (form, name, wert) {
+    var i = document.createElement('input');
+    i.type = 'hidden'; i.name = name; i.value = wert;
+    form.appendChild(i);
+  };
+  var frageBestaetigen = function (link) {
+    if (!frage) {
+      frage = document.createElement('dialog');
+      frage.className = 'fenster frage-fenster';
+      frage.setAttribute('aria-labelledby', 'frage-titel');
+      frage.addEventListener('click', function (e) { if (e.target === frage) frage.close(); });
+      document.body.appendChild(frage);
+    }
+    frage.textContent = '';
+    var form = document.createElement('form');
+    form.method = 'post';
+    form.action = '/anmeldungen/' + link.getAttribute('data-bestaetigen');
+    form.className = 'frage-form';
+    feld(form, '_csrf', csrfWert());
+    feld(form, 'zurueck', location.pathname + location.search);
+    feld(form, 'status', 'bestaetigt');
+    feld(form, 'version', link.getAttribute('data-version') || '');
+    var titel = document.createElement('p');
+    titel.id = 'frage-titel';
+    titel.className = 'frage-titel';
+    titel.textContent = (link.getAttribute('data-name') || 'Eintrag') + ' bestätigen?';
+    var hinweis = document.createElement('p');
+    hinweis.className = 'unter';
+    hinweis.textContent = 'Enter = Bestätigen. Esc = Abbrechen.';
+    var reihe = document.createElement('div');
+    reihe.className = 'knopfreihe';
+    var ja = document.createElement('button');
+    ja.type = 'submit'; ja.className = 'knopf haupt'; ja.textContent = 'Bestätigen';
+    var menue = document.createElement('button');
+    menue.type = 'button'; menue.className = 'knopf'; menue.textContent = 'Menü öffnen';
+    menue.addEventListener('click', function () { frage.close(); oeffneFenster(link); });
+    var nein = document.createElement('button');
+    nein.type = 'button'; nein.className = 'knopf'; nein.textContent = 'Abbrechen';
+    nein.addEventListener('click', function () { frage.close(); });
+    reihe.appendChild(ja); reihe.appendChild(menue); reihe.appendChild(nein);
+    form.appendChild(titel); form.appendChild(hinweis); form.appendChild(reihe);
+    form.addEventListener('submit', function () { setTimeout(function () { if (frage.open) frage.close(); }, 0); });
+    frage.appendChild(form);
+    frage.showModal();
+    ja.focus();
+  };
+
+  document.addEventListener('click', function (ev) {
+    var link = ev.target && ev.target.closest ? ev.target.closest('a[data-eintrag]') : null;
+    if (link) {
+      if (ev.button !== 0 || ev.ctrlKey || ev.metaKey || ev.shiftKey || !window.fetch || !window.HTMLDialogElement) return;
+      ev.preventDefault();
+      if (link.hasAttribute('data-bestaetigen')) frageBestaetigen(link);
+      else oeffneFenster(link);
       return;
     }
     var zu = ev.target && ev.target.closest ? ev.target.closest('[data-fenster-zu]') : null;
@@ -356,6 +415,50 @@
   document.addEventListener('submit', function (ev) {
     if (fenster && fenster.contains(ev.target)) setTimeout(fensterZu, 0);
   }, true);
+
+  // ---------- Reiter «Schichten»: Personen verschieben (Wunsch Yann 20.11.2026) ----------
+  // Ziehen einer Karte in eine andere Spalte wählt die Schicht im Menü ⇄ und sendet dessen Formular.
+  // Ohne Ziehen (Handy, Tastatur, ohne Skript) geht dasselbe über das Menü ⇄.
+  var gezogen = null;
+  var spalteVon = function (el) { return el && el.closest ? el.closest('.zieh-spalte[data-ziel-schicht]') : null; };
+  document.addEventListener('dragstart', function (ev) {
+    var karte = ev.target && ev.target.closest ? ev.target.closest('.zieh-karte[data-zieh]') : null;
+    if (!karte) return;
+    gezogen = karte;
+    karte.classList.add('zieht');
+    ev.dataTransfer.effectAllowed = 'move';
+    try { ev.dataTransfer.setData('text/plain', karte.getAttribute('data-zieh')); } catch (e) { /* alter Browser */ }
+  });
+  document.addEventListener('dragend', function () {
+    if (gezogen) gezogen.classList.remove('zieht');
+    gezogen = null;
+    document.querySelectorAll('.zieh-spalte.ziel-aktiv').forEach(function (s) { s.classList.remove('ziel-aktiv'); });
+  });
+  document.addEventListener('dragover', function (ev) {
+    var spalte = spalteVon(ev.target);
+    if (!gezogen || !spalte || spalte.contains(gezogen)) return;
+    ev.preventDefault();
+    ev.dataTransfer.dropEffect = 'move';
+    document.querySelectorAll('.zieh-spalte.ziel-aktiv').forEach(function (s) { if (s !== spalte) s.classList.remove('ziel-aktiv'); });
+    spalte.classList.add('ziel-aktiv');
+  });
+  document.addEventListener('drop', function (ev) {
+    var spalte = spalteVon(ev.target);
+    if (!gezogen || !spalte || spalte.contains(gezogen)) return;
+    ev.preventDefault();
+    var form = gezogen.querySelector('form.zieh-form');
+    var wahl = form && form.querySelector('select[name="schicht"]');
+    spalte.classList.remove('ziel-aktiv');
+    if (!form || !wahl) return;
+    wahl.value = spalte.getAttribute('data-ziel-schicht');
+    if (wahl.value !== spalte.getAttribute('data-ziel-schicht')) return;
+    // Sofort in der Zielspalte zeigen. Die Antwort des Servers ersetzt die Ansicht danach.
+    var liste = spalte.querySelector('.zieh-liste');
+    var leer = liste && liste.querySelector('.zieh-leer');
+    if (leer) leer.remove();
+    if (liste) liste.appendChild(gezogen);
+    if (form.requestSubmit) form.requestSubmit(); else form.submit();
+  });
 
   // ---------- Live: Formulare im Hintergrund senden ----------
 

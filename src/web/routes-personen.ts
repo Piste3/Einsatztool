@@ -14,7 +14,7 @@ import { STATUS_TEXT, KANAELE, KANAL_TEXT, id as leseId, type Kanal, type Status
 import { html, Roh } from './html.js';
 import { k, aktuellerPfad } from './kontext.js';
 import { formFelder, seite, seitenKopf } from './views/layout.js';
-import { datumZeit, istSoll, kachel, kachelLegende, KACHEL_TEXT, kanalAuswahl, legende, rolleAuswahl, statusMarke, statusText, telefon, warnungen, zeitraum } from './views/teile.js';
+import { bestaetigenFrage, datumZeit, istSoll, kachel, kachelLegende, KACHEL_TEXT, kanalAuswahl, legende, rolleAuswahl, statusMarke, statusText, telefon, warnungen, zeitraum } from './views/teile.js';
 import { verlaufListe } from './routes-schichten.js';
 import { alterAm, datumCh, datumChVonIso, lokalesDatum, lokaleZeit, wochentagKurz } from '../domain/zeit.js';
 
@@ -155,7 +155,7 @@ ${r.schichten.length === 0 ? html`<p class="leer">Keine kommenden Schichten im Z
   </thead>
   <tbody>${r.personen.map((p) => html`<tr>
     <th class="name-spalte"><a href="/personen/${p.clubdesk_id}"><span class="rang">${p.rang_name ?? ''}</span><span class="name">${p.vorname ?? ''} ${p.nachname ?? ''}</span></a></th>
-    ${p.zellen.map((c, i) => { const sch = r.schichten[i]; const art = c.status ?? c.andere; return html`<td class="zelle-klick${c.passt ? '' : ' passt-nicht'}${gruppenStart.has(i) ? ' gruppe-start' : ''}"><a href="/rueckmeldungen/eintrag?schicht=${sch.id}&amp;person=${p.clubdesk_id}&amp;zurueck=${encodeURIComponent(hier)}" data-eintrag title="${c.status ? `${STATUS_TEXT[c.status]} · ${datumChVonIso(c.geaendert_am!)} ${lokaleZeit(c.geaendert_am!)} · ${KANAL_TEXT[c.kanal as Kanal]}${c.bemerkung ? ` · Bemerkung: ${c.bemerkung}` : ''}` : c.andere ? KACHEL_TEXT[c.andere] : c.passt ? 'nicht gefragt' : 'passt nicht zu Mindestalter oder Mindestrang'} – Klick zum Eintragen">${kachel(art)}${c.bemerkung ? html`<span class="bemerkung-marke" aria-hidden="true">✎</span>` : ''}<span class="sr">${c.status ? STATUS_TEXT[c.status] : c.andere ? KACHEL_TEXT[c.andere] : 'nicht gefragt'}${c.bemerkung ? ', mit Bemerkung' : ''}${c.passt ? '' : ', passt nicht'}</span></a></td>`; })}
+    ${p.zellen.map((c, i) => { const sch = r.schichten[i]; const art = c.status ?? c.andere; return html`<td class="zelle-klick${c.passt ? '' : ' passt-nicht'}${gruppenStart.has(i) ? ' gruppe-start' : ''}"><a href="/rueckmeldungen/eintrag?schicht=${sch.id}&amp;person=${p.clubdesk_id}&amp;zurueck=${encodeURIComponent(hier)}" data-eintrag${bestaetigenFrage(c, `${p.vorname ?? ''} ${p.nachname ?? ''}`.trim())} title="${c.status ? `${STATUS_TEXT[c.status]} · ${datumChVonIso(c.geaendert_am!)} ${lokaleZeit(c.geaendert_am!)} · ${KANAL_TEXT[c.kanal as Kanal]}${c.bemerkung ? ` · Bemerkung: ${c.bemerkung}` : ''}` : c.andere ? KACHEL_TEXT[c.andere] : c.passt ? 'nicht gefragt' : 'passt nicht zu Mindestalter oder Mindestrang'} – Klick zum Eintragen">${kachel(art)}${c.bemerkung ? html`<span class="bemerkung-marke" aria-hidden="true">✎</span>` : ''}<span class="sr">${c.status ? STATUS_TEXT[c.status] : c.andere ? KACHEL_TEXT[c.andere] : 'nicht gefragt'}${c.bemerkung ? ', mit Bemerkung' : ''}${c.passt ? '' : ', passt nicht'}</span></a></td>`; })}
   </tr>`)}</tbody>
   <tfoot>
     ${(['an', 'ab', 'unsicher', 'offen'] as const).map((n) => html`<tr><th class="name-spalte">${{ an: 'An', ab: 'Ab', unsicher: 'Unsicher', offen: 'Offen' }[n]}</th>${r.schichten.map((s, i) => html`<td${gruppenStart.has(i) ? new Roh(' class="gruppe-start"') : ''}>${s.summe[n]}</td>`)}</tr>`)}

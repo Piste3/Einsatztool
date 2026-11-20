@@ -7,11 +7,11 @@ import type { Schicht } from './schicht.js';
 import { passtZuSchicht, warnungenFuerSchichten, type SchichtWarnungen } from './warnungen.js';
 import { nachRangTiefZuerst } from './listen.js';
 
-export const BESETZEN_FILTER = ['neu', 'offen', 'nicht', 'bestaetigt', 'ab', 'warnung', 'alle'] as const;
+export const BESETZEN_FILTER = ['an', 'neu', 'offen', 'nicht', 'bestaetigt', 'ab', 'warnung', 'alle'] as const;
 export type BesetzenFilter = (typeof BESETZEN_FILTER)[number];
 
 export const BESETZEN_FILTER_TEXT: Record<BesetzenFilter, string> = {
-  neu: 'Neu', offen: 'Offen', nicht: 'Nicht gefragt', bestaetigt: 'Bestätigt', ab: 'Ab', warnung: 'Mit Warnung', alle: 'Alle',
+  an: 'Neu + Bestätigt', neu: 'Neu', offen: 'Offen', nicht: 'Nicht gefragt', bestaetigt: 'Bestätigt', ab: 'Ab', warnung: 'Mit Warnung', alle: 'Alle',
 };
 
 export interface BesetzenEintrag {
@@ -119,6 +119,7 @@ export async function besetzenDaten(db: Db, einsatzId: number): Promise<Besetzen
 function passtInSchicht(z: BesetzenZeile, sid: number, filter: BesetzenFilter): boolean {
   const a = z.zellen.get(sid);
   switch (filter) {
+    case 'an': return a?.status === 'angemeldet' || a?.status === 'bestaetigt';
     case 'neu': return a?.status === 'angemeldet';
     case 'offen': return !!a && OFFEN.includes(a.status);
     case 'bestaetigt': return a?.status === 'bestaetigt';
@@ -151,9 +152,12 @@ export function zaehleBesetzen(zeilen: BesetzenZeile[], schichtIds: number[]): R
   return { ...zahl, unpassend: filtereBesetzen(zeilen, schichtIds, 'nicht', true).length - zahl.nicht };
 }
 
-/** Vorgabe ohne Filter in der Adresse: Gibt es Neue, dann «Neu». Gibt es Einträge, dann «Alle». Sonst «Nicht gefragt». */
+/**
+ * Vorgabe ohne Filter in der Adresse (Wunsch Yann 20.11.2026): «Neu + Bestätigt».
+ * Gibt es niemanden mit «angemeldet» oder «bestätigt», dann «Alle». Ohne Einträge «Nicht gefragt».
+ */
 export function vorgabeFilter(zahl: Record<BesetzenFilter, number>): BesetzenFilter {
-  if (zahl.neu) return 'neu';
+  if (zahl.an) return 'an';
   if (zahl.alle) return 'alle';
   return 'nicht';
 }

@@ -3,7 +3,8 @@ import type { Express } from 'express';
 import type { Abhaengigkeiten } from './app.js';
 import { nurAufgebot, refererPfad, zurueck } from './app.js';
 import { macheRueckgaengig, mitRueckgaengig } from '../domain/rueckgaengig.js';
-import { aendereAnmeldung, ladeAnmeldung, loescheAnmeldung, ordneZu, verlauf } from '../domain/anmeldung.js';
+import { aendereAnmeldung, ladeAnmeldung, loescheAnmeldung, ordneZu, verlauf, verschiebeAnmeldung } from '../domain/anmeldung.js';
+import { warnungenFuerSchichten } from '../domain/warnungen.js';
 import { ladeSchicht } from '../domain/schicht.js';
 import { unbekannteEintraege, zuordnungsVorschlaege } from '../domain/listen.js';
 import { personAuswahlText, idAusAuswahl, personenListe } from '../domain/personen.js';
@@ -32,8 +33,25 @@ export function registriereAnmeldungen(app: Express, deps: Abhaengigkeiten): voi
       },
       k(res).benutzer!.id,
     ));
-    const text = req.body.status === 'bestaetigt' && Object.keys(req.body).length <= 3 ? 'Bestätigt.' : 'Gespeichert.';
+    const nurStatus = !['rolle', 'kanal', 'bemerkung'].some((f) => f in (req.body ?? {}));
+    const text = req.body.status === 'bestaetigt' && nurStatus ? 'Bestätigt.' : 'Gespeichert.';
     zurueck(req, res, `/schichten/${a.schicht_id}`, text, 'ok', schluessel);
+  });
+
+  // Reiter «Schichten»: Eintrag in eine andere Schicht verschieben (Wunsch Yann 20.11.2026).
+  app.post('/anmeldungen/:id/verschieben', nurAufgebot, async (req, res) => {
+    const id = leseId(req.params.id);
+    const ziel = leseId(req.body?.schicht);
+    const benutzer = k(res).benutzer!.id;
+    const { ergebnis: r, schluessel } = await mitRueckgaengig(db, benutzer, () => verschiebeAnmeldung(db, id, ziel, req.body?.version, benutzer));
+    const s = await ladeSchicht(db, r.nach);
+    if (!r.geaendert) {
+      zurueck(req, res, `/einsaetze/${s.einsatz_id}/schichten`, '', 'ok');
+      return;
+    }
+    const w = (await warnungenFuerSchichten(db, [r.nach])).get(r.nach)?.anmeldungen.get(id) ?? [];
+    const text = `${r.name} nach «${s.name}» verschoben.${w.length ? ` Warnung: ${w.map((x) => x.text).join(' ')}` : ''}`;
+    zurueck(req, res, `/einsaetze/${s.einsatz_id}/schichten`, text, w.length ? 'hinweis' : 'ok', schluessel);
   });
 
   app.get('/anmeldungen/:id/loeschen', nurAufgebot, async (req, res) => {
