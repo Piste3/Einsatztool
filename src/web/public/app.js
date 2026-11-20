@@ -416,6 +416,17 @@
     if (fenster && fenster.contains(ev.target)) setTimeout(fensterZu, 0);
   }, true);
 
+  // Kanal «WhatsApp» gewählt: Das Ergebnis springt auf «Nachricht gesendet» (Wunsch Yann 20.11.2026).
+  // Danach lässt es sich von Hand ändern. Gilt für Optionsfelder und Auswahllisten im selben Formular.
+  document.addEventListener('change', function (ev) {
+    var feld = ev.target;
+    if (!feld || feld.name !== 'kanal' || feld.value !== 'whatsapp' || !feld.form) return;
+    var knopf = feld.form.querySelector('input[name="status"][value="nachricht_gesendet"]');
+    if (knopf) { knopf.checked = true; return; }
+    var liste = feld.form.querySelector('select[name="status"]');
+    if (liste && liste.querySelector('option[value="nachricht_gesendet"]')) liste.value = 'nachricht_gesendet';
+  });
+
   // ---------- Reiter «Schichten»: Personen verschieben (Wunsch Yann 20.11.2026) ----------
   // Ziehen einer Karte in eine andere Spalte wählt die Schicht im Menü ⇄ und sendet dessen Formular.
   // Ohne Ziehen (Handy, Tastatur, ohne Skript) geht dasselbe über das Menü ⇄.
