@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { einsatz, inTagen, neueDatenbank, person, zeilen } from './hilfe.js';
 import { anmelden, starteApp } from './web-hilfe.js';
 import { aendereAnmeldung, bestaetigeAlle, loescheAnmeldung, ordneZu, setzeAnmeldung } from '../src/domain/anmeldung.js';
-import { letzteAktion, macheRueckgaengig, mitRueckgaengig, _paketeFuerTests } from '../src/domain/rueckgaengig.js';
+import { letzteAktion, macheRueckgaengig, mitRueckgaengig, wiederhole, _paketeFuerTests } from '../src/domain/rueckgaengig.js';
 import { schreibe } from '../src/db/db.js';
 
 test('T36 Rückgängig: Status, Eintragen, Entfernen, Bestätigen, Zuordnen, Konflikt', async () => {
@@ -126,7 +126,8 @@ test('T36 Rückgängig im Browser: Toast zeigt den Knopf, ein Klick setzt zurüc
     assert.equal(r2.headers.get('location'), ziel);
     const html2 = await toastNach(r2);
     assert.match(html2, /Rückgängig gemacht: Lea Meier eingetragen/);
-    assert.doesNotMatch(html2, /data-toast-aktion/);
+    // Nach Rückgängig zeigt der Toast «Wiederholen».
+    assert.match(html2, /<form method="post" action="\/wiederholen" class="toast-form">/);
     assert.equal((await zeilen(t.db, 'SELECT id FROM anmeldung')).length, 0);
 
     // Ein zweiter Klick ändert nichts und zeigt einen Fehler.
@@ -235,6 +236,117 @@ test('T36 Rückgängig in der Navigation: Knopf auf jeder Seite, grau ohne eigen
     assert.equal(r2.headers.get('location'), '/personen');
     assert.equal((await zeilen(t.db, 'SELECT id FROM anmeldung')).length, 0);
     assert.match(await seite('/personen'), /class="rueckgaengig-knopf"[^>]* disabled/);
+  } finally {
+    await app.stopp();
+    await t.ende();
+  }
+});
+
+// Wunsch Yann (20.11.2026): «Wiederholen» führt einen rückgängig gemachten Schritt wieder aus.
+test('T36 Wiederholen: Schritt vorwärts nach Rückgängig, nur eigene, neue Aktion beendet die Kette', async () => {
+  const t = await neueDatenbank();
+  _paketeFuerTests().clear();
+  try {
+    const { benutzerId: ich } = await anmelden(t.db, 'admin');
+    const { benutzerId: andere } = await anmelden(t.db, 'aufgebot');
+    await person(t.db, 1, { vorname: 'Lea', nachname: 'Meier' });
+    await person(t.db, 2, { vorname: 'Tim', nachname: 'Graf' });
+    const s = await einsatz(t.db, 'Herbstmesse', inTagen(5, 12), inTagen(5, 18));
+    const status = async (id: number) => (await zeilen(t.db, 'SELECT status FROM anmeldung WHERE id = ?', [id]))[0]?.status ?? null;
+
+    // Eintragen, bestätigen. Zweimal rückgängig, zweimal wiederholen.
+    const { ergebnis: id } = await mitRueckgaengig(t.db, ich, () => setzeAnmeldung(t.db, { schichtId: s.schichtId, personId: 1, status: 'angemeldet', kanal: 'telefon' }, ich));
+    await mitRueckgaengig(t.db, ich, () => aendereAnmeldung(t.db, id, { status: 'bestaetigt' }, ich));
+    assert.equal(letzteAktion(ich, 'wiederholen'), null);
+
+    await macheRueckgaengig(t.db, letzteAktion(ich)!.schluessel, ich);
+    assert.equal(await status(id), 'angemeldet');
+    assert.equal(letzteAktion(ich, 'wiederholen')!.beschreibung, 'Lea Meier: angemeldet → bestätigt');
+    await macheRueckgaengig(t.db, letzteAktion(ich)!.schluessel, ich);
+    assert.equal(await status(id), null);
+    assert.equal(letzteAktion(ich), null);
+
+    // Ein anderer Benutzer kann meinen Schritt nicht wiederholen.
+    await assert.rejects(wiederhole(t.db, letzteAktion(ich, 'wiederholen')!.schluessel, andere), /Wiederholen geht nicht mehr/);
+    assert.equal(letzteAktion(andere, 'wiederholen'), null);
+
+    // Wiederholen in umgekehrter Reihenfolge: zuerst Eintragen, dann Bestätigen.
+    assert.match(letzteAktion(ich, 'wiederholen')!.beschreibung, /Lea Meier eingetragen/);
+    await wiederhole(t.db, letzteAktion(ich, 'wiederholen')!.schluessel, ich);
+    assert.equal(await status(id), 'angemeldet');
+    // Der Eintrag kommt mit derselben Nummer und seinem Protokoll zurück.
+    assert.ok((await zeilen(t.db, "SELECT id FROM status_log WHERE anmeldung_id = ? AND aktion = 'erstellt'", [id])).length === 1);
+    await wiederhole(t.db, letzteAktion(ich, 'wiederholen')!.schluessel, ich);
+    assert.equal(await status(id), 'bestaetigt');
+    assert.equal(letzteAktion(ich, 'wiederholen'), null);
+    // Ein wiederholter Schritt lässt sich wieder rückgängig machen.
+    assert.equal(letzteAktion(ich)!.beschreibung, 'Lea Meier: angemeldet → bestätigt');
+    await macheRueckgaengig(t.db, letzteAktion(ich)!.schluessel, ich);
+    assert.equal(await status(id), 'angemeldet');
+
+    // Eine neue eigene Aktion löscht die Wiederholen-Liste.
+    assert.ok(letzteAktion(ich, 'wiederholen'));
+    await mitRueckgaengig(t.db, ich, () => setzeAnmeldung(t.db, { schichtId: s.schichtId, personId: 2, status: 'unsicher', kanal: 'telefon' }, ich));
+    assert.equal(letzteAktion(ich, 'wiederholen'), null);
+
+    // Konflikt: Ändert ein anderer Benutzer den Eintrag nach dem Rückgängig, ändert Wiederholen nichts.
+    // Tim wieder weg. Danach trägt ein anderer Benutzer Tim selbst ein.
+    await macheRueckgaengig(t.db, letzteAktion(ich)!.schluessel, ich);
+    const w = letzteAktion(ich, 'wiederholen')!;
+    assert.match(w.beschreibung, /Tim Graf eingetragen/);
+    await setzeAnmeldung(t.db, { schichtId: s.schichtId, personId: 2, status: 'abgemeldet', kanal: 'telefon' }, andere);
+    await assert.rejects(wiederhole(t.db, w.schluessel, ich), /inzwischen geändert/);
+    const tim = await zeilen(t.db, 'SELECT status FROM anmeldung WHERE person_id = 2');
+    assert.deepEqual(tim.map((z) => z.status), ['abgemeldet']);
+    assert.equal(letzteAktion(ich, 'wiederholen'), null);
+  } finally {
+    await t.ende();
+  }
+});
+
+test('T36 Wiederholen im Browser: Knopf in der Navigation und im Toast nach Rückgängig', async () => {
+  const t = await neueDatenbank();
+  _paketeFuerTests().clear();
+  const app = await starteApp(t.db);
+  try {
+    await person(t.db, 1, { vorname: 'Lea', nachname: 'Meier' });
+    const s = await einsatz(t.db, 'Herbstmesse', inTagen(5, 12), inTagen(5, 18));
+    const { cookie, csrf } = await anmelden(t.db);
+    const post = (pfad: string, felder: Record<string, string>) => fetch(`${app.url}${pfad}`, {
+      method: 'POST', redirect: 'manual',
+      headers: { cookie, referer: `${app.url}/personen`, 'content-type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ _csrf: csrf, ...felder }),
+    });
+    const seite = async (r?: Response) => {
+      const meldung = r ? (r.headers.get('set-cookie') ?? '').match(/meldung=[^;]+/)?.[0] : undefined;
+      return (await fetch(`${app.url}/personen`, { headers: { cookie: meldung ? `${cookie}; ${meldung}` : cookie } })).text();
+    };
+
+    let html = await seite();
+    assert.match(html, /class="wiederholen-knopf"[^>]* disabled/);
+    await post(`/schichten/${s.schichtId}/anmeldungen`, { person: '1', status: 'angemeldet', kanal: 'telefon' });
+    html = await seite();
+    const undo = html.match(/action="\/rueckgaengig"[\s\S]*?name="schluessel" value="([A-Za-z0-9_-]+)"/)?.[1];
+    assert.ok(undo);
+    const r1 = await post('/rueckgaengig', { schluessel: undo! });
+    html = await seite(r1);
+    // Toast nach Rückgängig: Knopf «Wiederholen».
+    assert.match(html, /Rückgängig gemacht: Lea Meier eingetragen/);
+    assert.match(html, /<form method="post" action="\/wiederholen" class="toast-form">/);
+    // Navigation: Knopf «Wiederholen» aktiv, mit Tastatur.
+    assert.match(html, /data-wiederholen/);
+    assert.match(html, /aria-keyshortcuts="Control\+Y Control\+Shift\+Z"/);
+    const redo = html.match(/action="\/wiederholen" class="rueckgaengig-form[\s\S]*?name="schluessel" value="([A-Za-z0-9_-]+)"/)?.[1];
+    assert.ok(redo);
+    const r2 = await post('/wiederholen', { schluessel: redo! });
+    assert.equal(r2.headers.get('location'), '/personen');
+    html = await seite(r2);
+    assert.match(html, /Wiederholt: Lea Meier eingetragen/);
+    assert.equal((await zeilen(t.db, 'SELECT id FROM anmeldung')).length, 1);
+    // Ein zweiter Klick auf denselben Schlüssel ändert nichts.
+    html = await seite(await post('/wiederholen', { schluessel: redo! }));
+    assert.match(html, /Wiederholen geht nicht mehr/);
+    assert.equal((await zeilen(t.db, 'SELECT id FROM anmeldung')).length, 1);
   } finally {
     await app.stopp();
     await t.ende();

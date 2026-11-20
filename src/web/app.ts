@@ -84,9 +84,17 @@ export function setzeCookie(res: Response, konfig: Konfiguration, name: string, 
 }
 
 /** Meldung für die nächste Seite (z. B. «Gespeichert»). Signiertes Cookie, eine Minute gültig. */
-export function setzeMeldung(res: Response, konfig: Konfiguration, art: Meldung['art'], text: string, rueckgaengig?: string | null): void {
+export function setzeMeldung(
+  res: Response,
+  konfig: Konfiguration,
+  art: Meldung['art'],
+  text: string,
+  rueckgaengig?: string | null,
+  wiederholen?: string | null,
+): void {
   const m: Meldung = { art, text: text.slice(0, 500) };
   if (rueckgaengig) m.rueckgaengig = rueckgaengig;
+  if (wiederholen) m.wiederholen = wiederholen;
   const wert = Buffer.from(JSON.stringify(m)).toString('base64url');
   setzeCookie(res, konfig, 'meldung', `${wert}.${signiere(konfig.sessionSecret, 'meldung', wert)}`, 60);
 }
@@ -100,8 +108,12 @@ function leseMeldung(req: Request, res: Response, konfig: Konfiguration): Meldun
   try {
     const m = JSON.parse(Buffer.from(wert, 'base64url').toString('utf8'));
     if (['ok', 'fehler', 'hinweis'].includes(m.art) && typeof m.text === 'string') {
+      const meldung: Meldung = { art: m.art, text: m.text };
       const r = gueltigerSchluessel(m.rueckgaengig);
-      return r ? { art: m.art, text: m.text, rueckgaengig: r } : { art: m.art, text: m.text };
+      const w = gueltigerSchluessel(m.wiederholen);
+      if (r) meldung.rueckgaengig = r;
+      if (w) meldung.wiederholen = w;
+      return meldung;
     }
   } catch {
     // ignorieren
@@ -129,9 +141,10 @@ export function zurueck(
   text = 'Gespeichert.',
   art: Meldung['art'] = 'ok',
   rueckgaengig: string | null = null,
+  wiederholen: string | null = null,
 ): void {
   const deps = res.locals.deps as Abhaengigkeiten;
-  if (text) setzeMeldung(res, deps.konfig, art, text, rueckgaengig);
+  if (text) setzeMeldung(res, deps.konfig, art, text, rueckgaengig, wiederholen);
   res.redirect(303, sicheresZiel(req.body?.zurueck, standard));
 }
 

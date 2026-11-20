@@ -2,7 +2,7 @@
 import type { Express } from 'express';
 import type { Abhaengigkeiten } from './app.js';
 import { nurAufgebot, refererPfad, zurueck } from './app.js';
-import { beschreibungVon, macheRueckgaengig, mitRueckgaengig } from '../domain/rueckgaengig.js';
+import { mitRueckgaengig, setzeZurueck } from '../domain/rueckgaengig.js';
 import { aendereAnmeldung, ladeAnmeldung, loescheAnmeldung, ordneZu, verlauf, verschiebeAnmeldung } from '../domain/anmeldung.js';
 import { warnungenFuerSchichten } from '../domain/warnungen.js';
 import { ladeSchicht } from '../domain/schicht.js';
@@ -79,10 +79,14 @@ ${seitenKopf({ titel: 'Eintrag entfernen?' })}
 
   // Knopf «Rückgängig» im Toast und in der Navigation: stellt die Einträge einer eigenen Aktion wieder her.
   app.post('/rueckgaengig', nurAufgebot, async (req, res) => {
-    const benutzer = k(res).benutzer!.id;
-    const beschreibung = beschreibungVon(req.body?.schluessel, benutzer);
-    const n = await macheRueckgaengig(db, req.body?.schluessel, benutzer);
-    zurueck(req, res, refererPfad(req), `Rückgängig gemacht: ${beschreibung ?? (n === 1 ? '1 Eintrag' : `${n} Einträge`)}.`);
+    const r = await setzeZurueck(db, req.body?.schluessel, k(res).benutzer!.id, 'aktion');
+    zurueck(req, res, refererPfad(req), `Rückgängig gemacht: ${r.beschreibung}.`, 'ok', null, r.gegenSchluessel);
+  });
+
+  // Knopf «Wiederholen» (Wunsch Yann, 20.11.2026): führt einen eigenen rückgängig gemachten Schritt wieder aus.
+  app.post('/wiederholen', nurAufgebot, async (req, res) => {
+    const r = await setzeZurueck(db, req.body?.schluessel, k(res).benutzer!.id, 'wiederholen');
+    zurueck(req, res, refererPfad(req), `Wiederholt: ${r.beschreibung}.`, 'ok', r.gegenSchluessel);
   });
 
   // Regel 14.6.2 und 14.6.3: unzugeordnete Einträge mit Suche.

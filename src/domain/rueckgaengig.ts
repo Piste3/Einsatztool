@@ -9,6 +9,9 @@
 // - Nur der Benutzer, der die Aktion ausgeführt hat, kann sie rückgängig machen (Wunsch Yann, 20.11.2026).
 // - Je Benutzer bleiben die letzten 20 Aktionen der letzten 12 Stunden. Jedes Paket gilt nur einmal.
 // - Der Knopf in der Navigation macht immer die neueste eigene Aktion rückgängig, dann die davor.
+// - Wiederholen (Wunsch Yann, 20.11.2026): Rückgängig merkt sich dabei den Stand vor dem Zurücksetzen
+//   als Paket der Art «wiederholen». Wiederholen ist dasselbe Zurücksetzen auf diesen Stand und legt
+//   wieder ein Paket der Art «aktion» an. Eine neue eigene Aktion löscht die eigenen Wiederholen-Pakete.
 // - Hat sich ein Eintrag seither geändert (Version), ändert das Tool nichts (Konflikt).
 // - Jede Wiederherstellung schreibt Einträge ins Statusprotokoll.
 // - Pakete liegen im Speicher. Nach einem Neustart sind sie weg (ein Server-Prozess).
@@ -35,7 +38,11 @@ interface Schritt {
   nachher: number | null;
 }
 
+/** aktion = lässt sich rückgängig machen, wiederholen = ein rückgängig gemachter Schritt. */
+export type Art = 'aktion' | 'wiederholen';
+
 interface Paket {
+  art: Art;
   benutzerId: number;
   /** Zeitpunkt der Aktion (ms). */
   zeit: number;
@@ -92,7 +99,15 @@ export async function merkeVorEntfernen(c: Db, zeile: Anmeldung): Promise<void> 
 export async function mitRueckgaengig<T>(db: Db, benutzerId: number, fn: () => Promise<T>): Promise<{ ergebnis: T; schluessel: string | null }> {
   const s: Sammlung = { vorher: new Map() };
   const ergebnis = await sammler.run(s, fn);
-  if (!s.vorher.size) return { ergebnis, schluessel: null };
+  const schluessel = await paketAus(db, s, benutzerId, 'aktion');
+  // Eine neue Aktion beendet die Kette: Rückgängig gemachte Schritte lassen sich nicht mehr wiederholen.
+  if (schluessel) for (const [k, q] of pakete) if (q.benutzerId === benutzerId && q.art === 'wiederholen') pakete.delete(k);
+  return { ergebnis, schluessel };
+}
+
+/** Legt aus dem gesammelten Stand ein Paket an. Ohne Änderung: null. */
+async function paketAus(db: Db, s: Sammlung, benutzerId: number, art: Art, text?: string): Promise<string | null> {
+  if (!s.vorher.size) return null;
   const ids = [...s.vorher.keys()];
   const jetzt = await alle<{ id: number; version: number; status: Status; schicht_id: number; person_id: number | null; name_text: string }>(
     db, 'SELECT id, version, status, schicht_id, person_id, name_text FROM anmeldung WHERE id IN (?)', [ids]);
@@ -106,12 +121,9 @@ export async function mitRueckgaengig<T>(db: Db, benutzerId: number, fn: () => P
     if (v.zeile !== null && nachher === v.zeile.version) continue;
     schritte.push({ id, vorher: v.zeile, log: v.log, nachher });
   }
-  if (!schritte.length) return { ergebnis, schluessel: null };
+  if (!schritte.length) return null;
   const zeit = Date.now();
-  return {
-    ergebnis,
-    schluessel: legeAb({ benutzerId, zeit, ablauf: zeit + GUELTIG_MS, beschreibung: beschreibe(schritte, nachZeile), schritte }),
-  };
+  return legeAb({ art, benutzerId, zeit, ablauf: zeit + GUELTIG_MS, beschreibung: text ?? beschreibe(schritte, nachZeile), schritte });
 }
 
 type NachZeile = { status: Status; schicht_id: number; person_id: number | null; name_text: string };
@@ -144,7 +156,7 @@ function legeAb(p: Paket): string {
   raeumeAuf();
   while (pakete.size >= MAX_PAKETE) pakete.delete(pakete.keys().next().value!);
   // Je Benutzer nur die neuesten Aktionen behalten.
-  const eigene = [...pakete].filter(([, q]) => q.benutzerId === p.benutzerId);
+  const eigene = [...pakete].filter(([, q]) => q.benutzerId === p.benutzerId && q.art === p.art);
   for (const [k] of eigene.slice(0, Math.max(0, eigene.length - MAX_JE_BENUTZER + 1))) pakete.delete(k);
   const schluessel = randomBytes(18).toString('base64url');
   pakete.set(schluessel, p);
@@ -152,12 +164,12 @@ function legeAb(p: Paket): string {
 }
 
 /** Die neueste eigene Aktion, die sich rückgängig machen lässt. null = keine. */
-export function letzteAktion(benutzerId: number): LetzteAktion | null {
+export function letzteAktion(benutzerId: number, art: Art = 'aktion'): LetzteAktion | null {
   const jetzt = Date.now();
   let letzte: [string, Paket] | null = null;
   let anzahl = 0;
   for (const e of pakete) {
-    if (e[1].benutzerId !== benutzerId || e[1].ablauf < jetzt) continue;
+    if (e[1].benutzerId !== benutzerId || e[1].art !== art || e[1].ablauf < jetzt) continue;
     anzahl++;
     // Die Map behält die Reihenfolge des Anlegens: Der letzte Treffer ist der neueste.
     letzte = e;
@@ -178,25 +190,50 @@ export function gueltigerSchluessel(wert: unknown): string | null {
 }
 
 const FELDER = ['status', 'rolle', 'kanal', 'bemerkung'] as const;
-const KONFLIKT = 'Rückgängig geht nicht mehr. Jemand hat den Eintrag inzwischen geändert. Das Tool hat nichts geändert.';
 
 /**
  * Macht eine Aktion rückgängig. Alles oder nichts, in einer Transaktion.
  * Gibt die Zahl der wiederhergestellten Einträge zurück.
  */
 export async function macheRueckgaengig(db: Db, schluessel: unknown, benutzerId: number): Promise<number> {
+  return (await setzeZurueck(db, schluessel, benutzerId, 'aktion')).anzahl;
+}
+
+/** Führt einen rückgängig gemachten Schritt wieder aus. */
+export async function wiederhole(db: Db, schluessel: unknown, benutzerId: number): Promise<number> {
+  return (await setzeZurueck(db, schluessel, benutzerId, 'wiederholen')).anzahl;
+}
+
+export interface Zurueckgesetzt {
+  anzahl: number;
+  beschreibung: string;
+  /** Schlüssel für den Gegenschritt: nach Rückgängig «Wiederholen», nach Wiederholen «Rückgängig». */
+  gegenSchluessel: string | null;
+}
+
+/**
+ * Setzt die Einträge eines Pakets auf den gemerkten Stand zurück. Alles oder nichts, in einer Transaktion.
+ * Merkt sich dabei den Stand davor als Gegenschritt.
+ */
+export async function setzeZurueck(db: Db, schluessel: unknown, benutzerId: number, art: Art): Promise<Zurueckgesetzt> {
+  const wort = art === 'aktion' ? 'Rückgängig' : 'Wiederholen';
+  const KONFLIKT = `${wort} geht nicht mehr. Jemand hat den Eintrag inzwischen geändert. Das Tool hat nichts geändert.`;
   const k = gueltigerSchluessel(schluessel);
   const p = k ? pakete.get(k) : undefined;
-  if (!k || !p || p.benutzerId !== benutzerId || p.ablauf < Date.now()) {
-    throw new Eingabefehler('Rückgängig geht nicht mehr. Die Aktion ist zu alt oder schon rückgängig gemacht.');
+  if (!k || !p || p.benutzerId !== benutzerId || p.art !== art || p.ablauf < Date.now()) {
+    throw new Eingabefehler(art === 'aktion'
+      ? 'Rückgängig geht nicht mehr. Die Aktion ist zu alt oder schon rückgängig gemacht.'
+      : 'Wiederholen geht nicht mehr. Der Schritt ist zu alt oder schon wiederholt.');
   }
+  const gegen: Sammlung = { vorher: new Map() };
   // Neue Versionen nach dem Zurücksetzen. Ältere Aktionen desselben Benutzers auf denselben
   // Einträgen erwarten danach diese Version (sonst ginge nur die neueste Aktion rückgängig).
   const neueVersion = new Map<number, { erwartet: number; neu: number }>();
   let n: number;
   try {
-    n = await transaktion(db, async (c) => {
+    n = await sammler.run(gegen, () => transaktion(db, async (c) => {
     neueVersion.clear();
+    gegen.vorher.clear();
     const zeit = jetztIso();
     for (const s of p.schritte) {
       const jetzt = await eine<Anmeldung>(c, 'SELECT * FROM anmeldung WHERE id = ? FOR UPDATE', [s.id]);
@@ -209,6 +246,7 @@ export async function macheRueckgaengig(db: Db, schluessel: unknown, benutzerId:
         const schicht = await eine(c, 'SELECT id FROM schicht WHERE id = ?', [s.vorher.schicht_id]);
         if (doppelt || !schicht) throw new Eingabefehler(KONFLIKT);
         await fuegeZeileEin(c, 'anmeldung', { ...s.vorher, version: s.vorher.version + 1, geaendert_am: zeit });
+        merkeNeu(s.id);
         neueVersion.set(s.id, { erwartet: s.vorher.version, neu: s.vorher.version + 1 });
         for (const l of s.log) await fuegeZeileEin(c, 'status_log', l);
         await schreibe(c, 'INSERT INTO status_log (anmeldung_id, zeit, benutzer_id, aktion, alt_wert, neu_wert) VALUES (?, ?, ?, ?, ?, ?)', [
@@ -219,6 +257,7 @@ export async function macheRueckgaengig(db: Db, schluessel: unknown, benutzerId:
       if (!jetzt || jetzt.version !== s.nachher) throw new Eingabefehler(KONFLIKT);
       if (s.vorher === null) {
         // Angelegt: Eintrag wieder entfernen (Klick auf «Rückgängig» ist die Bestätigung).
+        await merkeVorEntfernen(c, jetzt);
         await schreibe(c, 'DELETE FROM anmeldung WHERE id = ?', [s.id]);
         continue;
       }
@@ -251,6 +290,7 @@ export async function macheRueckgaengig(db: Db, schluessel: unknown, benutzerId:
           v.email_text ? `${v.name_text} <${v.email_text}>` : v.name_text,
         ]);
       }
+      merkeVorher(jetzt);
       await schreibe(
         c,
         `UPDATE anmeldung SET schicht_id = ?, person_id = ?, name_text = ?, email_text = ?, status = ?, rolle = ?, kanal = ?, bemerkung = ?,
@@ -260,7 +300,7 @@ export async function macheRueckgaengig(db: Db, schluessel: unknown, benutzerId:
       neueVersion.set(s.id, { erwartet: v.version, neu: jetzt.version + 1 });
     }
     return p.schritte.length;
-    });
+    }));
   } catch (fehler) {
     // Ein Konflikt bleibt ein Konflikt. Das Paket verschwindet, der Knopf zeigt die Aktion davor.
     if (fehler instanceof Eingabefehler) pakete.delete(k);
@@ -274,7 +314,8 @@ export async function macheRueckgaengig(db: Db, schluessel: unknown, benutzerId:
       if (v && s.nachher === v.erwartet) s.nachher = v.neu;
     }
   }
-  return n;
+  const gegenSchluessel = await paketAus(db, gegen, benutzerId, art === 'aktion' ? 'wiederholen' : 'aktion', p.beschreibung);
+  return { anzahl: n, beschreibung: p.beschreibung, gegenSchluessel };
 }
 
 /** Fügt eine Zeile mit allen Spalten ein. Die Spaltennamen kommen aus der Datenbank selbst. */

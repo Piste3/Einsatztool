@@ -148,8 +148,10 @@
       if (t.parentNode === stapel) return;
       // Dieselbe Meldung nur einmal zeigen.
       var text = t.textContent.trim();
+      // Ein neuer Knopf «Rückgängig» oder «Wiederholen» ersetzt den alten (sein Schlüssel ist verbraucht).
+      var mitAktion = t.hasAttribute('data-toast-aktion');
       Array.prototype.forEach.call(stapel.children, function (alt) {
-        if (alt.textContent.trim() === text) toastWeg(alt);
+        if (alt.textContent.trim() === text || (mitAktion && alt.hasAttribute('data-toast-aktion'))) toastWeg(alt);
       });
       stapel.appendChild(t);
       toastStarten(t);
@@ -157,13 +159,17 @@
     while (stapel.children.length > 4) stapel.removeChild(stapel.firstChild);
   };
   // Ctrl+Z (Mac: Cmd+Z) ausserhalb von Eingabefeldern: neueste eigene Aktion rückgängig machen.
-  // In einem Eingabefeld bleibt Ctrl+Z beim Browser (Text rückgängig).
+  // Ctrl+Y oder Ctrl+Shift+Z: den zuletzt rückgängig gemachten Schritt wiederholen.
+  // In einem Eingabefeld bleiben die Tasten beim Browser (Text rückgängig).
   document.addEventListener('keydown', function (ev) {
-    if (!(ev.ctrlKey || ev.metaKey) || ev.shiftKey || ev.altKey || (ev.key !== 'z' && ev.key !== 'Z')) return;
+    if (!(ev.ctrlKey || ev.metaKey) || ev.altKey) return;
+    var taste = (ev.key || '').toLowerCase();
+    var wiederholen = taste === 'y' || (taste === 'z' && ev.shiftKey);
+    if (!wiederholen && (taste !== 'z' || ev.shiftKey)) return;
     var z = ev.target;
     if (z && (z.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(z.tagName || ''))) return;
     if (document.querySelector('dialog[open]')) return;
-    var f = document.querySelector('form[data-rueckgaengig]');
+    var f = document.querySelector(wiederholen ? 'form[data-wiederholen]' : 'form[data-rueckgaengig]');
     if (!f || !f.requestSubmit) return;
     ev.preventDefault();
     f.requestSubmit();
@@ -302,8 +308,8 @@
     // Navigation: Zähler und markierte Seite. Das Menü auf dem Handy bleibt offen oder zu.
     altLeiste.innerHTML = neuLeiste.innerHTML;
     // Knopf «Rückgängig» im Kopf auf dem Handy.
-    var neuMobil = neu.querySelector('.kopf-mobil .rueckgaengig-form');
-    var altMobil = document.querySelector('.kopf-mobil .rueckgaengig-form');
+    var neuMobil = neu.querySelector('.kopf-mobil .rueckgaengig-reihe');
+    var altMobil = document.querySelector('.kopf-mobil .rueckgaengig-reihe');
     if (neuMobil && altMobil) altMobil.replaceWith(document.importNode(neuMobil, true));
     themaZeigen(themaLesen());
     altMain.className = neuMain.className;

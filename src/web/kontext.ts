@@ -7,6 +7,8 @@ export interface Meldung {
   text: string;
   /** Schlüssel für den Knopf «Rückgängig» im Toast (src/domain/rueckgaengig.ts). */
   rueckgaengig?: string;
+  /** Schlüssel für den Knopf «Wiederholen» im Toast (nach einem Rückgängig). */
+  wiederholen?: string;
 }
 
 export interface Kontext {

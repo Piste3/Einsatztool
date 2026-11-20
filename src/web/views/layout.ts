@@ -92,7 +92,9 @@ ${kopfDaten(`${titel} · Einsatzplaner`)}
   </div>
 </nav>
 <main class="inhalt${extra.breit ? ' breit' : ''}${extra.fest ? ' fest' : ''}">
-  ${k.meldung ? toast(k.meldung.art, k.meldung.text, k.meldung.rueckgaengig ? rueckgaengigKnopf(k, k.meldung.rueckgaengig) : undefined) : ''}
+  ${k.meldung ? toast(k.meldung.art, k.meldung.text, k.meldung.rueckgaengig
+    ? toastKnopf(k, 'rueckgaengig', k.meldung.rueckgaengig)
+    : k.meldung.wiederholen ? toastKnopf(k, 'wiederholen', k.meldung.wiederholen) : undefined) : ''}
   ${inhalt}
 </main>
 </body>
@@ -113,14 +115,14 @@ export function toast(art: 'ok' | 'fehler' | 'hinweis', text: string, aktion?: R
 }
 
 /**
- * Knopf «Rückgängig» im Toast. Er sendet den Schlüssel der letzten Aktion.
- * Der Toast bleibt dann 10 Sekunden. Der Server nimmt den Schlüssel 10 Minuten lang an.
+ * Knopf «Rückgängig» (nach einer Aktion) oder «Wiederholen» (nach einem Rückgängig) im Toast.
+ * Er sendet den Schlüssel dieses Schritts. Der Toast bleibt dann 10 Sekunden.
  */
-function rueckgaengigKnopf(k: Kontext, schluessel: string): Roh {
-  return html`<form method="post" action="/rueckgaengig" class="toast-form">
+function toastKnopf(k: Kontext, art: 'rueckgaengig' | 'wiederholen', schluessel: string): Roh {
+  return html`<form method="post" action="/${art}" class="toast-form">
       ${formFelder(k, k.pfad)}
       <input type="hidden" name="schluessel" value="${schluessel}">
-      <button type="submit" class="toast-rueckgaengig">Rückgängig</button>
+      <button type="submit" class="toast-rueckgaengig">${art === 'rueckgaengig' ? 'Rückgängig' : 'Wiederholen'}</button>
     </form>`;
 }
 
@@ -130,6 +132,24 @@ function rueckgaengigKnopf(k: Kontext, schluessel: string): Roh {
  * Ohne eigene Aktion ist er grau. Tastatur: Ctrl+Z ausserhalb von Eingabefeldern (app.js).
  */
 function rueckgaengigLeiste(k: Kontext, ort: 'leiste' | 'mobil'): Roh {
+  return html`<div class="rueckgaengig-reihe ${ortKlasse(ort)}">${undoKnopf(k, ort)}${wiederholenKnopf(k, ort)}</div>`;
+}
+
+/**
+ * Knopf «Wiederholen» neben «Rückgängig» (Wunsch Yann, 20.11.2026). Er führt den zuletzt
+ * rückgängig gemachten eigenen Schritt wieder aus. Tastatur: Ctrl+Y oder Ctrl+Shift+Z.
+ */
+function wiederholenKnopf(k: Kontext, ort: 'leiste' | 'mobil'): Roh {
+  const w = letzteAktion(k.benutzer!.id, 'wiederholen');
+  const titel = w ? `Wiederholen: ${w.beschreibung}` : 'Nichts zum Wiederholen';
+  return html`<form method="post" action="/wiederholen" class="rueckgaengig-form wiederholen-form ${ortKlasse(ort)}"${w && ort === 'leiste' ? new Roh(' data-wiederholen') : ''}>
+    ${formFelder(k)}
+    ${w ? html`<input type="hidden" name="schluessel" value="${w.schluessel}">` : ''}
+    <button type="submit" class="${ort === 'leiste' ? 'wiederholen-knopf' : 'rueckgaengig-mobil'}" title="${titel}" aria-label="${titel}"${w ? new Roh(' aria-keyshortcuts="Control+Y Control+Shift+Z"') : new Roh(' disabled')}>${symbol('wiederholen')}</button>
+  </form>`;
+}
+
+function undoKnopf(k: Kontext, ort: 'leiste' | 'mobil'): Roh {
   const a = letzteAktion(k.benutzer!.id);
   const titel = a ? `Rückgängig: ${a.beschreibung} (${zeitVor(a.zeit)})` : 'Keine eigene Änderung zum Rückgängigmachen';
   const knopf = ort === 'leiste'
@@ -137,11 +157,16 @@ function rueckgaengigLeiste(k: Kontext, ort: 'leiste' | 'mobil'): Roh {
         ${symbol('rueckgaengig')}<span class="rueckgaengig-text">Rückgängig<small>${a ? a.beschreibung : 'Nichts zum Rückgängigmachen'}</small></span>
       </button>`
     : html`<button type="submit" class="rueckgaengig-mobil" title="${titel}" aria-label="${titel}"${a ? '' : new Roh(' disabled')}>${symbol('rueckgaengig')}</button>`;
-  return html`<form method="post" action="/rueckgaengig" class="rueckgaengig-form ${ort}"${a && ort === 'leiste' ? new Roh(' data-rueckgaengig') : ''}>
+  return html`<form method="post" action="/rueckgaengig" class="rueckgaengig-form ${ortKlasse(ort)}"${a && ort === 'leiste' ? new Roh(' data-rueckgaengig') : ''}>
     ${formFelder(k)}
     ${a ? html`<input type="hidden" name="schluessel" value="${a.schluessel}">` : ''}
     ${knopf}
   </form>`;
+}
+
+/** Klasse je Ort. Nicht «leiste»: Diese Klasse hat die Navigation selbst. */
+function ortKlasse(ort: 'leiste' | 'mobil'): string {
+  return ort === 'leiste' ? 'in-leiste' : 'im-kopf';
 }
 
 function zeitVor(ms: number): string {
