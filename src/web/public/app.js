@@ -156,6 +156,19 @@
     });
     while (stapel.children.length > 4) stapel.removeChild(stapel.firstChild);
   };
+  // Ctrl+Z (Mac: Cmd+Z) ausserhalb von Eingabefeldern: neueste eigene Aktion rückgängig machen.
+  // In einem Eingabefeld bleibt Ctrl+Z beim Browser (Text rückgängig).
+  document.addEventListener('keydown', function (ev) {
+    if (!(ev.ctrlKey || ev.metaKey) || ev.shiftKey || ev.altKey || (ev.key !== 'z' && ev.key !== 'Z')) return;
+    var z = ev.target;
+    if (z && (z.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(z.tagName || ''))) return;
+    if (document.querySelector('dialog[open]')) return;
+    var f = document.querySelector('form[data-rueckgaengig]');
+    if (!f || !f.requestSubmit) return;
+    ev.preventDefault();
+    f.requestSubmit();
+  });
+
   // «Rückgängig» geht nur einmal: Der Toast verschwindet nach dem Klick.
   document.addEventListener('submit', function (ev) {
     var t = ev.target && ev.target.closest ? ev.target.closest('.toast') : null;
@@ -288,6 +301,10 @@
 
     // Navigation: Zähler und markierte Seite. Das Menü auf dem Handy bleibt offen oder zu.
     altLeiste.innerHTML = neuLeiste.innerHTML;
+    // Knopf «Rückgängig» im Kopf auf dem Handy.
+    var neuMobil = neu.querySelector('.kopf-mobil .rueckgaengig-form');
+    var altMobil = document.querySelector('.kopf-mobil .rueckgaengig-form');
+    if (neuMobil && altMobil) altMobil.replaceWith(document.importNode(neuMobil, true));
     themaZeigen(themaLesen());
     altMain.className = neuMain.className;
     // Tabellen mit eigenem Scrollbereich behalten ihre Position (z. B. Rückmeldungen nach einem Eintrag).

@@ -2,7 +2,7 @@
 import type { Express } from 'express';
 import type { Abhaengigkeiten } from './app.js';
 import { nurAufgebot, refererPfad, zurueck } from './app.js';
-import { macheRueckgaengig, mitRueckgaengig } from '../domain/rueckgaengig.js';
+import { beschreibungVon, macheRueckgaengig, mitRueckgaengig } from '../domain/rueckgaengig.js';
 import { aendereAnmeldung, ladeAnmeldung, loescheAnmeldung, ordneZu, verlauf, verschiebeAnmeldung } from '../domain/anmeldung.js';
 import { warnungenFuerSchichten } from '../domain/warnungen.js';
 import { ladeSchicht } from '../domain/schicht.js';
@@ -77,10 +77,12 @@ ${seitenKopf({ titel: 'Eintrag entfernen?' })}
     zurueck(req, res, `/schichten/${sid}`, 'Eintrag entfernt.', 'ok', schluessel);
   });
 
-  // Knopf «Rückgängig» im Toast: stellt die Einträge der letzten Aktion wieder her.
+  // Knopf «Rückgängig» im Toast und in der Navigation: stellt die Einträge einer eigenen Aktion wieder her.
   app.post('/rueckgaengig', nurAufgebot, async (req, res) => {
-    const n = await macheRueckgaengig(db, req.body?.schluessel, k(res).benutzer!.id);
-    zurueck(req, res, refererPfad(req), n === 1 ? 'Rückgängig gemacht.' : `Rückgängig gemacht (${n} Einträge).`);
+    const benutzer = k(res).benutzer!.id;
+    const beschreibung = beschreibungVon(req.body?.schluessel, benutzer);
+    const n = await macheRueckgaengig(db, req.body?.schluessel, benutzer);
+    zurueck(req, res, refererPfad(req), `Rückgängig gemacht: ${beschreibung ?? (n === 1 ? '1 Eintrag' : `${n} Einträge`)}.`);
   });
 
   // Regel 14.6.2 und 14.6.3: unzugeordnete Einträge mit Suche.
