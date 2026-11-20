@@ -6,7 +6,7 @@ import {
   aendereEinsatz, anzahlAnmeldungenEinsatz, einsatzListe, type EinsatzZeile, erstelleEinsatz, kopiereEinsatz, ladeEinsatz, loescheEinsatz, vorgabeKopie,
   type Einsatz,
 } from '../domain/einsatz.js';
-import { anzeigeZeiten, fremdabteilungen, passtInTabelle, schichtenVonEinsatz, speichereSchichtTabelle, zeilenAbdruck, type SchichtZeile } from '../domain/schicht.js';
+import { aendereSchicht, anzeigeZeiten, erstelleSchicht, fremdabteilungen, kopiereSchicht, ladeSchicht, passtInTabelle, schichtenVonEinsatz } from '../domain/schicht.js';
 import { bestaetigeAlle, verlaufEinsatz } from '../domain/anmeldung.js';
 import { mitRueckgaengig } from '../domain/rueckgaengig.js';
 import { logText } from './routes-schichten.js';
@@ -15,7 +15,7 @@ import { sollFarbe, zahlenFuerSchichten } from '../domain/zaehlung.js';
 import { teilnehmerlisteCsv } from '../domain/export.js';
 import { besetzenAnsicht, besetzenPfad } from './views/besetzen.js';
 import type { BesetzenFilter } from '../domain/besetzen.js';
-import { rollen as ladeRollen } from '../domain/stammdaten.js';
+import { raenge as ladeRaenge, rollen as ladeRollen } from '../domain/stammdaten.js';
 import { Eingabefehler, Konflikt, KANAL_TEXT, STATUS_TEXT, id as leseId, type Kanal, type Status } from '../domain/eingabe.js';
 import { einsatzLage, type ZuTunPunkt } from '../domain/einsatz-lage.js';
 import { alle } from '../db/db.js';
@@ -131,7 +131,7 @@ ${liste.length === 0 ? html`<p class="leer">Keine Einsätze.</p>` : html`
   });
 
   // Einsatz-Seite mit Reitern (Vorlage Yann, Handbuch): Übersicht, Anmeldungen, Schichten, Verlauf.
-  const einsatzSeite = async (req: Request, res: Response, ansicht: Ansicht, tabelle?: { werte: Record<string, any>; fehler: string }) => {
+  const einsatzSeite = async (req: Request, res: Response, ansicht: Ansicht, fehler?: { sid: number | 'neu'; werte: Record<string, any>; fehler: string; version?: unknown; status: number }) => {
     const kx = k(res);
     const e = await ladeEinsatz(db, leseId(req.params.id));
     const schichten = await schichtenVonEinsatz(db, e.id);
@@ -285,99 +285,109 @@ ${!schichten.length ? html`<p class="leer">Keine Schichten.</p>` : html`<div cla
   </form>
 </details>`;
     };
-    const schichtKarten = async () => html`<section aria-labelledby="karten-titel">
-<h2 id="karten-titel" class="sr">Schichten</h2>
-${!schichten.length ? html`<p class="leer">Keine Schichten.</p>` : html`<div class="schicht-karten">${schichten.map((s) => {
-  const z = zahlen.get(s.id)!;
-  const fehlt = s.soll_anzahl && s.soll_anzahl > z.teilnehmende ? s.soll_anzahl - z.teilnehmende : 0;
-  const leute = eintraege.filter((a) => a.schicht_id === s.id && an(a)).sort((x, y) => (x.status === y.status ? nachRangTiefZuerst(x, y) : x.status === 'bestaetigt' ? -1 : 1));
-  const zeigen = leute.slice(0, 12);
-  return html`<article class="karte schicht-karte2${s.end_zeit <= jetzt ? ' vergangen' : ''}">
-  <header>
-    <div><h3><a href="${besetzenPfad(e.id, schichten.length > 1 ? s.id : null)}">${s.name}</a></h3><p class="unter">${zeitraum(s.start_zeit, s.end_zeit, s.zeit_offen)}</p></div>
-    <div class="karte-besetzung">
-      <span class="unter">Besetzung</span>
-      <span class="karte-zahl f-${sollFarbe(z.teilnehmende, s.soll_anzahl)}"><strong>${z.teilnehmende}${s.soll_anzahl ? ` / ${s.soll_anzahl}` : ''}</strong>${fehlt ? ` · ${fehlt} fehlen` : ''}</span>
-      ${belegung(z, s.soll_anzahl, false)}
-    </div>
-  </header>
-  ${z.rollen.length ? html`<p class="pillen">${z.rollen.map((r) => html`<span class="pille ${r.ist >= r.soll ? 'gruen' : 'rot'}">${r.rolle} ${r.ist}/${r.soll}</span>`)}</p>` : ''}
-  ${fremdBlock(s.id)}
-  ${!leute.length ? html`<p class="leer karte-leer">Noch niemand zugeteilt.</p>` : html`<ul class="karte-personen">${zeigen.map((a) => html`<li><span>${name(a)}${a.rolle ? html` <span class="unter">· ${a.rolle}</span>` : ''}</span>${statusText(a.status as Status)}</li>`)}${leute.length > zeigen.length ? html`<li class="unter">+ ${leute.length - zeigen.length} weitere</li>` : ''}</ul>`}
-  <footer>
-    <a class="knopf klein" href="${besetzenPfad(e.id, schichten.length > 1 ? s.id : null)}">Besetzen ›</a>
-    <a class="knopf klein" href="/schichten/${s.id}/bearbeiten">Bearbeiten</a>
-    <form method="post" action="/schichten/${s.id}/publizieren" class="inline">
-      ${formFelder(kx, hier)}
-      <input type="hidden" name="publiziert" value="${s.publiziert ? '0' : '1'}">
-      <button type="submit" class="schalter${s.publiziert ? ' an' : ''}" aria-pressed="${s.publiziert ? 'true' : 'false'}">${s.publiziert ? 'Publiziert' : 'Nicht publiziert'}</button>
-    </form>
-  </footer>
-</article>`;
-})}</div>`}
-</section>`;
-
-    // ---------- Reiter «Schichten»: Tabelle «Schichten bearbeiten» ----------
-    const bearbeitenTabelle = async () => {
-      const bedarf = ids.length
-        ? await alle<{ schicht_id: number; rolle: string; anzahl: number }>(db, 'SELECT schicht_id, rolle, anzahl FROM schicht_rolle WHERE schicht_id IN (?)', [ids])
-        : [];
-      const werte = tabelle?.werte ?? {};
-      const zeileAusDb = (s: (typeof schichten)[number]): SchichtZeile => ({
-        name: s.name, datum: lokalesDatum(s.start_zeit), beginn: anzeigeZeiten(s).beginn, ende: anzeigeZeiten(s).ende,
-        soll_anzahl: s.soll_anzahl ?? '', ort: s.ort ?? '', bemerkung_intern: s.bemerkung_intern ?? '',
-        rollen: Object.fromEntries(bedarf.filter((b) => b.schicht_id === s.id).map((b) => [b.rolle, String(b.anzahl)])),
-      });
-      const wert = (z: SchichtZeile, feld: keyof SchichtZeile) => (z[feld] === null || z[feld] === undefined ? '' : String(z[feld]));
-      const rolleWert = (z: SchichtZeile, rolle: string) => {
-        const w = z.rollen?.[rolle];
+    // ---------- Reiter «Schichten»: eine Zeile zum Aufklappen je Schicht (Vorschlag Yann 20.11.2026) ----------
+    const raengeListe = ansicht === 'schichten' ? await ladeRaenge(db) : [];
+    const bedarf = ansicht === 'schichten' && ids.length
+      ? await alle<{ schicht_id: number; rolle: string; anzahl: number }>(db, 'SELECT schicht_id, rolle, anzahl FROM schicht_rolle WHERE schicht_id IN (?)', [ids])
+      : [];
+    const offenId = String(req.query.offen ?? '');
+    const schichtZeile = (s: (typeof schichten)[number]) => {
+      const f = fehler && fehler.sid === s.id ? fehler : null;
+      const werte: Record<string, unknown> = f ? f.werte : {
+        ...s,
+        start_datum: lokalesDatum(s.start_zeit), start_zeit: anzeigeZeiten(s).beginn,
+        end_datum: passtInTabelle(s) ? '' : lokalesDatum(s.end_zeit), end_zeit: anzeigeZeiten(s).ende,
+        rollen: Object.fromEntries(bedarf.filter((x) => x.schicht_id === s.id).map((x) => [x.rolle, String(x.anzahl)])),
+      };
+      const v = (n: string) => (werte[n] === null || werte[n] === undefined ? '' : String(werte[n]));
+      const rolleWert = (r: string) => {
+        const w = (werte.rollen as Record<string, unknown> | undefined)?.[r];
         return w === null || w === undefined ? '' : String(w);
       };
-      const zellen = (schluessel: string, z: SchichtZeile, neu: boolean) => html`
-    <td><input name="z[${schluessel}][name]" value="${wert(z, 'name')}" maxlength="255" aria-label="Name"${neu ? new Roh(' placeholder="+ Neue Schicht"') : new Roh(' required')}></td>
-    <td><input type="date" name="z[${schluessel}][datum]" value="${wert(z, 'datum')}" aria-label="Datum"></td>
-    <td><input type="time" name="z[${schluessel}][beginn]" value="${wert(z, 'beginn')}" aria-label="Beginn"></td>
-    <td><input type="time" name="z[${schluessel}][ende]" value="${wert(z, 'ende')}" aria-label="Ende"></td>
-    ${rollen.map((r) => html`<td class="zahl"><input class="zahl-feld" type="number" min="0" max="10000" name="z[${schluessel}][rollen][${r.name}]" value="${rolleWert(z, r.name)}" placeholder="–" aria-label="${r.name}"></td>`)}
-    <td class="zahl"><input class="zahl-feld" type="number" min="0" max="100000" name="z[${schluessel}][soll_anzahl]" value="${wert(z, 'soll_anzahl')}" placeholder="–" aria-label="Soll"></td>
-    <td><input name="z[${schluessel}][ort]" value="${wert(z, 'ort')}" maxlength="255" placeholder="${e.ort ?? 'Ort'}" aria-label="Antretensort"></td>
-    <td><input name="z[${schluessel}][bemerkung_intern]" value="${wert(z, 'bemerkung_intern')}" maxlength="5000" aria-label="Interne Bemerkung"></td>`;
-      const tagVorgabe = schichten.length ? lokalesDatum(schichten[schichten.length - 1].start_zeit) : '';
-      return html`<section aria-labelledby="bearbeiten-titel" class="schichten-bearbeiten">
-<div class="titelzeile"><h2 id="bearbeiten-titel">Schichten bearbeiten <span class="unter">Name, Tag, Zeit, Soll und Bedarf je Rolle</span></h2></div>
-${tabelle ? html`<div class="meldung fehler" role="alert">${tabelle.fehler}</div>` : ''}
-<form method="post" action="/einsaetze/${e.id}/schichten/tabelle" class="tabelle-formular">
-  ${formFelder(kx)}
-  <div class="rahmen"><table class="tabelle bearbeiten-tabelle">
-    <thead><tr><th>Name</th><th>Datum</th><th>Beginn</th><th>Ende</th>${rollen.map((r) => html`<th class="zahl" title="Bedarf ${r.name}">${r.name}</th>`)}<th class="zahl">Soll</th><th>Antretensort</th><th>Interne Bemerkung</th><th><span class="sr">Aktionen</span></th></tr></thead>
-    <tbody>
-    ${schichten.map((s) => {
-      const schluessel = `s${s.id}`;
-      if (!passtInTabelle(s)) {
-        return html`<tr class="nur-lesen"><td>${s.name}</td><td colspan="${3 + rollen.length + 3}">${zeitraum(s.start_zeit, s.end_zeit, s.zeit_offen)} <span class="unter">· dauert über den Folgetag hinaus</span></td><td><a class="knopf klein" href="/schichten/${s.id}/bearbeiten">Bearbeiten</a></td></tr>`;
-      }
-      const ausDb = zeileAusDb(s);
-      const gesendet = werte[schluessel] as SchichtZeile | undefined;
-      const z = gesendet ?? ausDb;
-      const ursprung = typeof gesendet?.ursprung === 'string' ? gesendet.ursprung : zeilenAbdruck(ausDb);
-      return html`<tr>
-    ${zellen(schluessel, z, false)}
-    <td class="aktionen-zelle"><input type="hidden" name="z[${schluessel}][version]" value="${s.version}"><input type="hidden" name="z[${schluessel}][ursprung]" value="${ursprung}"><a class="knopf gefahr klein" href="/schichten/${s.id}/loeschen">Löschen</a></td>
-  </tr>`;
-    })}
-    <tr class="neue-zeile">
-      ${zellen('neu', (werte.neu as SchichtZeile | undefined) ?? { name: '', datum: tagVorgabe, beginn: '', ende: '', rollen: {} }, true)}
-      <td class="unter">neu</td>
-    </tr>
-    </tbody>
-  </table></div>
-  <div class="tabelle-fuss">
-    <p class="unter">Ende vor Beginn = Ende am Folgetag. Soll zählt die Teilnehmenden, die Rollen zeigen den Bedarf je Rolle. Tenue, Abtreten, Mindestalter und Hinweis ändert das Formular der Schicht. Neue Schicht: unterste Zeile ausfüllen. Sie ist danach nicht publiziert.</p>
-    <button type="submit" class="knopf haupt">Speichern</button>
+      const id = (n: string) => `s${s.id}-${n}`;
+      const offen = !!f || offenId === String(s.id) || schichten.length === 1;
+      const ziel = `/einsaetze/${e.id}/schichten?offen=${s.id}#schicht-${s.id}`;
+      const z = zahlen.get(s.id)!;
+      const feld = (n: string, text: string, eingabe: Roh, hinweis = '') => html`<div class="feld"><label for="${id(n)}">${text}</label>${eingabe}${hinweis ? html`<small>${hinweis}</small>` : ''}</div>`;
+      const eingabe = (n: string, typ = 'text', extra = '') => html`<input id="${id(n)}" name="${n}" type="${typ}" value="${v(n)}"${new Roh(extra)}>`;
+      const textfeld = (n: string, max: number) => html`<textarea id="${id(n)}" name="${n}" rows="2" maxlength="${max}">${v(n)}</textarea>`;
+      return html`<article class="schicht-akk${s.end_zeit <= jetzt ? ' vergangen' : ''}" id="schicht-${s.id}">
+  <div class="akk-aktionen">
+    <form method="post" action="/schichten/${s.id}/publizieren" class="inline">
+      ${formFelder(kx, hier)}<input type="hidden" name="publiziert" value="${s.publiziert ? '0' : '1'}">
+      <button type="submit" class="schalter${s.publiziert ? ' an' : ''}" aria-pressed="${s.publiziert ? 'true' : 'false'}">${s.publiziert ? 'Publiziert' : 'Nicht publiziert'}</button>
+    </form>
+    <a class="knopf klein" href="${besetzenPfad(e.id, schichten.length > 1 ? s.id : null)}">Besetzen ›</a>
   </div>
-</form>
-</section>`;
+  <details${offen ? new Roh(' open') : ''}>
+    <summary>
+      <span class="akk-name"><span class="akk-pfeil" aria-hidden="true">›</span> <strong>${s.name}</strong> <span class="unter">${zeitraum(s.start_zeit, s.end_zeit, s.zeit_offen)}</span></span>
+      ${belegung(z, s.soll_anzahl)}
+    </summary>
+    <div class="akk-inhalt">
+      ${f ? html`<div class="meldung fehler" role="alert">${f.fehler}</div>` : ''}
+      <form method="post" action="/schichten/${s.id}" class="akk-form">
+        ${formFelder(kx, ziel)}<input type="hidden" name="version" value="${f?.version ?? s.version}">
+        <div class="akk-gruppen">
+          <fieldset class="akk-gruppe"><legend>Wann</legend>
+            ${feld('name', 'Name', html`<input id="${id('name')}" name="name" required maxlength="255" value="${v('name')}">`)}
+            <div class="akk-reihe">
+              ${feld('start_datum', 'Datum', html`<input id="${id('start_datum')}" name="start_datum" type="date" required value="${v('start_datum')}">`)}
+              ${feld('start_zeit', 'Beginn', eingabe('start_zeit', 'time'))}
+              ${feld('end_zeit', 'Ende', eingabe('end_zeit', 'time'))}
+            </div>
+            ${v('end_datum') ? feld('end_datum', 'Enddatum', eingabe('end_datum', 'date'), 'Leer = gleicher Tag.') : ''}
+            <small>Ende vor Beginn = Folgetag. Leer = «Zeit offen».</small>
+          </fieldset>
+          <fieldset class="akk-gruppe"><legend>Wer</legend>
+            <div class="akk-reihe zwei">
+              ${feld('soll_anzahl', 'Soll (Teilnehmende)', eingabe('soll_anzahl', 'number', ' min="0" max="100000"'))}
+              ${feld('min_alter', 'Mindestalter', eingabe('min_alter', 'number', ' min="0" max="120"'))}
+            </div>
+            ${feld('min_rang_id', 'Mindestrang', html`<select id="${id('min_rang_id')}" name="min_rang_id"><option value="">– keiner –</option>${raengeListe.map((r) => html`<option value="${r.id}"${String(r.id) === v('min_rang_id') ? new Roh(' selected') : ''}>${r.name}</option>`)}</select>`)}
+            ${rollen.length ? html`<div class="akk-reihe">${rollen.map((r, ri) => html`<div class="feld"><label for="${id(`rolle-${ri}`)}">${r.name}</label><input id="${id(`rolle-${ri}`)}" type="number" min="0" max="10000" name="rollen[${r.name}]" value="${rolleWert(r.name)}" placeholder="–"></div>`)}</div><small>Bedarf je Rolle.</small>` : ''}
+          </fieldset>
+          <fieldset class="akk-gruppe"><legend>Wo und was</legend>
+            ${feld('ort', 'Antreten', html`<input id="${id('ort')}" name="ort" maxlength="255" value="${v('ort')}" placeholder="${e.ort ?? ''}">`)}
+            ${feld('abtreten_ort', 'Abtreten', html`<input id="${id('abtreten_ort')}" name="abtreten_ort" maxlength="255" value="${v('abtreten_ort')}" placeholder="wie Antreten">`)}
+            ${feld('tenue', 'Tenue', html`<input id="${id('tenue')}" name="tenue" maxlength="255" value="${v('tenue')}">`)}
+          </fieldset>
+          <fieldset class="akk-gruppe"><legend>Texte</legend>
+            ${feld('aufgebot_hinweis', 'Hinweis Aufgebot', textfeld('aufgebot_hinweis', 2000))}
+            ${feld('bemerkung_extern', 'Bemerkung im Formular', textfeld('bemerkung_extern', 5000))}
+            ${feld('bemerkung_intern', 'Interne Bemerkung', textfeld('bemerkung_intern', 5000))}
+          </fieldset>
+        </div>
+        <div class="akk-fuss"><span class="unter">Ändert der Einsatz Ort, Abtreten, Tenue oder Hinweis, gilt das für Schichten mit gleichem Wert.</span><button type="submit" class="knopf haupt">Speichern</button></div>
+      </form>
+      ${fremdBlock(s.id)}
+      <div class="akk-fuss">
+        <span class="knopfreihe">
+          ${knopfPost(kx, `/schichten/${s.id}/kopieren`, 'Schicht kopieren', {}, 'knopf klein')}
+          ${schichten.length > 1 ? html`<a class="knopf gefahr klein" href="/schichten/${s.id}/loeschen">Schicht löschen</a>` : ''}
+        </span>
+      </div>
+    </div>
+  </details>
+</article>`;
     };
+    const fn = fehler && fehler.sid === 'neu' ? fehler : null;
+    const nv = (n: string) => (fn && fn.werte[n] !== undefined && fn.werte[n] !== null ? String(fn.werte[n]) : '');
+    const tagVorgabe = schichten.length ? lokalesDatum(schichten[schichten.length - 1].start_zeit) : '';
+    const schichtenAnsicht = () => html`<section aria-labelledby="akk-titel" class="schichten-akk">
+<h2 id="akk-titel" class="sr">Schichten</h2>
+${schichten.map(schichtZeile)}
+<form method="post" action="/einsaetze/${e.id}/schichten" class="neue-schicht" id="neue-schicht">
+  ${formFelder(kx)}
+  ${fn ? html`<div class="meldung fehler breit" role="alert">${fn.fehler}</div>` : ''}
+  <div class="feld"><label for="neu-name">Neue Schicht</label><input id="neu-name" name="name" required maxlength="255" placeholder="Name, z. B. Abbau" value="${nv('name')}"></div>
+  <div class="feld"><label for="neu-datum">Datum</label><input id="neu-datum" name="start_datum" type="date" required value="${nv('start_datum') || tagVorgabe}"></div>
+  <div class="feld"><label for="neu-beginn">Beginn</label><input id="neu-beginn" name="start_zeit" type="time" value="${nv('start_zeit')}"></div>
+  <div class="feld"><label for="neu-ende">Ende</label><input id="neu-ende" name="end_zeit" type="time" value="${nv('end_zeit')}"></div>
+  <button type="submit" class="knopf">Hinzufügen</button>
+</form>
+<p class="unter">Eine neue Schicht übernimmt Ort, Abtreten, Tenue und Hinweis vom Einsatz. Sie ist zuerst nicht publiziert. Leere Zeiten = «Zeit offen».</p>
+</section>`;
 
     // ---------- Reiter «Verlauf» ----------
     const verlaufAnsicht = async () => {
@@ -420,10 +430,10 @@ ${seitenKopf({
 <div class="einsatz-uebersicht">
 ${ansicht === 'uebersicht' ? html`${steckbrief}${zuTun}${schichtTabelle}`
   : ansicht === 'besetzen' ? (await besetzenAnsicht(db, kx, req, e.id, hier)).inhalt
-  : ansicht === 'schichten' ? html`${await schichtKarten()}${await bearbeitenTabelle()}`
+  : ansicht === 'schichten' ? schichtenAnsicht()
   : await verlaufAnsicht()}
 </div>`;
-    res.status(tabelle ? (tabelle.fehler.startsWith('Ein anderer Benutzer') ? 409 : 400) : 200)
+    res.status(fehler ? fehler.status : 200)
       .send(seite(kx, ansicht === 'uebersicht' ? e.name : `${e.name} · ${ANSICHT_TEXT[ansicht]}`, 'einsaetze', inhalt, { breit: true }));
   };
 
@@ -444,25 +454,46 @@ ${ansicht === 'uebersicht' ? html`${steckbrief}${zuTun}${schichtTabelle}`
   app.get('/einsaetze/:id/schichten', nurAufgebot, (req, res) => einsatzSeite(req, res, 'schichten'));
   app.get('/einsaetze/:id/verlauf', nurAufgebot, (req, res) => einsatzSeite(req, res, 'verlauf'));
 
-  // Tabelle «Schichten bearbeiten»: alle Zeilen in einer Transaktion, dazu eine neue Schicht (unterste Zeile).
-  app.post('/einsaetze/:id/schichten/tabelle', nurAufgebot, async (req, res) => {
-    const id = leseId(req.params.id);
-    const roh = (req.body?.z ?? {}) as Record<string, any>;
-    if (typeof roh !== 'object' || Array.isArray(roh)) throw new Eingabefehler('Die Tabelle ist ungültig.');
-    const zeilen: SchichtZeile[] = [];
-    for (const [schluessel, wert] of Object.entries(roh)) {
-      if (!/^s\d+$/.test(schluessel) || typeof wert !== 'object' || wert === null) continue;
-      zeilen.push({ ...wert, id: Number(schluessel.slice(1)), rollen: typeof wert.rollen === 'object' && wert.rollen ? wert.rollen : {} });
-    }
-    const neu = typeof roh.neu === 'object' && roh.neu ? { ...roh.neu, rollen: typeof roh.neu.rollen === 'object' && roh.neu.rollen ? roh.neu.rollen : {} } : null;
+  // Reiter «Schichten» (Vorschlag Yann 20.11.2026): Speichern einer Schicht. Fehler erscheinen in der aufgeklappten Zeile.
+  app.post('/schichten/:sid', nurAufgebot, async (req, res) => {
+    const sid = leseId(req.params.sid);
+    const s = await ladeSchicht(db, sid);
     try {
-      const r = await speichereSchichtTabelle(db, id, zeilen, neu);
-      const teile = [r.geaendert ? `${r.geaendert} ${r.geaendert === 1 ? 'Schicht' : 'Schichten'} gespeichert.` : '', r.neuId ? 'Neue Schicht angelegt. Sie ist nicht publiziert.' : ''].filter(Boolean);
-      zurueck(req, res, `/einsaetze/${id}/schichten`, teile.length ? teile.join(' ') : 'Keine Änderung.');
-    } catch (fehler) {
-      if (!(fehler instanceof Eingabefehler)) throw fehler;
-      await einsatzSeite(req, res, 'schichten', { werte: roh, fehler: fehler.message });
+      await aendereSchicht(db, sid, { ...req.body, rollen: req.body.rollen ?? {} });
+      zurueck(req, res, `/einsaetze/${s.einsatz_id}/schichten?offen=${sid}#schicht-${sid}`, 'Schicht gespeichert.');
+    } catch (f) {
+      if (!(f instanceof Eingabefehler)) throw f;
+      // Konflikt: Die Eingaben bleiben. Ein zweites Speichern überschreibt bewusst den neuen Stand.
+      const konflikt = f instanceof Konflikt;
+      req.params.id = String(s.einsatz_id);
+      await einsatzSeite(req, res, 'schichten', { sid, werte: req.body, fehler: f.message, version: konflikt ? f.aktuelleVersion : req.body.version, status: konflikt ? 409 : 400 });
     }
+  });
+
+  app.post('/einsaetze/:id/schichten', nurAufgebot, async (req, res) => {
+    const einsatzId = leseId(req.params.id);
+    try {
+      const sid = await erstelleSchicht(db, einsatzId, { ...req.body, end_datum: req.body?.end_datum ?? '' });
+      zurueck(req, res, `/einsaetze/${einsatzId}/schichten?offen=${sid}#schicht-${sid}`, 'Schicht hinzugefügt. Sie ist nicht publiziert.');
+    } catch (f) {
+      if (!(f instanceof Eingabefehler)) throw f;
+      await einsatzSeite(req, res, 'schichten', { sid: 'neu', werte: req.body, fehler: f.message, status: 400 });
+    }
+  });
+
+  app.post('/schichten/:sid/kopieren', nurAufgebot, async (req, res) => {
+    const s = await ladeSchicht(db, leseId(req.params.sid));
+    const neu = await kopiereSchicht(db, s.id);
+    zurueck(req, res, `/einsaetze/${s.einsatz_id}/schichten?offen=${neu}#schicht-${neu}`, 'Schicht kopiert. Die Kopie ist nicht publiziert.');
+  });
+
+  // Alte Seiten «Schicht bearbeiten» und «Schicht hinzufügen»: Der Reiter «Schichten» ersetzt sie.
+  app.get('/schichten/:sid/bearbeiten', nurAufgebot, async (req, res) => {
+    const s = await ladeSchicht(db, leseId(req.params.sid));
+    res.redirect(303, `/einsaetze/${s.einsatz_id}/schichten?offen=${s.id}#schicht-${s.id}`);
+  });
+  app.get('/einsaetze/:id/schichten/neu', nurAufgebot, (req, res) => {
+    res.redirect(303, `/einsaetze/${leseId(req.params.id)}/schichten#neue-schicht`);
   });
 
   app.get('/einsaetze/:id/bearbeiten', nurAufgebot, async (req, res) => {

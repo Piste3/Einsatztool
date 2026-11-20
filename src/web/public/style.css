@@ -31,6 +31,8 @@
   --violett: #6d28d9;
   --violett-punkt: #8b5cf6;
   --violett-hg: #f5f3ff;
+  --balken-bestaetigt: #15803d;
+  --balken-angemeldet: #86efac;
   --grau: #8a8a93;
   --grau-hg: #f4f4f5;
   --schatten: 0 1px 2px rgba(0, 0, 0, .04);
@@ -333,10 +335,8 @@ form.inline { display: inline; margin: 0; }
 .ist-soll.f-orange .zahl { color: var(--orange); }
 .ist-soll.f-rot .zahl { color: var(--rot); }
 .balken { display: block; height: 4px; background: var(--grau-hg); border-radius: 3px; overflow: hidden; width: 100%; }
-.balken > span { display: block; height: 100%; background: var(--grau); }
-.f-gruen .balken > span { background: var(--gruen-punkt); }
-.f-orange .balken > span { background: var(--orange-punkt); }
-.f-rot .balken > span { background: var(--rot); }
+.balken > span { display: block; height: 100%; background: var(--balken-bestaetigt); }
+/* Wunsch Yann 20.11.2026: Balken immer grün. Bestätigt dunkelgrün, angemeldet (offen) hellgrün. Ist / Soll zeigt die Zahl in Farbe. */
 .b0 { width: 0; } .b10 { width: 10%; } .b20 { width: 20%; } .b30 { width: 30%; } .b40 { width: 40%; } .b50 { width: 50%; }
 .b60 { width: 60%; } .b70 { width: 70%; } .b80 { width: 80%; } .b90 { width: 90%; } .b100 { width: 100%; }
 
@@ -712,11 +712,8 @@ body.druck { background: var(--hg); padding: 1rem; }
 .belegung { display: grid; gap: .25rem; min-width: 8.5rem; }
 .belegung-balken { display: block; width: 100%; height: 7px; border-radius: 4px; overflow: hidden; }
 .belegung-balken .spur { fill: var(--grau-hg); }
-.belegung-balken .b { fill: var(--grau); }
-.belegung-balken .a { fill: color-mix(in srgb, var(--gruen-punkt) 35%, transparent); }
-.belegung.f-gruen .belegung-balken .b { fill: var(--gruen-punkt); }
-.belegung.f-orange .belegung-balken .b { fill: var(--orange-punkt); }
-.belegung.f-rot .belegung-balken .b { fill: var(--rot); }
+.belegung-balken .b { fill: var(--balken-bestaetigt); }
+.belegung-balken .a { fill: var(--balken-angemeldet); }
 .belegung-text { font-size: .85rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .belegung-text .unter { margin: 0; }
 .belegung.f-gruen .belegung-text strong { color: var(--gruen); }
@@ -843,4 +840,42 @@ body.druck { background: var(--hg); padding: 1rem; }
   .besetzen-tabelle:not(.besetzen-matrix) td.antwort .knopfreihe { justify-content: flex-start; }
   .besetzen-tabelle:not(.besetzen-matrix) td.antwort .knopf { padding: .4rem .8rem; }
   .besetzen-tabelle .zeile-notiz, .besetzen-tabelle td.person .warnungen { margin-left: 0; }
+}
+
+/* ---------- Einsatz › Schichten: eine Zeile zum Aufklappen je Schicht (20.11.2026) ---------- */
+.schichten-akk { display: grid; gap: .6rem; }
+.schicht-akk { position: relative; border: 1px solid var(--linie); border-radius: 10px; background: var(--flaeche); }
+.schicht-akk.vergangen { opacity: .75; }
+.schicht-akk:has(> details[open]) { border-color: var(--linie-stark); box-shadow: 0 6px 20px rgba(0, 0, 0, .05); }
+.schicht-akk > details > summary { list-style: none; cursor: pointer; display: grid; grid-template-columns: minmax(0, 1fr) minmax(9rem, 14rem); gap: .4rem 1rem; align-items: center; padding: .75rem 17rem .75rem .9rem; }
+.schicht-akk > details > summary::-webkit-details-marker { display: none; }
+.schicht-akk > details > summary:hover { background: var(--grau-hg); border-radius: 10px; }
+.akk-name { min-width: 0; }
+.akk-name .unter { margin-left: .3rem; }
+.akk-pfeil { display: inline-block; width: 1em; color: var(--gedämpft); transition: transform .15s; }
+.schicht-akk > details[open] .akk-pfeil { transform: rotate(90deg); }
+@media (prefers-reduced-motion: reduce) { .akk-pfeil { transition: none; } }
+.akk-aktionen { position: absolute; top: .6rem; right: .8rem; display: flex; gap: .4rem; align-items: center; z-index: 1; }
+.akk-inhalt { border-top: 1px solid var(--linie); padding: .9rem; display: grid; gap: .8rem; }
+.akk-gruppen { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: .9rem; }
+.akk-gruppe { border: 0; margin: 0; padding: 0; display: grid; gap: .5rem; align-content: start; min-width: 0; }
+.akk-gruppe legend { padding: 0 0 .3rem; font-size: .72rem; text-transform: uppercase; letter-spacing: .06em; color: var(--gedämpft); font-weight: 600; }
+.akk-gruppe .feld { display: grid; gap: .15rem; min-width: 0; }
+.akk-gruppe .feld label { font-size: .78rem; color: var(--gedämpft); }
+.akk-gruppe .feld input, .akk-gruppe .feld select, .akk-gruppe .feld textarea { width: 100%; min-width: 0; box-sizing: border-box; }
+.akk-gruppe small { font-size: .72rem; color: var(--gedämpft); }
+.akk-reihe { display: grid; grid-template-columns: repeat(auto-fit, minmax(5.5rem, 1fr)); gap: .5rem; }
+.akk-reihe.zwei { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.akk-fuss { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; justify-content: space-between; }
+.akk-fuss .unter { font-size: .78rem; }
+.neue-schicht { display: grid; grid-template-columns: minmax(0, 2fr) repeat(3, minmax(0, 1fr)) auto; gap: .5rem; align-items: end; padding: .75rem .9rem; border: 1px dashed var(--linie-stark); border-radius: 10px; }
+.neue-schicht .feld { display: grid; gap: .15rem; min-width: 0; }
+.neue-schicht .feld label { font-size: .78rem; color: var(--gedämpft); }
+.neue-schicht .feld input { width: 100%; min-width: 0; box-sizing: border-box; }
+.neue-schicht .breit { grid-column: 1 / -1; }
+@media (max-width: 760px) {
+  .akk-aktionen { position: static; padding: .6rem .9rem 0; justify-content: flex-end; }
+  .schicht-akk > details > summary { grid-template-columns: minmax(0, 1fr); padding: .5rem .9rem .75rem; }
+  .neue-schicht { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .neue-schicht .feld:first-of-type { grid-column: 1 / -1; }
 }

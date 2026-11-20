@@ -81,70 +81,8 @@ function v(e: Record<string, unknown>, n: string): string {
   return e[n] === null || e[n] === undefined ? '' : String(e[n]);
 }
 
-async function schichtFormular(deps: Abhaengigkeiten, kx: ReturnType<typeof k>, ziel: string, e: Record<string, unknown>, bedarf: Map<string, number>, fehler: string | null, neu: boolean): Promise<Roh> {
-  const raenge = await ladeRaenge(deps.db);
-  const rollen = await ladeRollen(deps.db);
-  const rollenWerte = (e.rollen ?? {}) as Record<string, string>;
-  return html`
-${fehler ? html`<div class="meldung fehler" role="alert">${fehler}</div>` : ''}
-<form method="post" action="${ziel}" class="formular-raster">
-  ${formFelder(kx)}${neu ? '' : html`<input type="hidden" name="version" value="${v(e, 'version')}">`}
-  <div class="feld breit"><label for="name">Name</label><input id="name" name="name" required maxlength="255" value="${v(e, 'name')}"></div>
-  <div class="feld"><label for="start_datum">Start Datum</label><input id="start_datum" type="date" name="start_datum" required value="${v(e, 'start_datum')}"></div>
-  <div class="feld"><label for="start_zeit">Start Zeit</label><input id="start_zeit" type="time" name="start_zeit" value="${v(e, 'start_zeit')}"></div>
-  <div class="feld"><label for="end_datum">Ende Datum</label><input id="end_datum" type="date" name="end_datum" required value="${v(e, 'end_datum')}"></div>
-  <div class="feld"><label for="end_zeit">Ende Zeit</label><input id="end_zeit" type="time" name="end_zeit" value="${v(e, 'end_zeit')}"></div>
-  ${neu ? html`<p class="breit unter">Ort, Ort Abtreten, Tenue und Hinweis übernimmt die Schicht vom Einsatz. Eine neue Schicht ist nicht publiziert.</p>` : html`
-  <div class="feld breit"><label for="ort">Ort Antreten</label><input id="ort" name="ort" maxlength="255" value="${v(e, 'ort')}"><small>Eine Änderung gilt nur für diese Schicht.</small></div>
-  <div class="feld breit"><label for="abtreten_ort">Ort Abtreten</label><input id="abtreten_ort" name="abtreten_ort" maxlength="255" value="${v(e, 'abtreten_ort')}"><small>Leer = gleich wie Ort Antreten.</small></div>
-  <div class="feld breit"><label for="tenue">Tenue</label><input id="tenue" name="tenue" maxlength="255" value="${v(e, 'tenue')}"></div>
-  <div class="feld breit"><label for="aufgebot_hinweis">Hinweis Aufgebot</label><textarea id="aufgebot_hinweis" name="aufgebot_hinweis" rows="2" maxlength="2000">${v(e, 'aufgebot_hinweis')}</textarea></div>`}
-  <div class="feld"><label for="min_alter">Mindestalter</label><input id="min_alter" type="number" min="0" max="120" name="min_alter" value="${v(e, 'min_alter')}"></div>
-  <div class="feld"><label for="min_rang_id">Mindestrang</label><select id="min_rang_id" name="min_rang_id"><option value="">– keiner –</option>${raenge.map(
-    (r) => html`<option value="${r.id}"${String(r.id) === v(e, 'min_rang_id') ? new Roh(' selected') : ''}>${r.name}</option>`,
-  )}</select></div>
-  <div class="feld"><label for="soll_anzahl">Soll-Anzahl TN</label><input id="soll_anzahl" type="number" min="0" name="soll_anzahl" value="${v(e, 'soll_anzahl')}"><small>Zielwert, keine Obergrenze.</small></div>
-  <fieldset class="breit rollen-bedarf"><legend>Benötigte Rollen</legend>
-    ${rollen.map((r) => html`<label>${r.name} <input type="number" min="0" max="10000" name="rollen[${r.name}]" value="${rollenWerte[r.name] ?? (bedarf.get(r.name) ? String(bedarf.get(r.name)) : '')}"></label>`)}
-  </fieldset>
-  <div class="feld breit"><label for="bemerkung_intern">Bemerkung intern</label><textarea id="bemerkung_intern" name="bemerkung_intern" rows="2" maxlength="5000">${v(e, 'bemerkung_intern')}</textarea></div>
-  <div class="feld breit"><label for="bemerkung_extern">Bemerkung extern</label><textarea id="bemerkung_extern" name="bemerkung_extern" rows="2" maxlength="5000">${v(e, 'bemerkung_extern')}</textarea><small>Sichtbar im Formular.</small></div>
-  <div class="aktionen breit"><button type="submit" class="knopf haupt">${neu ? 'Schicht hinzufügen' : 'Speichern'}</button></div>
-</form>`;
-}
-
-function schichtWerte(s: SchichtMitEinsatz): Record<string, unknown> {
-  return {
-    ...s,
-    start_datum: lokalesDatum(s.start_zeit), start_zeit: anzeigeZeiten(s).beginn,
-    end_datum: lokalesDatum(s.end_zeit), end_zeit: anzeigeZeiten(s).ende,
-  };
-}
-
 export function registriereSchichten(app: Express, deps: Abhaengigkeiten): void {
   const { db } = deps;
-
-  app.get('/einsaetze/:id/schichten/neu', nurAufgebot, async (req, res) => {
-    const kx = k(res);
-    const e = await ladeEinsatz(db, leseId(req.params.id));
-    const erste = await alle<{ start_zeit: string; end_zeit: string }>(db, 'SELECT start_zeit, end_zeit FROM schicht WHERE einsatz_id = ? ORDER BY start_zeit LIMIT 1', [e.id]);
-    const vorgabe = erste.length
-      ? { start_datum: lokalesDatum(erste[0].start_zeit), start_zeit: lokaleZeit(erste[0].start_zeit), end_datum: lokalesDatum(erste[0].end_zeit), end_zeit: lokaleZeit(erste[0].end_zeit) }
-      : {};
-    res.send(seite(kx, 'Schicht hinzufügen', 'einsaetze', html`${seitenKopf({ pfad: [{ text: 'Einsätze', href: '/einsaetze' }, { text: e.name, href: `/einsaetze/${e.id}` }, { text: 'Schicht hinzufügen' }], titel: 'Schicht hinzufügen' })}${await schichtFormular(deps, kx, `/einsaetze/${e.id}/schichten`, vorgabe, new Map(), null, true)}`));
-  });
-
-  app.post('/einsaetze/:id/schichten', nurAufgebot, async (req, res) => {
-    const kx = k(res);
-    const einsatzId = leseId(req.params.id);
-    try {
-      const sid = await erstelleSchicht(db, einsatzId, req.body);
-      zurueck(req, res, `/schichten/${sid}`, 'Schicht hinzugefügt. Sie ist nicht publiziert.');
-    } catch (e) {
-      if (!(e instanceof Eingabefehler)) throw e;
-      res.status(400).send(seite(kx, 'Schicht hinzufügen', 'einsaetze', html`${seitenKopf({ pfad: [{ text: 'Einsätze', href: '/einsaetze' }, { text: 'Schicht hinzufügen' }], titel: 'Schicht hinzufügen' })}${await schichtFormular(deps, kx, `/einsaetze/${einsatzId}/schichten`, req.body, new Map(), e.message, true)}`));
-    }
-  });
 
   // Konzept «Bedienung im Einsatz» (OK Yann 20.11.2026): Die Arbeit mit Personen liegt im Reiter «Besetzen».
   // Alte Adressen der Schicht führen dorthin. Der Filter «status» wird auf die Filter von «Besetzen» abgebildet.
@@ -153,30 +91,6 @@ export function registriereSchichten(app: Express, deps: Abhaengigkeiten): void 
     const status = String(req.query.status ?? '');
     const filter = ({ angemeldet: 'neu', unsicher: 'offen', nachricht_gesendet: 'offen', bestaetigt: 'bestaetigt', abgemeldet: 'ab' } as Record<string, BesetzenFilter>)[status] ?? 'alle';
     res.redirect(303, besetzenPfad(s.einsatz_id, s.id, filter));
-  });
-
-  app.get('/schichten/:sid/bearbeiten', nurAufgebot, async (req, res) => {
-    const kx = k(res);
-    const s = await ladeSchicht(db, leseId(req.params.sid));
-    const bedarf = await rollenBedarf(db, s.id);
-    res.send(seite(kx, 'Schicht bearbeiten', 'einsaetze', html`${seitenKopf({ pfad: schichtPfad(s, 'Bearbeiten'), titel: 'Schicht bearbeiten' })}${await schichtFormular(deps, kx, `/schichten/${s.id}`, schichtWerte(s), bedarf, null, false)}`));
-  });
-
-  app.post('/schichten/:sid', nurAufgebot, async (req, res) => {
-    const kx = k(res);
-    const sid = leseId(req.params.sid);
-    try {
-      await aendereSchicht(db, sid, { ...req.body, rollen: req.body.rollen ?? {} });
-      zurueck(req, res, `/schichten/${sid}`);
-    } catch (e) {
-      if (!(e instanceof Eingabefehler)) throw e;
-      // Konflikt: Die Eingaben bleiben. Ein zweites Speichern überschreibt bewusst den neuen Stand.
-      const konflikt = e instanceof Konflikt;
-      const werte = konflikt ? { ...req.body, version: e.aktuelleVersion } : req.body;
-      res.status(konflikt ? 409 : 400).send(seite(kx, 'Schicht bearbeiten', 'einsaetze', html`${seitenKopf({ pfad: [{ text: 'Einsätze', href: '/einsaetze' }, { text: 'Schicht bearbeiten' }], titel: 'Schicht bearbeiten' })}${
-        konflikt ? html`<p><a href="/schichten/${sid}" target="_blank" rel="noopener">Aktuellen Stand in neuem Tab öffnen</a></p>` : ''
-      }${await schichtFormular(deps, kx, `/schichten/${sid}`, werte, new Map(), e.message, false)}`));
-    }
   });
 
   app.post('/schichten/:sid/publizieren', nurAufgebot, async (req, res) => {

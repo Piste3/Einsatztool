@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { inTagen, neueDatenbank } from './hilfe.js';
 import { anmelden, starteApp } from './web-hilfe.js';
 import { erstelleEinsatz } from '../src/domain/einsatz.js';
-import { ladeSchicht, schichtenVonEinsatz, speichereSchichtTabelle, zeilenAbdruck, anzeigeZeiten } from '../src/domain/schicht.js';
+import { aendereSchicht, ladeSchicht, schichtenVonEinsatz, anzeigeZeiten } from '../src/domain/schicht.js';
 import { lokalesDatum, lokaleZeit } from '../src/domain/zeit.js';
 
 test('T35 Neuer Einsatz nur mit Datum: Zeit offen, gleicher Tag, später nachtragen', async () => {
@@ -50,9 +50,8 @@ test('T35 Neuer Einsatz nur mit Datum: Zeit offen, gleicher Tag, später nachtra
     assert.doesNotMatch(neu, /name="end_datum" required/);
     assert.doesNotMatch(neu, /name="end_zeit" required/);
 
-    // Zeiten in der Tabelle nachtragen: Die Zeit ist danach nicht mehr offen.
-    const z = { name: s.name, datum: tag, beginn: '', ende: '', soll_anzahl: '', ort: '', bemerkung_intern: '', rollen: {} };
-    await speichereSchichtTabelle(t.db, id, [{ ...z, id: s.id, version: s.version, ursprung: zeilenAbdruck(z), beginn: '10:00', ende: '16:00' }], null);
+    // Zeiten im Reiter «Schichten» nachtragen (Enddatum leer = gleicher Tag): Die Zeit ist danach nicht mehr offen.
+    await aendereSchicht(t.db, s.id, { name: s.name, start_datum: tag, start_zeit: '10:00', end_datum: '', end_zeit: '16:00', version: s.version });
     const s4 = await ladeSchicht(t.db, s.id);
     assert.equal(Number(s4.zeit_offen), 0);
     assert.equal(lokaleZeit(s4.start_zeit), '10:00');
