@@ -501,6 +501,64 @@
     if (form.requestSubmit) form.requestSubmit(); else form.submit();
   });
 
+  // ---------- Reihenfolge ziehen: Ränge und Rollen (Wunsch Yann 20.11.2026) ----------
+  // Nur der Griff ⠿ startet das Ziehen. So bleiben Eingabefelder in der Zeile bedienbar.
+  // Nach dem Loslassen sendet das Skript die ganze neue Reihenfolge. Ohne Ziehen geht es über das Menü ⋮.
+  var ordnenZeile = null;
+  document.addEventListener('mousedown', function (ev) {
+    var griff = ev.target && ev.target.closest ? ev.target.closest('.ordnen-griff') : null;
+    var zeile = griff && griff.closest('tr.ordnen-zeile');
+    if (zeile) zeile.setAttribute('draggable', 'true');
+  });
+  document.addEventListener('dragstart', function (ev) {
+    var zeile = ev.target && ev.target.closest ? ev.target.closest('tr.ordnen-zeile[draggable="true"]') : null;
+    if (!zeile) return;
+    ordnenZeile = zeile;
+    zeile.classList.add('zieht');
+    ev.dataTransfer.effectAllowed = 'move';
+    try { ev.dataTransfer.setData('text/plain', zeile.getAttribute('data-ordnen-wert')); } catch (e) { /* alter Browser */ }
+  });
+  document.addEventListener('dragover', function (ev) {
+    if (!ordnenZeile) return;
+    var ziel = ev.target && ev.target.closest ? ev.target.closest('tr.ordnen-zeile') : null;
+    if (!ziel || ziel.parentNode !== ordnenZeile.parentNode) return;
+    ev.preventDefault();
+    ev.dataTransfer.dropEffect = 'move';
+    if (ziel === ordnenZeile) return;
+    var r = ziel.getBoundingClientRect();
+    var davor = ev.clientY < r.top + r.height / 2;
+    ziel.parentNode.insertBefore(ordnenZeile, davor ? ziel : ziel.nextSibling);
+  });
+  document.addEventListener('drop', function (ev) {
+    if (ordnenZeile && ev.target && ev.target.closest && ev.target.closest('tbody[data-ordnen]')) ev.preventDefault();
+  });
+  document.addEventListener('dragend', function () {
+    var zeile = ordnenZeile;
+    ordnenZeile = null;
+    if (!zeile) return;
+    zeile.classList.remove('zieht');
+    zeile.removeAttribute('draggable');
+    var tbody = zeile.parentNode;
+    var liste = tbody.getAttribute('data-ordnen');
+    var form = document.querySelector('form[data-ordnen-form="' + liste + '"]');
+    if (!form) return;
+    var werte = Array.prototype.map.call(tbody.querySelectorAll('tr.ordnen-zeile'), function (z) { return z.getAttribute('data-ordnen-wert'); });
+    if (werte.join('\n') === tbody.getAttribute('data-ordnen-vorher')) return;
+    form.querySelectorAll('input[name="reihenfolge"]').forEach(function (i) { i.remove(); });
+    werte.forEach(function (w) {
+      var i = document.createElement('input');
+      i.type = 'hidden'; i.name = 'reihenfolge'; i.value = w;
+      form.appendChild(i);
+    });
+    if (form.requestSubmit) form.requestSubmit(); else form.submit();
+  });
+  // Reihenfolge beim Start merken: Ohne Änderung sendet das Ziehen nichts.
+  document.addEventListener('dragstart', function () {
+    document.querySelectorAll('tbody[data-ordnen]').forEach(function (t) {
+      t.setAttribute('data-ordnen-vorher', Array.prototype.map.call(t.querySelectorAll('tr.ordnen-zeile'), function (z) { return z.getAttribute('data-ordnen-wert'); }).join('\n'));
+    });
+  }, true);
+
   // ---------- Live: Formulare im Hintergrund senden ----------
 
   var meldeFehler = function (text) {

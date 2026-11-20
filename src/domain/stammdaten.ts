@@ -193,3 +193,35 @@ export async function setzeBenutzerAktiv(db: Db, id: number, aktiv: boolean): Pr
     if (!aktiv) await schreibe(c, 'DELETE FROM sitzung WHERE benutzer_id = ?', [id]);
   });
 }
+
+/** Prüft, ob die Liste aus dem Browser genau die aktuellen Einträge enthält. Sonst hat jemand inzwischen etwas geändert. */
+function gleicheMenge<T>(neu: T[], alt: T[]): boolean {
+  return neu.length === alt.length && new Set(neu).size === neu.length && alt.every((x) => neu.includes(x));
+}
+
+/**
+ * Ziehen mit der Maus (Wunsch Yann 20.11.2026): setzt die ganze Reihenfolge der Ränge.
+ * ids: von oben (höchster Rang) nach unten (tiefster Rang). Kleine Zahl in `reihenfolge` = tiefer Rang.
+ */
+export async function ordneRaenge(db: Db, ids: number[]): Promise<void> {
+  await transaktion(db, async (c) => {
+    const alt = await alle<{ id: number }>(c, 'SELECT id FROM rang ORDER BY reihenfolge DESC FOR UPDATE');
+    if (!gleicheMenge(ids, alt.map((r) => Number(r.id)))) {
+      throw new Eingabefehler('Die Ränge haben sich inzwischen geändert. Die Seite zeigt den neuen Stand. Zieh den Rang noch einmal.');
+    }
+    // Spalte ist eindeutig: zuerst auf freie negative Werte, dann auf die neuen Werte.
+    for (let i = 0; i < ids.length; i++) await schreibe(c, 'UPDATE rang SET reihenfolge = ? WHERE id = ?', [-(i + 1), ids[i]]);
+    for (let i = 0; i < ids.length; i++) await schreibe(c, 'UPDATE rang SET reihenfolge = ? WHERE id = ?', [ids.length - i, ids[i]]);
+  });
+}
+
+/** Ziehen mit der Maus: setzt die ganze Reihenfolge der Rollen, von oben nach unten. */
+export async function ordneRollen(db: Db, namen: string[]): Promise<void> {
+  await transaktion(db, async (c) => {
+    const alt = await alle<{ name: string }>(c, 'SELECT name FROM rolle ORDER BY reihenfolge, name FOR UPDATE');
+    if (!gleicheMenge(namen, alt.map((r) => r.name))) {
+      throw new Eingabefehler('Die Rollen haben sich inzwischen geändert. Die Seite zeigt den neuen Stand. Zieh die Rolle noch einmal.');
+    }
+    for (let i = 0; i < namen.length; i++) await schreibe(c, 'UPDATE rolle SET reihenfolge = ? WHERE name = ?', [i + 1, namen[i]]);
+  });
+}

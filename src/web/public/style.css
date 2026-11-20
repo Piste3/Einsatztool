@@ -1028,3 +1028,20 @@ body.druck { background: var(--hg); padding: 1rem; }
   .eingang-tabelle tr { padding: .6rem .7rem; border-bottom: 1px solid var(--linie); }
   .eingang-tabelle td { border: 0; padding: .15rem 0; }
 }
+
+/* ---------- Reihenfolge ziehen: Ränge und Rollen (Wunsch Yann 20.11.2026) ---------- */
+.ordnen-griff-kopf { width: 1.6rem; }
+.ordnen-griff { cursor: grab; color: var(--gedämpft); user-select: none; text-align: center; width: 1.6rem; letter-spacing: -.1em; }
+.ordnen-griff:hover { color: var(--text); }
+tr.ordnen-zeile.zieht { opacity: .45; }
+.ordnen-menue { position: relative; }
+.ordnen-menue-inhalt { position: absolute; right: 0; z-index: 5; display: grid; gap: .3rem; padding: .4rem; background: var(--flaeche); border: 1px solid var(--linie-stark); border-radius: 8px; box-shadow: 0 6px 18px rgba(0, 0, 0, .15); white-space: nowrap; }
+/* Mit Maus: Ziehen genügt, das Menü ⋮ ist nur für Touch und Tastatur da. */
+@media (hover: hover) and (pointer: fine) {
+  .ordnen-menue:not([open]) > summary { opacity: 0; }
+  tr.ordnen-zeile:hover .ordnen-menue > summary, .ordnen-menue > summary:focus-visible { opacity: 1; }
+}
+@media (hover: none), (pointer: coarse) {
+  .ordnen-griff, .ordnen-griff-kopf { display: none; }
+}
+
