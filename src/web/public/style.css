@@ -969,3 +969,14 @@ body.druck { background: var(--hg); padding: 1rem; }
 .vorschau-text pre { margin: .5rem 0 0; }
 #clubdesk .haupt-und-seite form > .feld { align-self: stretch; }
 #clubdesk .haupt-und-seite form .feld input, #clubdesk .haupt-und-seite form .feld textarea { width: 100%; min-width: 0; box-sizing: border-box; }
+
+/* ---------- Feste Seite (Rückmeldungen): Nur die Tabelle scrollt (Wunsch Yann) ---------- */
+@media (min-width: 861px) {
+  .inhalt.fest { height: 100vh; height: 100dvh; display: flex; flex-direction: column; overflow: hidden; padding-bottom: 1rem; }
+  .inhalt.fest > * { flex: none; }
+  .inhalt.fest > .rahmen { flex: 1 1 auto; min-height: 0; max-height: none; }
+}
+/* Beide Kopfzeilen (Einsatz und Schicht) bleiben gemeinsam oben stehen. */
+.rueck thead { position: sticky; top: 0; z-index: 3; }
+.rueck thead th, .rueck thead tr.einsatz-zeile th { position: static; }
+.rueck thead th.name-spalte, .rueck thead tr.einsatz-zeile th.name-spalte { position: sticky; left: 0; top: auto; z-index: 4; }
