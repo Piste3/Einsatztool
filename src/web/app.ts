@@ -12,6 +12,7 @@ import { zaehlerSeitenleiste } from '../domain/listen.js';
 import { isoUtc } from '../domain/zeit.js';
 import { gueltigerSchluessel } from '../domain/rueckgaengig.js';
 import { log } from '../log.js';
+import { herkunft } from '../config.js';
 import { html } from './html.js';
 import { einfacheSeite } from './views/layout.js';
 import { multipart } from './multipart.js';
@@ -203,6 +204,14 @@ export function erstelleApp(deps: Abhaengigkeiten): express.Express {
       `default-src 'self'; img-src 'self' data:; form-action 'self'; base-uri 'none'; object-src 'none'; frame-ancestors ${rahmen}`,
     );
     if (!formular) res.setHeader('X-Frame-Options', 'DENY');
+    // Hilfe bei der Fehlersuche: Ein iframe von einer nicht erlaubten Website sperrt der Browser. Das Log nennt die Website.
+    if (formular && req.method === 'GET' && req.get('sec-fetch-dest') === 'iframe') {
+      const quelle = herkunft(req.get('referer'));
+      const erlaubt = konfig.formAllowedOrigin.split(' ');
+      if (quelle && !erlaubt.includes(quelle)) {
+        log('warn', `Formular im iframe von ${quelle}. Diese Website ist nicht erlaubt (FORM_ALLOWED_ORIGIN). Der Browser sperrt die Anzeige.`);
+      }
+    }
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Referrer-Policy', 'same-origin');
     res.setHeader('Cache-Control', 'no-store');

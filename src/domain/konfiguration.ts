@@ -9,7 +9,7 @@ import { alle, transaktion, type Db } from '../db/db.js';
 import { Eingabefehler } from './eingabe.js';
 import { isoUtc } from './zeit.js';
 
-export type Art = 'text' | 'port' | 'stunde' | 'url' | 'mail' | 'geheim' | 'janein' | 'pfad' | 'host' | 'branch' | 'name';
+export type Art = 'text' | 'port' | 'stunde' | 'url' | 'urls' | 'mail' | 'geheim' | 'janein' | 'pfad' | 'host' | 'branch' | 'name';
 
 export interface Definition {
   schluessel: string;
@@ -53,7 +53,7 @@ export const DEFINITIONEN: Definition[] = [
   { schluessel: 'BESTAETIGUNG_STUNDE', gruppe: 'Mail', titel: 'Stunde der Bestätigungsmail', hilfe: 'Lokale Zeit, 0 bis 23.', art: 'stunde', standard: '18', pflicht: true },
 
   { schluessel: 'CLUBDESK_ICAL_URL', gruppe: 'Clubdesk', titel: 'Adresse des iCal-Feeds', hilfe: 'Aus Clubdesk › Kalender › Abonnieren.', art: 'url', standard: '' },
-  { schluessel: 'FORM_ALLOWED_ORIGIN', gruppe: 'Clubdesk', titel: 'Seite mit dem Anmeldeformular', hilfe: 'Nur diese Website darf das Formular im iframe einbetten, z. B. https://web.kkb.ch. Ein Pfad zählt nicht.', art: 'url', standard: '' },
+  { schluessel: 'FORM_ALLOWED_ORIGIN', gruppe: 'Clubdesk', titel: 'Seite mit dem Anmeldeformular', hilfe: 'Nur diese Websites dürfen das Formular im iframe einbetten, z. B. https://web.kkb.ch. Mehrere mit Leerzeichen trennen. Ein Pfad zählt nicht.', art: 'urls', standard: '' },
 
   { schluessel: 'EXPORT_HOUR', gruppe: 'Tagesexport und SharePoint', titel: 'Stunde des Tagesexports', hilfe: 'Lokale Zeit, 0 bis 23.', art: 'stunde', standard: '2', pflicht: true },
   { schluessel: 'SHAREPOINT_SITE_ID', gruppe: 'Tagesexport und SharePoint', titel: 'SharePoint Site-ID', hilfe: 'Leer = kein Hochladen nach SharePoint.', art: 'text', standard: '' },
@@ -175,6 +175,19 @@ export function pruefeWert(d: Definition, roh: unknown): string {
       }
       if (u.protocol !== 'https:' && u.protocol !== 'http:') throw new Eingabefehler(`${feld} muss mit https:// oder http:// beginnen.`);
       return w.replace(/\/+$/, '');
+    }
+    case 'urls': {
+      const teile = w.split(/[\s,]+/).filter(Boolean);
+      for (const t of teile) {
+        let u: URL;
+        try {
+          u = new URL(t);
+        } catch {
+          throw new Eingabefehler(`${feld}: «${t}» ist keine gültige Adresse.`);
+        }
+        if (u.protocol !== 'https:' && u.protocol !== 'http:') throw new Eingabefehler(`${feld} muss mit https:// oder http:// beginnen.`);
+      }
+      return teile.join(' ');
     }
     case 'mail':
       if (!/^[^\s@<>"]+@[^\s@<>"]+\.[^\s@<>"]+$/.test(w)) throw new Eingabefehler(`${feld} ist keine gültige Mail-Adresse.`);

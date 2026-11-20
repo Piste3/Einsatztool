@@ -9,6 +9,8 @@ test('T45 Formular im iframe: nur die erlaubte Herkunft, der Rest des Tools blei
   assert.equal(herkunft('https://web.kkb.ch/termine/einsaetze/test'), 'https://web.kkb.ch');
   assert.equal(herkunft('kein url'), '');
   assert.equal(herkunft('javascript:alert(1)'), '');
+  // Mehrere Websites, getrennt mit Leerzeichen oder Komma. Doppelte und ungültige entfallen.
+  assert.equal(herkunft('https://web.kkb.ch/a, https://www.kkb.ch  https://web.kkb.ch/b x'), 'https://web.kkb.ch https://www.kkb.ch');
 
   const t = await neueDatenbank();
   const app = await starteApp(t.db, { FORM_ALLOWED_ORIGIN: 'https://web.kkb.ch/termine/einsaetze/test' });

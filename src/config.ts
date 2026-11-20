@@ -126,16 +126,20 @@ export function leseKonfiguration(env: NodeJS.ProcessEnv = process.env): Konfigu
 }
 
 /**
- * Herkunft für CSP `frame-ancestors`: nur Schema, Host und Port (z. B. https://web.kkb.ch).
- * Ein Pfad wie /termine/einsaetze würde in manchen Browsern die Einbettung sperren. Ungültig = leer (nicht einbettbar).
+ * Herkünfte für CSP `frame-ancestors`: nur Schema, Host und Port (z. B. https://web.kkb.ch).
+ * Mehrere Werte mit Leerzeichen oder Komma trennen. Ein Pfad wie /termine/einsaetze würde in manchen Browsern
+ * die Einbettung sperren. Ungültige Werte entfallen. Leer = nicht einbettbar.
  */
 export function herkunft(wert: string | undefined): string {
-  const w = (wert ?? '').trim();
-  if (!w) return '';
-  try {
-    const u = new URL(w);
-    return u.protocol === 'https:' || u.protocol === 'http:' ? u.origin : '';
-  } catch {
-    return '';
+  const liste: string[] = [];
+  for (const teil of (wert ?? '').split(/[\s,]+/)) {
+    if (!teil) continue;
+    try {
+      const u = new URL(teil);
+      if ((u.protocol === 'https:' || u.protocol === 'http:') && !liste.includes(u.origin)) liste.push(u.origin);
+    } catch {
+      // ungültig: entfällt
+    }
   }
+  return liste.join(' ');
 }
