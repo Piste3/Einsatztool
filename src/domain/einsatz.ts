@@ -24,6 +24,8 @@ export interface Einsatz {
   abtreten_ort: string | null;
   tenue: string | null;
   aufgebot_hinweis: string | null;
+  /** 1 = im Formular mehrere Schichten wählbar, 0 = nur eine Schicht. */
+  formular_mehrere: number;
   /** Zählt jede Änderung. Schutz gegen gegenseitiges Überschreiben. */
   version: number;
 }
@@ -101,6 +103,9 @@ export interface EinsatzAenderung {
   abtreten_ort?: unknown;
   tenue?: unknown;
   aufgebot_hinweis?: unknown;
+  /** Häkchen «Im Formular mehrere Schichten wählbar». Gilt nur, wenn `formular_mehrere_feld` gesendet wurde. */
+  formular_mehrere?: unknown;
+  formular_mehrere_feld?: unknown;
   /** Version, die das Formular angezeigt hat. Leer = keine Prüfung. */
   version?: unknown;
 }
@@ -122,6 +127,8 @@ export async function aendereEinsatz(db: Db, id: number, a: EinsatzAenderung): P
   await transaktion(db, async (c) => {
     const alt = await eine<Einsatz>(c, 'SELECT * FROM einsatz WHERE id = ? FOR UPDATE', [id]);
     if (!alt) throw new NichtGefunden('Einsatz nicht gefunden.');
+    // Ein Häkchen ohne Haken sendet nichts. Das Feld `formular_mehrere_feld` zeigt, dass das Formular es enthält.
+    const mehrere = a.formular_mehrere_feld !== undefined ? (istJa(a.formular_mehrere) ? 1 : 0) : Number(alt.formular_mehrere);
     pruefeVersion(
       a.version,
       alt.version,
@@ -138,10 +145,15 @@ export async function aendereEinsatz(db: Db, id: number, a: EinsatzAenderung): P
     await schreibe(
       c,
       `UPDATE einsatz SET name = ?, ort = ?, bemerkung_intern = ?, bemerkung_extern = ?,
-         abtreten_ort = ?, tenue = ?, aufgebot_hinweis = ?, version = version + 1 WHERE id = ?`,
-      [neu.name, neu.ort, neu.bemerkung_intern, neu.bemerkung_extern, neu.abtreten_ort, neu.tenue, neu.aufgebot_hinweis, id],
+         abtreten_ort = ?, tenue = ?, aufgebot_hinweis = ?, formular_mehrere = ?, version = version + 1 WHERE id = ?`,
+      [neu.name, neu.ort, neu.bemerkung_intern, neu.bemerkung_extern, neu.abtreten_ort, neu.tenue, neu.aufgebot_hinweis, mehrere, id],
     );
   });
+}
+
+function istJa(w: unknown): boolean {
+  const x = Array.isArray(w) ? w[w.length - 1] : w;
+  return x === '1' || x === 'on' || x === 1 || x === true;
 }
 
 /** Zahl der Anmeldungen eines Einsatzes (für die Bestätigung beim Löschen). */
@@ -206,8 +218,8 @@ export async function kopiereEinsatz(
     const r = await schreibe(
       c,
       `INSERT INTO einsatz (name, ort, bemerkung_intern, bemerkung_extern, erstellt_am, erstellt_von,
-         abtreten_ort, tenue, aufgebot_hinweis) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [name, e.ort, e.bemerkung_intern, e.bemerkung_extern, jetztIso(), benutzerId, e.abtreten_ort, e.tenue, e.aufgebot_hinweis],
+         abtreten_ort, tenue, aufgebot_hinweis, formular_mehrere) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [name, e.ort, e.bemerkung_intern, e.bemerkung_extern, jetztIso(), benutzerId, e.abtreten_ort, e.tenue, e.aufgebot_hinweis, e.formular_mehrere],
     );
     const neuId = r.insertId;
     const schichten = await alle<any>(c, 'SELECT * FROM schicht WHERE einsatz_id = ? ORDER BY start_zeit, id', [id]);

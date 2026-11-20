@@ -33,6 +33,12 @@ const EINSATZLEITUNG = 'Einsatzleitung';
 import { telefonText, hauptnummer } from '../domain/personen.js';
 import { nachRangTiefZuerst } from '../domain/listen.js';
 
+/** Häkchen «mehrere Schichten»: Formular-Eingabe nach einem Fehler, sonst Wert aus der Datenbank (Vorgabe ja). */
+function mehrereGewaehlt(e: Partial<Record<string, unknown>>): boolean {
+  if (e.formular_mehrere_feld !== undefined) return e.formular_mehrere === '1';
+  return Number(e.formular_mehrere ?? 1) !== 0;
+}
+
 function einsatzFormular(kx: ReturnType<typeof k>, ziel: string, e: Partial<Record<string, unknown>>, neu: boolean, fehler: string | null): Roh {
   const v = (n: string) => (e[n] === null || e[n] === undefined ? '' : String(e[n]));
   return html`
@@ -53,7 +59,8 @@ ${fehler ? html`<div class="meldung fehler" role="alert">${fehler}</div>` : ''}
   <div class="feld breit"><label for="tenue">Tenue</label><input id="tenue" name="tenue" maxlength="255" value="${v('tenue')}"></div>
   <div class="feld breit"><label for="aufgebot_hinweis">Hinweis Aufgebot</label><textarea id="aufgebot_hinweis" name="aufgebot_hinweis" rows="2" maxlength="2000">${v('aufgebot_hinweis')}</textarea></div>
   <div class="feld breit"><label for="bemerkung_intern">Bemerkung intern</label><textarea id="bemerkung_intern" name="bemerkung_intern" rows="3" maxlength="5000">${v('bemerkung_intern')}</textarea><small>Nur für die Aufgebotsstelle.</small></div>
-  <div class="feld breit"><label for="bemerkung_extern">Bemerkung extern</label><textarea id="bemerkung_extern" name="bemerkung_extern" rows="3" maxlength="5000">${v('bemerkung_extern')}</textarea><small>Sichtbar im Formular.</small></div>`}
+  <div class="feld breit"><label for="bemerkung_extern">Bemerkung extern</label><textarea id="bemerkung_extern" name="bemerkung_extern" rows="3" maxlength="5000">${v('bemerkung_extern')}</textarea><small>Sichtbar im Formular.</small></div>
+  <div class="feld breit"><input type="hidden" name="formular_mehrere_feld" value="1"><label class="haken"><input type="checkbox" name="formular_mehrere" value="1"${mehrereGewaehlt(e) ? new Roh(' checked') : ''}> Im Formular mehrere Schichten wählbar</label><small>Ohne Haken wählt eine Person im Formular höchstens eine Schicht dieses Einsatzes. Eintragen von Hand bleibt frei.</small></div>`}
   <div class="aktionen breit"><button type="submit" class="knopf haupt">${neu ? 'Einsatz erstellen' : 'Speichern'}</button></div>
 </form>`;
 }

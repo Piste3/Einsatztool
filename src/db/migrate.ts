@@ -117,6 +117,11 @@ const migrationen: { version: number; anweisungen: () => string[] }[] = [
           WHERE a.kanal = 'formular'`,
     ],
   },
+  {
+    // Einstellung je Einsatz: Im Formular mehrere Schichten wählbar (1) oder nur eine (0).
+    version: 8,
+    anweisungen: () => ['ALTER TABLE einsatz ADD COLUMN formular_mehrere TINYINT NOT NULL DEFAULT 1'],
+  },
 ];
 
 export async function migriere(db: Db): Promise<number> {

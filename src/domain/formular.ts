@@ -47,6 +47,8 @@ export interface FormularSchicht {
   einsatz_id: number;
   einsatz_name: string;
   einsatz_bemerkung_extern: string | null;
+  /** 1 = mehrere Schichten wählbar, 0 = nur eine Schicht in diesem Einsatz. */
+  einsatz_formular_mehrere: number;
 }
 
 /** Regel 13.4: publizierte Schichten mit Ende in der Zukunft, gruppiert nach Einsatz. */
@@ -54,7 +56,8 @@ export async function sichtbareSchichten(db: Db): Promise<FormularSchicht[]> {
   return alle<FormularSchicht>(
     db,
     `SELECT s.id, s.name, s.start_zeit, s.end_zeit, s.ort, s.bemerkung_extern, s.min_alter, r.name AS min_rang_name,
-            e.id AS einsatz_id, e.name AS einsatz_name, e.bemerkung_extern AS einsatz_bemerkung_extern
+            e.id AS einsatz_id, e.name AS einsatz_name, e.bemerkung_extern AS einsatz_bemerkung_extern,
+            e.formular_mehrere AS einsatz_formular_mehrere
        FROM schicht s JOIN einsatz e ON e.id = s.einsatz_id LEFT JOIN rang r ON r.id = s.min_rang_id
       WHERE s.publiziert = 1 AND s.end_zeit > ?
       ORDER BY (SELECT MIN(x.start_zeit) FROM schicht x WHERE x.einsatz_id = e.id AND x.publiziert = 1), e.id, s.start_zeit, s.id`,
@@ -113,6 +116,14 @@ export async function verarbeiteFormular(db: Db, e: FormularEingabe): Promise<Fo
     );
     if (sichtbar.length !== schichtIds.length) {
       throw new Eingabefehler('Eine gewählte Schicht ist nicht mehr verfügbar. Lade das Formular neu.');
+    }
+    // Einstellung des Einsatzes: nur eine Schicht im Formular. Gilt nicht für das Eintragen von Hand.
+    const jeEinsatz = new Map<number, number>();
+    for (const x of sichtbar) jeEinsatz.set(x.einsatz_id, (jeEinsatz.get(x.einsatz_id) ?? 0) + 1);
+    const mehrfach = [...jeEinsatz].filter(([, n]) => n > 1).map(([id]) => id);
+    if (mehrfach.length) {
+      const nurEine = await alle<{ name: string }>(c, 'SELECT name FROM einsatz WHERE id IN (?) AND formular_mehrere = 0 ORDER BY id', [mehrfach]);
+      if (nurEine.length) throw new Eingabefehler(`Für «${nurEine[0].name}» kannst du nur eine Schicht wählen.`);
     }
 
     // Regel 15.3.2 bis 15.3.5: Person suchen.

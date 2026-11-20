@@ -26,6 +26,20 @@ function formularSeite(inhalt: Roh): string {
 </html>`}`;
 }
 
+/** Einstellung des Einsatzes: Im Formular ist nur eine Schicht wählbar (Auswahlknöpfe statt Häkchen). */
+function nurEine(liste: FormularSchicht[]): boolean {
+  return Number(liste[0].einsatz_formular_mehrere) === 0;
+}
+
+/** Gewählte Schichten: Häkchen `schichten` und Auswahlknöpfe `schicht_<Einsatz-ID>`. */
+function gewaehlteSchichten(b: Record<string, unknown>): string[] {
+  const ids = liste(b.schichten);
+  for (const [schluessel, wert] of Object.entries(b)) {
+    if (/^schicht_\d+$/.test(schluessel)) ids.push(...liste(wert));
+  }
+  return ids.filter((x) => x !== '');
+}
+
 function hinweisVorgaben(s: FormularSchicht): string {
   const teile: string[] = [];
   if (s.min_alter !== null) teile.push(`Nur ${s.min_alter}+`);
@@ -86,10 +100,13 @@ ${schichten.length === 0
     <section class="formular-karte einsatz-gruppe">
       <h3>${liste[0].einsatz_name}</h3>
       ${liste[0].einsatz_bemerkung_extern ? html`<p class="einsatz-info">${mehrzeilig(liste[0].einsatz_bemerkung_extern)}</p>` : ''}
+      ${nurEine(liste) ? html`<p class="nur-eine">Wähle höchstens eine Schicht.</p>` : ''}
       <div class="schicht-liste">
       ${liste.map((s) => html`
       <label class="schicht-wahl">
-        <input type="checkbox" name="schichten" value="${s.id}"${angehakt(gewaehlt.has(String(s.id)))}>
+        ${nurEine(liste)
+          ? html`<input type="radio" name="schicht_${s.einsatz_id}" value="${s.id}"${angehakt(gewaehlt.has(String(s.id)))}>`
+          : html`<input type="checkbox" name="schichten" value="${s.id}"${angehakt(gewaehlt.has(String(s.id)))}>`}
         <span class="schicht-datum" aria-hidden="true"><small>${wochentagKurz(s.start_zeit)}</small><strong>${lokalesDatum(s.start_zeit).slice(8, 10)}</strong><small>${MONATE[Number(lokalesDatum(s.start_zeit).slice(5, 7)) - 1]}</small></span>
         <span class="schicht-text">
           <strong>${s.name}</strong>
@@ -100,6 +117,12 @@ ${schichten.length === 0
         </span>
         <span class="schicht-haken" aria-hidden="true"></span>
       </label>`)}
+      ${nurEine(liste) ? html`
+      <label class="schicht-wahl keine-schicht">
+        <input type="radio" name="schicht_${liste[0].einsatz_id}" value=""${angehakt(!liste.some((s) => gewaehlt.has(String(s.id))))}>
+        <span class="schicht-text"><strong>Keine Schicht in diesem Einsatz</strong></span>
+        <span class="schicht-haken" aria-hidden="true"></span>
+      </label>` : ''}
       </div>
       <div class="feld einsatz-bemerkung"><label for="bemerkung_${liste[0].einsatz_id}">Bemerkungen</label><textarea id="bemerkung_${liste[0].einsatz_id}" name="bemerkung_${liste[0].einsatz_id}" maxlength="2000" rows="2">${werte.bemerkungen?.[String(liste[0].einsatz_id)] ?? ''}</textarea></div>
     </section>`)}
@@ -126,7 +149,7 @@ export function registriereOeffentlich(app: Express, deps: Abhaengigkeiten): voi
       vorname: typeof b.vorname === 'string' ? b.vorname : '',
       nachname: typeof b.nachname === 'string' ? b.nachname : '',
       bemerkungen: bemerkungenJeEinsatz(b),
-      schichten: liste(b.schichten),
+      schichten: gewaehlteSchichten(b),
     };
     // Grenze: 20 Anfragen pro Stunde je IP-Adresse (15.2).
     if (!grenze.erlaubt(req.ip ?? 'unbekannt')) {
@@ -149,7 +172,7 @@ export function registriereOeffentlich(app: Express, deps: Abhaengigkeiten): voi
       return;
     }
     try {
-      await verarbeiteFormular(deps.db, { vorname: b.vorname, nachname: b.nachname, bemerkungen: werte.bemerkungen, schichten: b.schichten });
+      await verarbeiteFormular(deps.db, { vorname: b.vorname, nachname: b.nachname, bemerkungen: werte.bemerkungen, schichten: werte.schichten });
     } catch (e) {
       if (e instanceof Eingabefehler) {
         await zeigeFormular(deps, res, werte, e.message, 400);

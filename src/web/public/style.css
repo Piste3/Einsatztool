@@ -595,6 +595,10 @@ body.formular {
 .schicht-wahl .bemerkung { font-size: .85rem; margin-top: .2rem; }
 .schicht-haken { flex: none; width: 1.45rem; height: 1.45rem; border: 1.5px solid var(--linie-stark); border-radius: 7px; background: var(--flaeche); display: flex; align-items: center; justify-content: center; }
 .schicht-wahl:has(input:checked) .schicht-haken { background: var(--akzent); border-color: var(--akzent); }
+.schicht-wahl input[type="radio"] ~ .schicht-haken { border-radius: 50%; }
+.keine-schicht { padding-block: .55rem; }
+.keine-schicht .schicht-text strong { font-weight: 500; color: var(--gedämpft); }
+.nur-eine { margin: -.3rem 0 .7rem; color: var(--gedämpft); font-size: .9rem; }
 .schicht-wahl:has(input:checked) .schicht-haken::after { content: ''; width: .4rem; height: .75rem; border: solid #fff; border-width: 0 2.5px 2.5px 0; transform: translateY(-1px) rotate(45deg); }
 .einsatz-bemerkung { margin-bottom: 0; }
 .formular-senden { margin-top: 1.2rem; }
