@@ -787,3 +787,60 @@ body.druck { background: var(--hg); padding: 1rem; }
 /* Neuer Einsatz: links die Daten, rechts die Zeiten (Wunsch Yann). */
 .zeit-raster { display: grid; grid-template-columns: 1fr 1fr; gap: 0 1rem; }
 .zeit-raster .feld label .unter { font-weight: 400; margin: 0; }
+
+/* ---------- Einsatz › Besetzen (Konzept «Bedienung im Einsatz», 20.11.2026) ---------- */
+.schicht-chips { display: flex; flex-wrap: wrap; gap: .4rem; margin: .2rem 0 .6rem; }
+.schicht-chip { display: inline-flex; align-items: baseline; gap: .45rem; border: 1px solid var(--linie-stark); border-radius: 8px; padding: .3rem .7rem; background: var(--flaeche); color: var(--text); font-size: .85rem; }
+.schicht-chip:hover { text-decoration: none; background: var(--grau-hg); }
+.schicht-chip[aria-current="page"] { border-color: var(--text); box-shadow: inset 0 0 0 1px var(--text); }
+.schicht-chip[aria-current="page"] .schicht-chip-name { font-weight: 650; }
+.schicht-chip strong { font-variant-numeric: tabular-nums; font-size: .8rem; }
+.schicht-chip .f-gruen { color: var(--gruen); }
+.schicht-chip .f-orange { color: var(--orange); }
+.schicht-chip .f-rot { color: var(--rot); }
+.schicht-info { display: flex; flex-wrap: wrap; gap: .5rem 1rem; align-items: center; justify-content: space-between; padding: .5rem .8rem; border: 1px solid var(--linie); border-radius: 10px; background: var(--flaeche-2); font-size: .88rem; }
+.besetzen .filterzeile { align-items: center; }
+.besetzen .filterzeile .filter-chips { margin: .3rem 0; }
+.besetzen-filter a.f-neu[aria-current="page"] { border-color: var(--orange-punkt); box-shadow: inset 0 0 0 1px var(--orange-punkt); }
+.besetzen-eintragen { padding: .5rem .7rem; border: 1px dashed var(--linie-stark); border-radius: 10px; }
+.besetzen-tabelle td { vertical-align: middle; }
+.besetzen-tabelle th.waehlen, .besetzen-tabelle td.waehlen { width: 2rem; }
+.besetzen-tabelle th.mitte, .besetzen-tabelle td.mitte { text-align: center; }
+.besetzen-tabelle th.rechts { text-align: right; }
+.besetzen-tabelle td.person { text-align: left; white-space: normal; min-width: 11rem; }
+.besetzen-tabelle td.person .rang { display: inline-block; min-width: 2.2em; }
+.besetzen-tabelle td.person .name { font-weight: 600; }
+.besetzen-tabelle td.person .unter { margin-left: .3rem; }
+.besetzen-tabelle .zeile-notiz { display: block; color: var(--gedämpft); font-size: .76rem; margin-left: 2.4em; }
+.besetzen-tabelle td.person .warnungen { margin: .2rem 0 0 2.4em; }
+.besetzen-tabelle td.kontakt { white-space: nowrap; font-size: .85rem; text-align: left; }
+.besetzen-tabelle td.antwort { text-align: right; }
+.besetzen-tabelle td.antwort .knopfreihe { justify-content: flex-end; flex-wrap: wrap; gap: .25rem; }
+.besetzen-tabelle td.zelle-klick { padding: 0; text-align: center; }
+.besetzen-tabelle td.zelle-klick > a { display: inline-flex; flex-direction: column; align-items: center; justify-content: center; min-height: 2.3rem; padding: .3rem .5rem; color: inherit; position: relative; border-radius: 8px; }
+.besetzen-tabelle td.zelle-klick > a:hover { background: var(--grau-hg); text-decoration: none; }
+.besetzen-tabelle td.zelle-klick > a .bemerkung-marke { position: absolute; top: .15rem; right: .25rem; font-size: .7rem; line-height: 1; opacity: .75; }
+.besetzen-tabelle .rolle { display: block; font-size: .68rem; color: var(--gedämpft); }
+.knopf.a-an { color: var(--gruen); }
+.knopf.a-ab { color: var(--rot); }
+.knopf.a-unsicher { color: var(--orange); }
+.knopf.a-nachricht { color: var(--violett); }
+.sammel-leiste { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; margin-top: .6rem; padding: .45rem .8rem; border: 1px solid var(--linie); border-radius: 10px; background: var(--flaeche-2); font-size: .85rem; }
+.fremd-block { margin: .3rem 0; font-size: .85rem; }
+.fremd-block .zeilen-form .zahl-feld { width: 5rem; }
+
+/* Handy: jede Zeile wird eine Karte. Anruf und Antwort liegen unter dem Daumen. */
+@media (max-width: 700px) {
+  .besetzen-tabelle:not(.besetzen-matrix) thead { display: none; }
+  .besetzen-tabelle:not(.besetzen-matrix), .besetzen-tabelle:not(.besetzen-matrix) tbody { display: block; }
+  .besetzen-tabelle:not(.besetzen-matrix) tr { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: .3rem .5rem; padding: .6rem .7rem; border-top: 1px solid var(--linie); align-items: center; }
+  .besetzen-tabelle:not(.besetzen-matrix) td { display: block; border: 0; padding: 0; }
+  .besetzen-tabelle:not(.besetzen-matrix) td.waehlen { grid-column: 1; grid-row: 1; }
+  .besetzen-tabelle:not(.besetzen-matrix) td.person { grid-column: 2; grid-row: 1; min-width: 0; }
+  .besetzen-tabelle:not(.besetzen-matrix) td.zelle-klick, .besetzen-tabelle:not(.besetzen-matrix) td.mitte { grid-column: 3; grid-row: 1; }
+  .besetzen-tabelle:not(.besetzen-matrix) td.kontakt { grid-column: 2 / 4; grid-row: 2; }
+  .besetzen-tabelle:not(.besetzen-matrix) td.antwort { grid-column: 1 / 4; grid-row: 3; text-align: left; }
+  .besetzen-tabelle:not(.besetzen-matrix) td.antwort .knopfreihe { justify-content: flex-start; }
+  .besetzen-tabelle:not(.besetzen-matrix) td.antwort .knopf { padding: .4rem .8rem; }
+  .besetzen-tabelle .zeile-notiz, .besetzen-tabelle td.person .warnungen { margin-left: 0; }
+}

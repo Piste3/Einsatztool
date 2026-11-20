@@ -170,7 +170,7 @@ test('T26 Web: Konflikt führt zurück mit Meldung, Formular behält die Eingabe
     const aid = await setzeAnmeldung(t.db, { schichtId: s.schichtId, personId: 1, status: 'angemeldet', kanal: 'telefon' }, null);
     const { cookie, csrf } = await anmelden(t.db);
 
-    const seite = await (await fetch(`${app.url}/schichten/${s.schichtId}`, { headers: { cookie } })).text();
+    const seite = await (await fetch(`${app.url}/rueckmeldungen/eintrag?schicht=${s.schichtId}&person=1`, { headers: { cookie } })).text();
     assert.match(seite, /name="version" value="1"/);
 
     // Ein anderer Benutzer ändert den Eintrag.

@@ -28,7 +28,9 @@ import { druckseite, formFelder, mehrMenue, seite, seitenKopf, type PfadTeil } f
 import {
   abgleichPunkt, datumZeit, istSoll, kanalAuswahl, karte, knopfPost, rolleAuswahl, statusAuswahl, statusText, telefon, warnungen, zeitraum,
 } from './views/teile.js';
-import { dateiTeil, einsatzReiter, sendeCsv } from './routes-einsaetze.js';
+import { dateiTeil, sendeCsv } from './routes-einsaetze.js';
+import { besetzenPfad } from './views/besetzen.js';
+import type { BesetzenFilter } from '../domain/besetzen.js';
 
 /** Pfad oben: Einsätze › Einsatz › Schicht › … */
 function schichtPfad(s: { id: number; name: string; einsatz_id: number; einsatz_name: string }, weiter?: string): PfadTeil[] {
@@ -144,168 +146,13 @@ export function registriereSchichten(app: Express, deps: Abhaengigkeiten): void 
     }
   });
 
+  // Konzept «Bedienung im Einsatz» (OK Yann 20.11.2026): Die Arbeit mit Personen liegt im Reiter «Besetzen».
+  // Alte Adressen der Schicht führen dorthin. Der Filter «status» wird auf die Filter von «Besetzen» abgebildet.
   app.get('/schichten/:sid', nurAufgebot, async (req, res) => {
-    const kx = k(res);
     const s = await ladeSchicht(db, leseId(req.params.sid));
-    const z = (await zahlenFuerSchichten(db, [s.id])).get(s.id)!;
-    const w = await warnungenFuerSchicht(db, s.id);
-    const rollen = await ladeRollen(db);
-    const fremd = await fremdabteilungen(db, s.id);
-    const eintraege = await alle<any>(
-      db,
-      `SELECT a.*, p.vorname, p.nachname, p.geburtsdatum, p.essenseinschraenkung, p.telefon, p.telefon_privat, p.geloescht_am,
-              r.name AS rang_name, r.reihenfolge AS rang_reihenfolge
-         FROM anmeldung a LEFT JOIN person p ON p.clubdesk_id = a.person_id LEFT JOIN rang r ON r.id = p.rang_id
-        WHERE a.schicht_id = ?`,
-      [s.id],
-    );
-    for (const e of eintraege) {
-      if (!e.vorname && !e.nachname) e.vorname = e.name_text;
-    }
-    eintraege.sort(nachRangTiefZuerst);
-    const logs = await verlauf(db, eintraege.map((e) => e.id));
-    const filter = typeof req.query.status === 'string' && (STATUS as readonly string[]).includes(req.query.status) ? (req.query.status as Status) : null;
-    const sichtbar = filter ? eintraege.filter((e) => e.status === filter) : eintraege;
-    const hier = aktuellerPfad(req);
-    const stichtag = lokalesDatum(s.start_zeit);
-    const personen = await personenListe(db);
-    const vermerk = await icsVermerk(db, s.id);
-    const feed = feedStand();
-    const alleSchichten = await schichtenVonEinsatz(db, s.einsatz_id);
-
-    const zaehlerStatus = new Map<Status, number>();
-    for (const e of eintraege) zaehlerStatus.set(e.status, (zaehlerStatus.get(e.status) ?? 0) + 1);
-
-    const zeile = (e: any) => {
-      const wl = w.anmeldungen.get(e.id);
-      return html`<tr class="${e.status === 'angemeldet' ? 'unbestaetigt' : ''}" data-suche="${`${e.name_text} ${e.rang_name ?? ''}`.toLowerCase()}">
-  <td>${e.person_id !== null ? html`<a href="/personen/${e.person_id}">${e.name_text}</a>` : html`${e.name_text} <span class="pille orange">unbekannt</span>${e.email_text ? html`<br><small>${e.email_text}</small>` : ''}`}</td>
-  <td>${e.rang_name ?? ''}</td>
-  <td>${e.geburtsdatum ? alterAm(e.geburtsdatum, stichtag) : ''}</td>
-  <td>${statusText(e.status)}</td>
-  <td>${e.rolle ?? ''}</td>
-  <td>${KANAL_TEXT[e.kanal as Kanal]}</td>
-  <td class="bemerkung">${mehrzeilig(e.bemerkung)}</td>
-  <td>${warnungen(wl)}</td>
-  <td>${e.essenseinschraenkung ?? ''}</td>
-  <td class="aktionen-zelle">
-    ${e.status !== 'bestaetigt' ? knopfPost(kx, `/anmeldungen/${e.id}`, 'Bestätigen', { status: 'bestaetigt' }, 'knopf klein', hier) : ''}
-    <details class="aufklapp"><summary>Ändern</summary>
-      <form method="post" action="/anmeldungen/${e.id}" class="mini-form">
-        ${formFelder(kx, hier)}<input type="hidden" name="version" value="${e.version}">
-        <label>Status ${statusAuswahl('status', e.status)}</label>
-        <label>Rolle ${rolleAuswahl('rolle', rollen, e.rolle)}</label>
-        <label>Kanal ${kanalAuswahl('kanal', e.kanal)}</label>
-        <label>Bemerkung <textarea name="bemerkung" rows="2" maxlength="5000">${e.bemerkung ?? ''}</textarea></label>
-        <button type="submit" class="knopf haupt klein">Speichern</button>
-        <a class="knopf gefahr klein" href="/anmeldungen/${e.id}/loeschen?zurueck=${encodeURIComponent(hier)}">Eintrag entfernen</a>
-      </form>
-    </details>
-    <details class="aufklapp"><summary>Verlauf</summary>${verlaufListe(logs.get(e.id))}</details>
-  </td>
-</tr>`;
-    };
-    const tabelle = (liste: any[]) => html`<div class="rahmen"><table class="tabelle filterbar">
-  <thead><tr><th>Name</th><th>Rang</th><th>Alter</th><th>Status</th><th>Rolle</th><th>Kanal</th><th>Bemerkung</th><th>Warnungen</th><th>Essen</th><th></th></tr></thead>
-  <tbody>${liste.map(zeile)}</tbody></table></div>`;
-    const zuBearbeiten = sichtbar.filter((e) => ['angemeldet', 'unsicher', 'nachricht_gesendet'].includes(e.status));
-    const bestaetigt = sichtbar.filter((e) => e.status === 'bestaetigt');
-    const abgemeldet = sichtbar.filter((e) => e.status === 'abgemeldet');
-
-    const inhalt = html`
-${seitenKopf({
-  pfad: schichtPfad(s),
-  titel: html`${abgleichPunkt(w.abgleich)} ${s.name}`,
-  marke: html`<form method="post" action="/schichten/${s.id}/publizieren" class="inline">
-      ${formFelder(kx, hier)}<input type="hidden" name="publiziert" value="${s.publiziert ? '0' : '1'}">
-      <button type="submit" class="schalter${s.publiziert ? ' an' : ''}" aria-pressed="${s.publiziert ? 'true' : 'false'}" title="Nur die Schicht hat den Schalter «Publiziert».">${s.publiziert ? 'Publiziert' : 'Nicht publiziert'}</button>
-    </form>`,
-  angaben: [
-    html`<strong>${zeitraum(s.start_zeit, s.end_zeit, s.zeit_offen)}</strong>`,
-    s.ort ? `Antreten ${s.ort}` : '',
-    s.min_alter !== null ? `ab ${s.min_alter} Jahren` : '',
-    s.min_rang_name ? `ab ${s.min_rang_name}` : '',
-  ],
-  aktionen: html`<a class="knopf haupt" href="/schichten/${s.id}/anrufliste">Anrufliste</a>
-    <a class="knopf" href="/schichten/${s.id}/bearbeiten">Bearbeiten</a>
-    ${mehrMenue([
-      html`<a href="/schichten/${s.id}/aufgebot">Aufgebot (Briefe)</a>`,
-      html`<a href="/schichten/${s.id}/ics">Kalendertermin (ICS)</a>`,
-      html`<a href="/schichten/${s.id}/termintext">Text für Clubdesk-Termin</a>`,
-      html`<a href="/schichten/${s.id}/essensliste.csv">Essensliste (CSV)</a>`,
-      html`<div class="menue-trenner"></div>`,
-      html`<a class="gefahr" href="/schichten/${s.id}/loeschen">Schicht löschen</a>`,
-    ])}`,
-  reiter: einsatzReiter(s.einsatz_id, 'schichten'),
-})}
-${alleSchichten.length > 1 ? html`<p class="filter-chips schicht-wahl" aria-label="Schichten dieses Einsatzes">${alleSchichten.map((x) => html`<a href="/schichten/${x.id}"${x.id === s.id ? new Roh(' aria-current="page"') : ''}>${x.name}</a>`)}</p>` : ''}
-<div class="zahl-karten">
-  <div class="zahl-karte"><span class="wert">${istSoll(z.teilnehmende, s.soll_anzahl)}</span><span class="titel">Teilnehmende</span></div>
-  ${karte('Unbestätigt', z.unbestaetigt, z.unbestaetigt ? 'orange' : '')}
-  ${karte('Unsicher', z.unsicher)}
-  ${karte('Nachricht gesendet', z.nachricht)}
-  ${karte('Essen', z.essen)}
-  ${z.fremd ? karte('Fremdabteilungen', z.fremd) : ''}
-  ${z.rollen.map((r) => karte(r.rolle, `${r.ist} / ${r.soll}`, r.ist >= r.soll ? 'gruen' : 'rot'))}
-</div>
-${warnungen(w.schicht)}
-${feed.fehlerSeit ? html`<p class="hinweis">Abgleich nicht verfügbar seit ${datumZeit(feed.fehlerSeit)}.</p>` : ''}
-${vermerk ? html`<p class="unter">ICS exportiert am ${datumZeit(vermerk.exportiert_am)}${vermerk.benutzer ? ` von ${vermerk.benutzer}` : ''}.</p>` : ''}
-${s.bemerkung_intern ? html`<p class="bemerkung intern"><strong>Intern:</strong> ${mehrzeilig(s.bemerkung_intern)}</p>` : ''}
-
-<section class="abschnitt">
-  <h2>Person eintragen</h2>
-  <form method="post" action="/schichten/${s.id}/anmeldungen" class="zeilen-form">
-    ${formFelder(kx, hier)}
-    <label class="wachsen">Person <input name="person" list="personen-liste" required placeholder="Name tippen …" autocomplete="off"></label>
-    <datalist id="personen-liste">${personen.map((p) => html`<option value="${personAuswahlText(p)}"></option>`)}</datalist>
-    <label>Kanal ${kanalAuswahl('kanal', 'telefon', true)}</label>
-    <label>Status ${statusAuswahl('status', 'angemeldet')}</label>
-    <label>Rolle ${rolleAuswahl('rolle', rollen, null)}</label>
-    <label class="wachsen">Bemerkung <input name="bemerkung" maxlength="5000" autocomplete="off"></label>
-    <button type="submit" class="knopf haupt">Eintragen</button>
-  </form>
-</section>
-
-<section class="abschnitt">
-  <div class="titelzeile">
-    <h2>Einträge</h2>
-    <input type="search" class="suche" data-filter=".filterbar tbody tr" placeholder="Suchen …" aria-label="Einträge suchen">
-  </div>
-  <p class="filter-chips">
-    <a href="/schichten/${s.id}"${filter ? '' : new Roh(' aria-current="page"')}>alle ${eintraege.length}</a>
-    ${STATUS.map((st) => html`<a class="s-${st}" href="/schichten/${s.id}?status=${st}"${filter === st ? new Roh(' aria-current="page"') : ''}>${STATUS_TEXT[st]} ${zaehlerStatus.get(st) ?? 0}</a>`)}
-  </p>
-  ${z.unbestaetigt ? html`<p>${knopfPost(kx, `/schichten/${s.id}/alle-bestaetigen`, `Alle angemeldeten bestätigen (${z.unbestaetigt})`, {}, 'knopf haupt', hier)}</p>` : ''}
-  ${zuBearbeiten.length ? html`<h3>Zu bearbeiten (${zuBearbeiten.length})</h3>${tabelle(zuBearbeiten)}` : ''}
-  ${bestaetigt.length ? html`<h3>Bestätigt (${bestaetigt.length})</h3>${tabelle(bestaetigt)}` : ''}
-  ${abgemeldet.length ? html`<details class="gruppe"><summary><h3>Abgemeldet (${abgemeldet.length})</h3></summary>${tabelle(abgemeldet)}</details>` : ''}
-  ${sichtbar.length === 0 ? html`<p class="leer">Keine Einträge.</p>` : ''}
-</section>
-
-<section class="abschnitt">
-  <h2>Fremdabteilungen</h2>
-  <p class="unter">Fremdabteilungen zählen als Teilnehmende und beim Essen.</p>
-  ${fremd.length ? html`<div class="rahmen"><table class="tabelle"><thead><tr><th>Name</th><th>Anzahl</th><th>Bemerkung</th><th></th></tr></thead><tbody>
-  ${fremd.map((f) => html`<tr><td colspan="4">
-    <form method="post" action="/schichten/${s.id}/fremdabteilungen" class="zeilen-form">
-      ${formFelder(kx, hier)}<input type="hidden" name="id" value="${f.id}">
-      <input name="name" required maxlength="255" value="${f.name}" aria-label="Name">
-      <input name="anzahl" type="number" min="1" required value="${f.anzahl}" aria-label="Anzahl">
-      <input name="bemerkung" maxlength="2000" value="${f.bemerkung ?? ''}" aria-label="Bemerkung" class="wachsen">
-      <button type="submit" class="knopf klein">Speichern</button>
-      <label class="haken klein"><input type="checkbox" name="loeschen" value="1"> löschen</label>
-    </form></td></tr>`)}
-  </tbody></table></div>` : ''}
-  <form method="post" action="/schichten/${s.id}/fremdabteilungen" class="zeilen-form">
-    ${formFelder(kx, hier)}
-    <input name="name" required maxlength="255" placeholder="Name" aria-label="Name">
-    <input name="anzahl" type="number" min="1" required placeholder="Anzahl" aria-label="Anzahl">
-    <input name="bemerkung" maxlength="2000" placeholder="Bemerkung, z. B. 2 vegetarisch" aria-label="Bemerkung" class="wachsen">
-    <button type="submit" class="knopf">Hinzufügen</button>
-  </form>
-</section>`;
-    res.send(seite(kx, s.name, 'einsaetze', inhalt, { breit: true}));
+    const status = String(req.query.status ?? '');
+    const filter = ({ angemeldet: 'neu', unsicher: 'offen', nachricht_gesendet: 'offen', bestaetigt: 'bestaetigt', abgemeldet: 'ab' } as Record<string, BesetzenFilter>)[status] ?? 'alle';
+    res.redirect(303, besetzenPfad(s.einsatz_id, s.id, filter));
   });
 
   app.get('/schichten/:sid/bearbeiten', nurAufgebot, async (req, res) => {
@@ -401,46 +248,10 @@ ${s.anzahl_schichten <= 1 ? html`<p class="meldung fehler">Das ist die einzige S
     zurueck(req, res, `/schichten/${sid}`, `${n} Anmeldungen bestätigt.`, 'ok', schluessel);
   });
 
+  // Die Anrufliste ist der Filter «Nicht gefragt» in «Besetzen».
   app.get('/schichten/:sid/anrufliste', nurAufgebot, async (req, res) => {
-    const kx = k(res);
     const s = await ladeSchicht(db, leseId(req.params.sid));
-    const alleZeigen = req.query.alle === '1';
-    const { zeilen, ausgeblendet } = await anrufliste(db, s.id, alleZeigen);
-    const hier = aktuellerPfad(req);
-    const inhalt = html`
-${seitenKopf({
-  pfad: schichtPfad(s, 'Anrufliste'),
-  titel: 'Anrufliste',
-  angaben: [terminTitel(s), zeitraum(s.start_zeit, s.end_zeit, s.zeit_offen)],
-  aktionen: html`<button type="submit" form="sammel" class="knopf haupt">Nachricht gesendet (gewählte)</button>`,
-})}
-<div class="titelzeile filterzeile">
-  <input type="search" class="suche" data-filter=".filterbar tbody tr" placeholder="Person suchen …" aria-label="Personen suchen">
-</div>
-<p>${alleZeigen
-    ? html`Alle Personen sichtbar. <a href="/schichten/${s.id}/anrufliste">Unpassende ausblenden</a>`
-    : html`${ausgeblendet} Personen passen nicht zu Mindestalter oder Mindestrang. <a href="/schichten/${s.id}/anrufliste?alle=1">Einblenden</a>`}</p>
-<form method="post" action="/schichten/${s.id}/sammelstatus" id="sammel">
-  ${formFelder(kx, hier)}
-  <input type="hidden" name="status" value="nachricht_gesendet">
-  <input type="hidden" name="kanal" value="whatsapp">
-</form>
-<div class="rahmen"><table class="tabelle filterbar">
-  <thead><tr><th><input type="checkbox" data-alle-waehlen="personen" aria-label="Alle wählen"></th><th>Rang</th><th>Name</th><th>Alter</th><th>Telefon</th><th>Status</th><th>Aktion</th></tr></thead>
-  <tbody>${zeilen.map((p) => html`<tr class="${p.passt ? '' : 'passt-nicht'}" data-suche="${`${p.vorname ?? ''} ${p.nachname ?? ''} ${p.rang_name ?? ''}`.toLowerCase()}">
-    <td><input type="checkbox" name="personen" value="${p.clubdesk_id}" form="sammel" aria-label="wählen"></td>
-    <td>${p.rang_name ?? ''}</td>
-    <td><a href="/personen/${p.clubdesk_id}">${`${p.vorname ?? ''} ${p.nachname ?? ''}`.trim()}</a>${p.bemerkung ? html`<br><small>${p.bemerkung}</small>` : ''}</td>
-    <td>${p.alter ?? ''}</td>
-    <td>${telefon(p)}</td>
-    <td>${p.status ? statusText(p.status) : '–'}</td>
-    <td class="knopfreihe">
-      ${(['angemeldet', 'bestaetigt', 'unsicher', 'abgemeldet'] as const).map((st) =>
-        knopfPost(kx, `/schichten/${s.id}/sammelstatus`, STATUS_TEXT[st].replace(/^./, (c) => c.toUpperCase()), { status: st, kanal: 'telefon', personen: String(p.clubdesk_id) }, 'knopf klein', hier))}
-    </td>
-  </tr>`)}</tbody>
-</table></div>`;
-    res.send(seite(kx, 'Anrufliste', 'einsaetze', inhalt, { breit: true}));
+    res.redirect(303, besetzenPfad(s.einsatz_id, s.id, 'nicht', req.query.alle === '1'));
   });
 
   // Regel 17.3: Erster Export liefert die Datei. Danach zuerst W_ICS_DUPLIKAT, «Trotzdem laden».

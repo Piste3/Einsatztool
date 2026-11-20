@@ -87,21 +87,21 @@ test('T32 Einsatzansicht: Steckbrief, Schichten-Tabelle, Kacheln bei mehreren Sc
     assert.match(eine, /Keine Einsatzleitung eingeteilt\./);
     assert.match(eine, /<dt>Antreten<\/dt><dd>Marktplatz<\/dd>/);
     assert.match(eine, /0 bestätigt<\/strong> <span class="unter">\+ 1 angemeldet/);
-    assert.match(eine, /href="\/schichten\/\d+\/bearbeiten">Soll setzen/);
-    // Reiter «Anmeldungen»: Personen. Alte Links mit Filter führen dorthin.
-    const anm1 = await hole(`/einsaetze/${s.einsatzId}/anmeldungen`);
+    assert.match(eine, /href="\/einsaetze\/\d+\/schichten">Soll setzen/);
+    // Reiter «Besetzen» (seit 20.11.2026, ersetzt «Anmeldungen»): Personen.
+    const anm1 = await hole(`/einsaetze/${s.einsatzId}/besetzen?filter=alle`);
     assert.match(anm1, /Rüegg &lt;b&gt;/);
     assert.doesNotMatch(anm1, /Rüegg <b>/);
     assert.match(anm1, /Komme später/);
-    assert.doesNotMatch(anm1, /class="tabelle rueck personen-tabelle"/);
+    assert.doesNotMatch(anm1, /besetzen-matrix/);
     assert.match(anm1, new RegExp(`/rueckmeldungen/eintrag\\?schicht=${s.schichtId}&amp;person=8`));
 
     // Zweite Schicht: Matrix mit Kacheln, Fenster-Link für leere Felder, Hinweis «zeitlich möglich».
     const tag = lokalesDatum(inTagen(5, 12));
     const s2 = await erstelleSchicht(t.db, s.einsatzId, { name: 'Abend', start_datum: tag, start_zeit: '21:00', end_datum: tag, end_zeit: '23:00', soll_anzahl: '2' });
     await setzeAnmeldung(t.db, { schichtId: s2, personId: 7, status: 'bestaetigt', kanal: 'telefon', rolle: 'Einsatzleitung' }, null);
-    const anm2 = await hole(`/einsaetze/${s.einsatzId}/anmeldungen`);
-    assert.match(anm2, /class="tabelle rueck personen-tabelle"/);
+    const anm2 = await hole(`/einsaetze/${s.einsatzId}/besetzen?schicht=alle&filter=alle`);
+    assert.match(anm2, /besetzen-matrix/);
     assert.match(anm2, new RegExp(`/rueckmeldungen/eintrag\\?schicht=${s2}&amp;person=8`));
     assert.match(anm2, /kachel k-bestaetigt/);
     assert.match(anm2, /kachel k-moeglich/);
@@ -111,10 +111,10 @@ test('T32 Einsatzansicht: Steckbrief, Schichten-Tabelle, Kacheln bei mehreren Sc
     assert.match(zwei, /Abend: 1 Person fehlt\./);
     assert.match(zwei, /Keine Einsatzleitung eingeteilt: Stadtlauf\./);
 
-    // Filter «Offen»: nur Personen mit offenem Eintrag.
+    // Alte Links führen auf «Besetzen». Filter «Neu»: nur Personen mit unbestätigtem Eintrag.
     const alt = await fetch(`${app.url}/einsaetze/${s.einsatzId}?personen=offen`, { headers: { cookie }, redirect: 'manual' });
-    assert.equal(alt.headers.get('location'), `/einsaetze/${s.einsatzId}/anmeldungen?personen=offen`);
-    const offen = await hole(`/einsaetze/${s.einsatzId}/anmeldungen?personen=offen`);
+    assert.equal(alt.headers.get('location'), `/einsaetze/${s.einsatzId}/besetzen`);
+    const offen = await hole(`/einsaetze/${s.einsatzId}/besetzen?filter=neu`);
     assert.match(offen, /Rüegg/);
     assert.doesNotMatch(offen, /<span class="name">Nina Baumann<\/span>/);
   } finally {

@@ -26,7 +26,8 @@ test('Alle Seiten antworten ohne Fehler', async () => {
       '/', '/einsaetze', '/einsaetze?archiv=1', '/einsaetze/neu', `/einsaetze/${s.einsatzId}`, `/einsaetze/${s.einsatzId}/bearbeiten`,
       `/einsaetze/${s.einsatzId}/kopieren`, `/einsaetze/${s.einsatzId}/loeschen`, `/einsaetze/${s.einsatzId}/export.csv`,
       `/einsaetze/${s.einsatzId}/teilnehmerliste`, `/einsaetze/${s.einsatzId}/schichten/neu`,
-      `/einsaetze/${s.einsatzId}/anmeldungen`, `/einsaetze/${s.einsatzId}/schichten`, `/einsaetze/${s.einsatzId}/verlauf`,
+      `/einsaetze/${s.einsatzId}/besetzen`, `/einsaetze/${s.einsatzId}/besetzen?filter=nicht`, `/einsaetze/${s.einsatzId}/besetzen?filter=neu`,
+      `/einsaetze/${s.einsatzId}/besetzen?filter=nicht&unpassend=1`, `/einsaetze/${s.einsatzId}/anmeldungen`, `/einsaetze/${s.einsatzId}/schichten`, `/einsaetze/${s.einsatzId}/verlauf`,
       `/schichten/${s.schichtId}`, `/schichten/${s.schichtId}/bearbeiten`, `/schichten/${s.schichtId}/loeschen`,
       `/schichten/${s.schichtId}/anrufliste`, `/schichten/${s.schichtId}/anrufliste?alle=1`, `/schichten/${s.schichtId}/ics`,
       `/schichten/${s.schichtId}/termintext`, `/schichten/${s.schichtId}/aufgebot`, `/schichten/${s.schichtId}/essensliste.csv`,
@@ -37,7 +38,7 @@ test('Alle Seiten antworten ohne Fehler', async () => {
     for (const pfad of seiten) {
       const antwort = await fetch(`${app.url}${pfad}`, { headers: { cookie }, redirect: 'manual' });
       const text = await antwort.text();
-      assert.ok(antwort.status === 200 || antwort.status === 302, `${pfad}: ${antwort.status} ${text.slice(0, 300)}`);
+      assert.ok(antwort.status === 200 || antwort.status === 302 || antwort.status === 303, `${pfad}: ${antwort.status} ${text.slice(0, 300)}`);
       if ((antwort.headers.get('content-type') ?? '').startsWith('text/html')) {
         assert.doesNotMatch(text, /<b>2026<\/b>/, `${pfad}: HTML nicht maskiert`);
         assert.doesNotMatch(text, /style="|<script>/, `${pfad}: Inline-Stil oder Inline-Skript`);

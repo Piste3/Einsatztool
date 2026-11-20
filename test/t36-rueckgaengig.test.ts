@@ -110,7 +110,8 @@ test('T36 Rückgängig im Browser: Toast zeigt den Knopf, ein Klick setzt zurüc
       return seite.text();
     };
 
-    const r1 = await post(`/schichten/${s.schichtId}/anmeldungen`, { person: '1', status: 'angemeldet', kanal: 'telefon', zurueck: `/schichten/${s.schichtId}` });
+    const ziel = `/einsaetze/${s.einsatzId}/besetzen?filter=alle`;
+    const r1 = await post(`/schichten/${s.schichtId}/anmeldungen`, { person: '1', status: 'angemeldet', kanal: 'telefon', zurueck: ziel });
     assert.equal(r1.status, 303);
     const html1 = await toastNach(r1);
     assert.match(html1, /data-toast-aktion/);
@@ -118,18 +119,18 @@ test('T36 Rückgängig im Browser: Toast zeigt den Knopf, ein Klick setzt zurüc
     const schluessel = html1.match(/name="schluessel" value="([A-Za-z0-9_-]+)"/)?.[1];
     assert.ok(schluessel);
     // Der Knopf führt auf dieselbe Seite zurück.
-    assert.match(html1, new RegExp(`name="zurueck" value="/schichten/${s.schichtId}"`));
+    assert.match(html1, new RegExp(`name="zurueck" value="${ziel.replace(/[?]/g, '\\?')}"`));
 
-    const r2 = await post('/rueckgaengig', { schluessel, zurueck: `/schichten/${s.schichtId}` });
+    const r2 = await post('/rueckgaengig', { schluessel, zurueck: ziel });
     assert.equal(r2.status, 303);
-    assert.equal(r2.headers.get('location'), `/schichten/${s.schichtId}`);
+    assert.equal(r2.headers.get('location'), ziel);
     const html2 = await toastNach(r2);
     assert.match(html2, /Rückgängig gemacht\./);
     assert.doesNotMatch(html2, /data-toast-aktion/);
     assert.equal((await zeilen(t.db, 'SELECT id FROM anmeldung')).length, 0);
 
     // Ein zweiter Klick ändert nichts und zeigt einen Fehler.
-    const r3 = await post('/rueckgaengig', { schluessel: schluessel!, zurueck: `/schichten/${s.schichtId}` });
+    const r3 = await post('/rueckgaengig', { schluessel: schluessel!, zurueck: ziel });
     assert.match(await toastNach(r3), /Rückgängig geht nicht mehr/);
     // Ein ungültiger Schlüssel ebenso.
     const r4 = await post('/rueckgaengig', { schluessel: '<script>', zurueck: `/schichten/${s.schichtId}` });

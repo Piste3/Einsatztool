@@ -32,8 +32,8 @@ test('T30 Bemerkung: Formular speichert sie, Aufgebot sieht und bearbeitet sie m
     const [a] = await zeilen(t.db, 'SELECT id, version, bemerkung FROM anmeldung WHERE id = ?', [f.anmeldungIds[0]]);
     assert.equal(a.bemerkung, 'Komme erst um 13 Uhr <b>');
 
-    // Die Schicht zeigt die Bemerkung maskiert und im Formular «Ändern».
-    const schicht = await (await hole(`/schichten/${s.schichtId}`)).text();
+    // «Besetzen» zeigt die Bemerkung maskiert.
+    const schicht = await (await hole(`/einsaetze/${s.einsatzId}/besetzen`)).text();
     assert.match(schicht, /Komme erst um 13 Uhr &lt;b&gt;/);
     assert.doesNotMatch(schicht, /13 Uhr <b>/);
 

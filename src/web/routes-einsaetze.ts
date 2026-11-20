@@ -6,13 +6,15 @@ import {
   aendereEinsatz, anzahlAnmeldungenEinsatz, einsatzListe, type EinsatzZeile, erstelleEinsatz, kopiereEinsatz, ladeEinsatz, loescheEinsatz, vorgabeKopie,
   type Einsatz,
 } from '../domain/einsatz.js';
-import { anzeigeZeiten, passtInTabelle, schichtenVonEinsatz, speichereSchichtTabelle, zeilenAbdruck, type SchichtZeile } from '../domain/schicht.js';
+import { anzeigeZeiten, fremdabteilungen, passtInTabelle, schichtenVonEinsatz, speichereSchichtTabelle, zeilenAbdruck, type SchichtZeile } from '../domain/schicht.js';
 import { bestaetigeAlle, verlaufEinsatz } from '../domain/anmeldung.js';
 import { mitRueckgaengig } from '../domain/rueckgaengig.js';
 import { logText } from './routes-schichten.js';
 import { warnungenFuerSchichten } from '../domain/warnungen.js';
 import { sollFarbe, zahlenFuerSchichten } from '../domain/zaehlung.js';
 import { teilnehmerlisteCsv } from '../domain/export.js';
+import { besetzenAnsicht, besetzenPfad } from './views/besetzen.js';
+import type { BesetzenFilter } from '../domain/besetzen.js';
 import { rollen as ladeRollen } from '../domain/stammdaten.js';
 import { Eingabefehler, Konflikt, KANAL_TEXT, STATUS_TEXT, id as leseId, type Kanal, type Status } from '../domain/eingabe.js';
 import { einsatzLage, type ZuTunPunkt } from '../domain/einsatz-lage.js';
@@ -104,7 +106,7 @@ ${liste.length === 0 ? html`<p class="leer">Keine Einsätze.</p>` : html`
     <td class="antreten">${lokaleZeit(e.start)}${e.antretenOrt ? html` · ${e.antretenOrt}` : ''}</td>
     <td>${e.publiziert ? punktMarke('Im Formular', 'gruen') : punktMarke('Entwurf', 'grau')}</td>
     <td>${besetzung(e)}</td>
-    <td class="zahl">${e.unbestaetigt ? html`<a href="/einsaetze/${e.id}/anmeldungen?personen=offen" class="orange-text">${e.unbestaetigt}</a>` : '–'}</td>
+    <td class="zahl">${e.unbestaetigt ? html`<a href="${besetzenPfad(e.id, null, 'neu')}" class="orange-text">${e.unbestaetigt}</a>` : '–'}</td>
     <td class="zahl">${e.bestaetigt || '–'}</td>
     <td class="einsatzleitung">${e.einsatzleitung.length ? e.einsatzleitung.map((n, i) => html`${i ? html`<br>` : ''}${n}`) : '–'}</td>
   </tr>`)}</tbody>
@@ -167,28 +169,11 @@ ${liste.length === 0 ? html`<p class="leer">Keine Einsätze.</p>` : html`
       mitEinsatzleitung: elRolle ? new Set(elEintraege.map((a) => a.schicht_id)) : null,
     });
 
-    // Zeilen der Personen: bekannte Personen oder unbekannte Einträge, je mit einem Feld pro Schicht.
-    type Zeile = { schluessel: string; name: string; rang_name: string | null; rang_reihenfolge: number | null; vorname: string | null; nachname: string | null; personId: number | null; zellen: Map<number, any> };
-    const zeilen = new Map<string, Zeile>();
-    for (const a of eintraege) {
-      const schluessel = a.person_id !== null ? `p${a.person_id}` : `u${a.id}`;
-      if (!zeilen.has(schluessel)) {
-        zeilen.set(schluessel, {
-          schluessel, name: a.name, rang_name: a.rang_name, rang_reihenfolge: a.rang_reihenfolge,
-          vorname: a.vorname ?? a.name, nachname: a.nachname ?? '', personId: a.person_id, zellen: new Map(),
-        });
-      }
-      zeilen.get(schluessel)!.zellen.set(a.schicht_id, a);
-    }
-    const alleZeilen = [...zeilen.values()].sort(nachRangTiefZuerst);
-    const mitWarnung = (z: Zeile) => [...z.zellen.values()].some((a) => (w.get(a.schicht_id)?.anmeldungen.get(a.id)?.length ?? 0) > 0);
-    const offen = (z: Zeile) => [...z.zellen.values()].some((a) => a.status === 'angemeldet' || a.status === 'unsicher' || a.status === 'nachricht_gesendet');
-    const filter = req.query.personen === 'offen' ? 'offen' : req.query.personen === 'warnung' ? 'warnung' : null;
-    const sichtbar = filter === 'offen' ? alleZeilen.filter(offen) : filter === 'warnung' ? alleZeilen.filter(mitWarnung) : alleZeilen;
+    // Zahl der Personen mit Eintrag (für den Reiter «Besetzen»).
+    const mitEintrag = new Set(eintraege.map((a) => (a.person_id !== null ? `p${a.person_id}` : `u${a.id}`))).size;
 
     const ende = schichten.reduce((m, sc) => (sc.end_zeit > m ? sc.end_zeit : m), schichten[0]?.end_zeit ?? '');
     const name = (z: { rang_name: string | null; name: string }) => html`${z.rang_name ? html`<span class="rang">${z.rang_name}</span> ` : ''}${z.name}`;
-    const eintragLink = (sid: number, personId: number) => `/rueckmeldungen/eintrag?schicht=${sid}&person=${personId}&zurueck=${encodeURIComponent(hier)}`;
 
     // ---------- Steckbrief ----------
     const leer = html`<span class="unter">–</span>`;
@@ -211,14 +196,16 @@ ${e.bemerkung_extern ? html`<p class="bemerkung"><strong>Extern:</strong> ${mehr
       return html`<span class="zutun-symbol z-${farbe}" aria-hidden="true">${text}</span>`;
     };
     const knopf = (p: ZuTunPunkt) => {
+      const besetzen = (filter: BesetzenFilter) => besetzenPfad(e.id, schichten.length > 1 ? p.schichtId : null, filter);
       switch (p.art) {
-        case 'fehlt': return html`<a class="knopf klein" href="/schichten/${p.schichtId}/anrufliste">Anrufliste</a>`;
-        case 'kein_soll': return html`<a class="knopf klein" href="/schichten/${p.schichtId}/bearbeiten">Soll setzen</a>`;
-        case 'unbestaetigt': return knopfPost(kx, `/einsaetze/${e.id}/alle-bestaetigen`, lage.unbestaetigt === 1 ? 'Bestätigen' : `Alle ${lage.unbestaetigt} bestätigen`, {}, 'knopf klein', hier);
-        case 'offen': return html`<a class="knopf klein" href="/schichten/${p.schichtId}?status=${p.status}">Zeigen</a>`;
-        case 'einsatzleitung': return html`<a class="knopf klein" href="/schichten/${p.schichtId}">Eintragen</a>`;
+        case 'fehlt': return html`<a class="knopf klein" href="${besetzen('nicht')}">Anfragen ›</a>`;
+        case 'kein_soll': return html`<a class="knopf klein" href="/einsaetze/${e.id}/schichten">Soll setzen</a>`;
+        case 'unbestaetigt': return html`<span class="knopfreihe"><a class="knopf klein" href="${besetzenPfad(e.id, schichten.length > 1 ? 'alle' : null, 'neu')}">Ansehen ›</a>${knopfPost(kx, `/einsaetze/${e.id}/alle-bestaetigen`, lage.unbestaetigt === 1 ? 'Bestätigen' : `Alle ${lage.unbestaetigt} bestätigen`, {}, 'knopf klein', hier)}</span>`;
+        case 'offen': return html`<a class="knopf klein" href="${besetzen('offen')}">Nachfassen ›</a>`;
+        case 'einsatzleitung': return html`<a class="knopf klein" href="${besetzen('alle')}">Eintragen ›</a>`;
+        case 'warnung': return html`<a class="knopf klein" href="${besetzen('warnung')}">Zeigen ›</a>`;
         case 'zeit_offen': return html`<a class="knopf klein" href="/einsaetze/${e.id}/schichten">Zeiten eintragen</a>`;
-        default: return html`<a class="knopf klein" href="/schichten/${p.schichtId}">Zeigen</a>`;
+        default: return html`<a class="knopf klein" href="${besetzen('alle')}">Zeigen ›</a>`;
       }
     };
     const zuTun = html`<section class="zutun-block" aria-labelledby="zutun-titel">
@@ -259,92 +246,16 @@ ${!schichten.length ? html`<p class="leer">Keine Schichten.</p>` : html`<div cla
       warnZahl.get(s.id) ? html`<span class="pille orange">⚠ ${warnZahl.get(s.id)}</span>` : '',
     ].filter((x) => x !== '');
     return html`<tr class="${s.end_zeit <= jetzt ? 'vergangen' : ''}">
-    <td><div class="schicht-name">${abgleichPunkt(ws.abgleich)} <a href="/schichten/${s.id}">${s.name}</a></div><div class="unter">${zeitraum(s.start_zeit, s.end_zeit, s.zeit_offen)}${s.ort ? ` · ${s.ort}` : ''}</div></td>
+    <td><div class="schicht-name">${abgleichPunkt(ws.abgleich)} <a href="${besetzenPfad(e.id, schichten.length > 1 ? s.id : null)}">${s.name}</a></div><div class="unter">${zeitraum(s.start_zeit, s.end_zeit, s.zeit_offen)}${s.ort ? ` · ${s.ort}` : ''}</div></td>
     <td>${belegung(z, s.soll_anzahl)}</td>
     <td>${pillen.length ? html`<span class="pillen">${pillen}</span>` : html`<span class="unter">–</span>`}</td>
     <td>${z.rollen.length ? html`<span class="pillen">${z.rollen.map((r) => html`<span class="pille ${r.ist >= r.soll ? 'gruen' : 'rot'}">${r.rolle} ${r.ist}/${r.soll}</span>`)}</span>` : html`<span class="unter">–</span>`}</td>
     <td class="zahl">${z.essen}</td>
-    <td><form method="post" action="/schichten/${s.id}/publizieren" class="inline">
-        ${formFelder(kx, hier)}
-        <input type="hidden" name="publiziert" value="${s.publiziert ? '0' : '1'}">
-        <button type="submit" class="schalter${s.publiziert ? ' an' : ''}" aria-pressed="${s.publiziert ? 'true' : 'false'}">${s.publiziert ? 'Publiziert' : 'Nicht publiziert'}</button>
-      </form></td>
-    <td class="aktionen-zelle"><a class="knopf klein" href="/schichten/${s.id}">Öffnen ›</a></td>
+    <td>${s.publiziert ? punktMarke('Publiziert', 'gruen') : punktMarke('Nicht publiziert', 'grau')}</td>
+    <td class="aktionen-zelle"><a class="knopf klein" href="${besetzenPfad(e.id, schichten.length > 1 ? s.id : null)}">Besetzen ›</a></td>
   </tr>`;
   })}</tbody>
 </table></div>`}
-</section>`;
-
-    // ---------- Personen ----------
-    const filterChips = html`<p class="filter-chips">
-  <a href="/einsaetze/${e.id}/anmeldungen"${filter ? '' : new Roh(' aria-current="page"')}>Alle ${alleZeilen.length}</a>
-  <a href="/einsaetze/${e.id}/anmeldungen?personen=offen"${filter === 'offen' ? new Roh(' aria-current="page"') : ''}>Offen ${alleZeilen.filter(offen).length}</a>
-  <a href="/einsaetze/${e.id}/anmeldungen?personen=warnung"${filter === 'warnung' ? new Roh(' aria-current="page"') : ''}>Mit Warnung ${alleZeilen.filter(mitWarnung).length}</a>
-</p>`;
-    const suche = html`<input type="search" class="suche" data-filter=".personen-tabelle tbody tr" placeholder="Name suchen …" aria-label="Personen suchen">`;
-    const titelPersonen = html`<div class="titelzeile filterzeile"><h2 id="personen-titel">Anmeldungen</h2>${alleZeilen.length ? suche : ''}</div>${alleZeilen.length ? filterChips : ''}`;
-
-    // Mehrere Schichten: Kacheln wie in den Rückmeldungen. Ein Klick öffnet das Fenster zum Eintragen.
-    const feld = (z: Zeile, s: (typeof schichten)[number]) => {
-      const a = z.zellen.get(s.id);
-      const wl = a ? w.get(s.id)?.anmeldungen.get(a.id) : undefined;
-      let art: KachelArt = a ? (a.status as Status) : null;
-      if (!a && z.personId !== null) {
-        // Hinweis wie in den Rückmeldungen: Die Person ist in einer anderen Schicht dieses Einsatzes an.
-        const andere = schichten.filter((x) => x.id !== s.id && z.zellen.get(x.id) && an(z.zellen.get(x.id)));
-        if (andere.length) art = andere.some((x) => x.start_zeit < s.end_zeit && s.start_zeit < x.end_zeit) ? 'gleich' : 'moeglich';
-      }
-      const titel = a
-        ? `${STATUS_TEXT[a.status as Status]}${a.rolle ? ` · ${a.rolle}` : ''}${a.bemerkung ? ` · Bemerkung: ${a.bemerkung}` : ''}${wl?.length ? ` · ⚠ ${wl.map((x) => x.text).join(' ')}` : ''}`
-        : art ? KACHEL_TEXT[art as 'gleich' | 'moeglich'] : 'nicht gefragt';
-      const innen = html`<span class="kachel-huelle">${kachel(art)}${wl?.length ? html`<span class="warn-marke" aria-hidden="true">!</span>` : ''}${a?.bemerkung ? html`<span class="bemerkung-marke" aria-hidden="true">✎</span>` : ''}</span>${a?.rolle ? html`<small class="rolle">${a.rolle}</small>` : ''}<span class="sr">${titel}</span>`;
-      if (z.personId !== null) return html`<td class="zelle-klick"><a href="${eintragLink(s.id, z.personId)}" data-eintrag title="${titel} – Klick zum Eintragen">${innen}</a></td>`;
-      if (a) return html`<td class="zelle-klick"><a href="/schichten/${s.id}" title="${titel} – in der Schicht bearbeiten">${innen}</a></td>`;
-      return html`<td></td>`;
-    };
-    const summe = (s: (typeof schichten)[number], n: 'an' | 'ab' | 'unsicher') => {
-      const z = zahlen.get(s.id)!;
-      return n === 'an' ? z.bestaetigt + z.unbestaetigt : n === 'ab' ? z.abgemeldet : z.unsicher;
-    };
-    const matrix = html`${kachelLegende()}
-<div class="rahmen rueck-rahmen"><table class="tabelle rueck personen-tabelle">
-  <thead><tr><th class="name-spalte">Person</th>${schichten.map((s) => html`<th class="schicht-kopf"><a class="s" href="/schichten/${s.id}">${s.name}</a><span class="d">${wochentagKurz(s.start_zeit)} ${datumChVonIso(s.start_zeit).slice(0, 6)} ${lokaleZeit(s.start_zeit)}</span></th>`)}</tr></thead>
-  <tbody>${sichtbar.map((z) => html`<tr data-suche="${`${z.name} ${z.rang_name ?? ''}`.toLowerCase()}">
-    <th class="name-spalte">${z.personId !== null
-      ? html`<a href="/personen/${z.personId}"><span class="rang">${z.rang_name ?? ''}</span><span class="name">${z.name}</span></a>`
-      : html`<a href="/anmeldungen/unbekannt"><span class="rang"></span><span class="name">${z.name}</span></a> <span class="pille orange">unbekannt</span>`}</th>
-    ${schichten.map((s) => feld(z, s))}
-  </tr>`)}</tbody>
-  <tfoot>${(['an', 'ab', 'unsicher'] as const).map((n) => html`<tr><th class="name-spalte">${{ an: 'An', ab: 'Ab', unsicher: 'Unsicher' }[n]}</th>${schichten.map((s) => html`<td>${summe(s, n)}</td>`)}</tr>`)}</tfoot>
-</table></div>`;
-
-    // Eine Schicht: Eine Matrix mit einer Spalte hilft nicht. Die Seite zeigt eine Liste.
-    const liste = () => {
-      const s = schichten[0];
-      return html`<div class="rahmen"><table class="tabelle personen-tabelle">
-  <thead><tr><th>Person</th><th>Status</th><th>Rolle</th><th>Kanal</th><th>Bemerkung</th><th>Warnungen</th><th><span class="sr">Aktionen</span></th></tr></thead>
-  <tbody>${sichtbar.map((z) => {
-    const a = z.zellen.get(s.id)!;
-    return html`<tr class="${a.status === 'angemeldet' ? 'unbestaetigt' : ''}" data-suche="${`${z.name} ${z.rang_name ?? ''}`.toLowerCase()}">
-    <td>${z.personId !== null ? html`<a href="/personen/${z.personId}">${name(z)}</a>` : html`${z.name} <span class="pille orange">unbekannt</span>`}</td>
-    <td>${statusText(a.status as Status)}</td>
-    <td>${a.rolle ?? ''}</td>
-    <td>${KANAL_TEXT[a.kanal as Kanal]}</td>
-    <td class="bemerkung">${mehrzeilig(a.bemerkung)}</td>
-    <td>${warnungen(w.get(s.id)?.anmeldungen.get(a.id))}</td>
-    <td class="aktionen-zelle">${a.status !== 'bestaetigt' ? knopfPost(kx, `/anmeldungen/${a.id}`, 'Bestätigen', { status: 'bestaetigt' }, 'knopf klein', hier) : ''}
-      ${z.personId !== null ? html`<a class="knopf klein" href="${eintragLink(s.id, z.personId)}" data-eintrag>Ändern</a>` : html`<a class="knopf klein" href="/schichten/${s.id}">Ändern</a>`}</td>
-  </tr>`;
-  })}</tbody>
-</table></div>`;
-    };
-
-    const personen = html`<section aria-labelledby="personen-titel">${titelPersonen}
-${!alleZeilen.length
-  ? html`<p class="leer">Noch keine Einträge. Personen trägst du in der Schicht oder in den Rückmeldungen ein.</p>`
-  : !sichtbar.length
-    ? html`<p class="leer">Keine Person passt zum Filter.</p>`
-    : schichten.length === 1 ? liste() : matrix}
 </section>`;
 
     // ---------- Kopf: Leitung ----------
@@ -352,7 +263,29 @@ ${!alleZeilen.length
     const leitung = elPersonen.length ? elPersonen.map((a, i) => html`${i ? ', ' : ''}${name(a)}`) : '–';
 
     // ---------- Reiter «Schichten»: Karten je Schicht ----------
-    const schichtKarten = () => html`<section aria-labelledby="karten-titel">
+    const fremdJe = ansicht === 'schichten' ? new Map(await Promise.all(ids.map(async (sid) => [sid, await fremdabteilungen(db, sid)] as const))) : new Map();
+    const fremdBlock = (sid: number) => {
+      const fremd = fremdJe.get(sid) ?? [];
+      return html`<details class="aufklapp fremd-block"><summary>Fremdabteilungen${fremd.length ? ` (${fremd.reduce((n: number, f: any) => n + Number(f.anzahl), 0)})` : ''}</summary>
+  <p class="unter">Fremdabteilungen zählen als Teilnehmende und beim Essen.</p>
+  ${fremd.map((f: any) => html`<form method="post" action="/schichten/${sid}/fremdabteilungen" class="zeilen-form">
+    ${formFelder(kx, hier)}<input type="hidden" name="id" value="${f.id}">
+    <input name="name" required maxlength="255" value="${f.name}" aria-label="Name" class="wachsen">
+    <input name="anzahl" type="number" min="1" required value="${f.anzahl}" aria-label="Anzahl" class="zahl-feld">
+    <input name="bemerkung" maxlength="2000" value="${f.bemerkung ?? ''}" aria-label="Bemerkung" class="wachsen">
+    <button type="submit" class="knopf klein">Speichern</button>
+    <label class="haken klein"><input type="checkbox" name="loeschen" value="1"> löschen</label>
+  </form>`)}
+  <form method="post" action="/schichten/${sid}/fremdabteilungen" class="zeilen-form">
+    ${formFelder(kx, hier)}
+    <input name="name" required maxlength="255" placeholder="Name" aria-label="Name" class="wachsen">
+    <input name="anzahl" type="number" min="1" required placeholder="Anzahl" aria-label="Anzahl" class="zahl-feld">
+    <input name="bemerkung" maxlength="2000" placeholder="Bemerkung, z. B. 2 vegetarisch" aria-label="Bemerkung" class="wachsen">
+    <button type="submit" class="knopf klein">Hinzufügen</button>
+  </form>
+</details>`;
+    };
+    const schichtKarten = async () => html`<section aria-labelledby="karten-titel">
 <h2 id="karten-titel" class="sr">Schichten</h2>
 ${!schichten.length ? html`<p class="leer">Keine Schichten.</p>` : html`<div class="schicht-karten">${schichten.map((s) => {
   const z = zahlen.get(s.id)!;
@@ -361,7 +294,7 @@ ${!schichten.length ? html`<p class="leer">Keine Schichten.</p>` : html`<div cla
   const zeigen = leute.slice(0, 12);
   return html`<article class="karte schicht-karte2${s.end_zeit <= jetzt ? ' vergangen' : ''}">
   <header>
-    <div><h3><a href="/schichten/${s.id}">${s.name}</a></h3><p class="unter">${zeitraum(s.start_zeit, s.end_zeit, s.zeit_offen)}</p></div>
+    <div><h3><a href="${besetzenPfad(e.id, schichten.length > 1 ? s.id : null)}">${s.name}</a></h3><p class="unter">${zeitraum(s.start_zeit, s.end_zeit, s.zeit_offen)}</p></div>
     <div class="karte-besetzung">
       <span class="unter">Besetzung</span>
       <span class="karte-zahl f-${sollFarbe(z.teilnehmende, s.soll_anzahl)}"><strong>${z.teilnehmende}${s.soll_anzahl ? ` / ${s.soll_anzahl}` : ''}</strong>${fehlt ? ` · ${fehlt} fehlen` : ''}</span>
@@ -369,10 +302,11 @@ ${!schichten.length ? html`<p class="leer">Keine Schichten.</p>` : html`<div cla
     </div>
   </header>
   ${z.rollen.length ? html`<p class="pillen">${z.rollen.map((r) => html`<span class="pille ${r.ist >= r.soll ? 'gruen' : 'rot'}">${r.rolle} ${r.ist}/${r.soll}</span>`)}</p>` : ''}
+  ${fremdBlock(s.id)}
   ${!leute.length ? html`<p class="leer karte-leer">Noch niemand zugeteilt.</p>` : html`<ul class="karte-personen">${zeigen.map((a) => html`<li><span>${name(a)}${a.rolle ? html` <span class="unter">· ${a.rolle}</span>` : ''}</span>${statusText(a.status as Status)}</li>`)}${leute.length > zeigen.length ? html`<li class="unter">+ ${leute.length - zeigen.length} weitere</li>` : ''}</ul>`}
   <footer>
-    <a class="knopf klein" href="/schichten/${s.id}">Öffnen</a>
-    <a class="knopf klein" href="/schichten/${s.id}/anrufliste">Anrufliste</a>
+    <a class="knopf klein" href="${besetzenPfad(e.id, schichten.length > 1 ? s.id : null)}">Besetzen ›</a>
+    <a class="knopf klein" href="/schichten/${s.id}/bearbeiten">Bearbeiten</a>
     <form method="post" action="/schichten/${s.id}/publizieren" class="inline">
       ${formFelder(kx, hier)}
       <input type="hidden" name="publiziert" value="${s.publiziert ? '0' : '1'}">
@@ -473,23 +407,20 @@ ${seitenKopf({
     `Antreten ${schichten.length ? anzeigeZeiten(schichten[0]).beginn || 'Zeit offen' : ''}${e.ort ? ` · ${e.ort}` : ''}`,
     elRolle ? html`Leitung ${leitung}` : '',
   ],
-  aktionen: html`<a class="knopf haupt" href="/einsaetze/${e.id}/teilnehmerliste">Teilnehmerliste</a>
+  aktionen: html`${dokumenteMenue(e.id, schichten)}
     <a class="knopf" href="/einsaetze/${e.id}/bearbeiten">Bearbeiten</a>
     ${mehrMenue([
       html`<a href="/einsaetze/${e.id}/schichten/neu">Schicht hinzufügen</a>`,
       html`<a href="/einsaetze/${e.id}/kopieren">Einsatz kopieren</a>`,
-      html`<div class="menue-trenner"></div><div class="menue-titel">Export</div>`,
-      html`<a href="/einsaetze/${e.id}/teilnehmerliste">Teilnehmerliste drucken</a>`,
-      html`<a href="/einsaetze/${e.id}/export.csv">Teilnehmerliste als CSV</a>`,
       html`<div class="menue-trenner"></div>`,
       html`<a class="gefahr" href="/einsaetze/${e.id}/loeschen">Einsatz löschen</a>`,
     ])}`,
-  reiter: einsatzReiter(e.id, ansicht, { anmeldungen: alleZeilen.length, schichten: schichten.length }),
+  reiter: einsatzReiter(e.id, ansicht, { besetzen: mitEintrag, schichten: schichten.length }),
 })}
 <div class="einsatz-uebersicht">
 ${ansicht === 'uebersicht' ? html`${steckbrief}${zuTun}${schichtTabelle}`
-  : ansicht === 'anmeldungen' ? personen
-  : ansicht === 'schichten' ? html`${schichtKarten()}${await bearbeitenTabelle()}`
+  : ansicht === 'besetzen' ? (await besetzenAnsicht(db, kx, req, e.id, hier)).inhalt
+  : ansicht === 'schichten' ? html`${await schichtKarten()}${await bearbeitenTabelle()}`
   : await verlaufAnsicht()}
 </div>`;
     res.status(tabelle ? (tabelle.fehler.startsWith('Ein anderer Benutzer') ? 409 : 400) : 200)
@@ -499,12 +430,17 @@ ${ansicht === 'uebersicht' ? html`${steckbrief}${zuTun}${schichtTabelle}`
   app.get('/einsaetze/:id', nurAufgebot, async (req, res) => {
     // Alte Links mit Filter der Personen führen auf den Reiter «Anmeldungen».
     if (typeof req.query.personen === 'string') {
-      res.redirect(303, `/einsaetze/${leseId(req.params.id)}/anmeldungen?personen=${encodeURIComponent(req.query.personen)}`);
+      res.redirect(303, besetzenPfad(leseId(req.params.id), null, req.query.personen === 'warnung' ? 'warnung' : undefined));
       return;
     }
     await einsatzSeite(req, res, 'uebersicht');
   });
-  app.get('/einsaetze/:id/anmeldungen', nurAufgebot, (req, res) => einsatzSeite(req, res, 'anmeldungen'));
+  app.get('/einsaetze/:id/besetzen', nurAufgebot, (req, res) => einsatzSeite(req, res, 'besetzen'));
+  // Alte Adresse des Reiters «Anmeldungen» (bis 20.11.2026).
+  app.get('/einsaetze/:id/anmeldungen', nurAufgebot, (req, res) => {
+    const f = req.query.personen === 'warnung' ? 'warnung' : undefined;
+    res.redirect(303, besetzenPfad(leseId(req.params.id), null, f));
+  });
   app.get('/einsaetze/:id/schichten', nurAufgebot, (req, res) => einsatzSeite(req, res, 'schichten'));
   app.get('/einsaetze/:id/verlauf', nurAufgebot, (req, res) => einsatzSeite(req, res, 'verlauf'));
 
@@ -612,18 +548,34 @@ ${seitenKopf({ pfad: [{ text: 'Einsätze', href: '/einsaetze' }, { text: e.name,
   });
 }
 
-export type Ansicht = 'uebersicht' | 'anmeldungen' | 'schichten' | 'verlauf';
+export type Ansicht = 'uebersicht' | 'besetzen' | 'schichten' | 'verlauf';
 
-const ANSICHT_TEXT: Record<Ansicht, string> = { uebersicht: 'Übersicht', anmeldungen: 'Anmeldungen', schichten: 'Schichten', verlauf: 'Verlauf' };
+const ANSICHT_TEXT: Record<Ansicht, string> = { uebersicht: 'Übersicht', besetzen: 'Besetzen', schichten: 'Schichten', verlauf: 'Verlauf' };
 
 /** Reiter eines Einsatzes (Vorlage Yann, Handbuch): Übersicht, Anmeldungen, Schichten, Verlauf. */
-export function einsatzReiter(einsatzId: number, aktiv: Ansicht, zahlen: { anmeldungen?: number; schichten?: number } = {}): Reiter[] {
+export function einsatzReiter(einsatzId: number, aktiv: Ansicht, zahlen: { besetzen?: number; schichten?: number } = {}): Reiter[] {
   return [
     { text: 'Übersicht', href: `/einsaetze/${einsatzId}`, aktiv: aktiv === 'uebersicht' },
-    { text: 'Anmeldungen', href: `/einsaetze/${einsatzId}/anmeldungen`, aktiv: aktiv === 'anmeldungen', zahl: zahlen.anmeldungen },
+    { text: 'Besetzen', href: `/einsaetze/${einsatzId}/besetzen`, aktiv: aktiv === 'besetzen', zahl: zahlen.besetzen },
     { text: 'Schichten', href: `/einsaetze/${einsatzId}/schichten`, aktiv: aktiv === 'schichten', zahl: zahlen.schichten },
     { text: 'Verlauf', href: `/einsaetze/${einsatzId}/verlauf`, aktiv: aktiv === 'verlauf' },
   ];
+}
+
+/** Menü «Dokumente»: alles zum Drucken und Exportieren, nach Schicht gegliedert. */
+function dokumenteMenue(einsatzId: number, schichten: { id: number; name: string }[]): Roh {
+  const jeSchicht = (s: { id: number; name: string }) => [
+    html`<a href="/schichten/${s.id}/aufgebot">Aufgebot (Briefe)</a>`,
+    html`<a href="/schichten/${s.id}/essensliste.csv">Essensliste (CSV)</a>`,
+    html`<a href="/schichten/${s.id}/ics">Kalendertermin (ICS)</a>`,
+    html`<a href="/schichten/${s.id}/termintext">Text für Clubdesk-Termin</a>`,
+  ];
+  return mehrMenue([
+    html`<div class="menue-titel">Ganzer Einsatz</div>`,
+    html`<a href="/einsaetze/${einsatzId}/teilnehmerliste">Teilnehmerliste drucken</a>`,
+    html`<a href="/einsaetze/${einsatzId}/export.csv">Teilnehmerliste als CSV</a>`,
+    ...schichten.flatMap((s) => [html`<div class="menue-trenner"></div><div class="menue-titel">${schichten.length > 1 ? s.name : 'Schicht'}</div>`, ...jeSchicht(s)]),
+  ], 'Dokumente');
 }
 
 export function dateiTeil(name: string): string {

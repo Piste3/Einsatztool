@@ -62,7 +62,7 @@ test('T34 Schichten-Tabelle: ändern, neue Schicht, Nachtschicht, unberührte Ze
   }
 });
 
-test('T34 Reiter: Übersicht, Anmeldungen, Schichten, Verlauf; Tabelle über das Web', async () => {
+test('T34 Reiter: Übersicht, Besetzen, Schichten, Verlauf; Tabelle über das Web', async () => {
   const t = await neueDatenbank();
   const app = await starteApp(t.db);
   try {
@@ -71,7 +71,7 @@ test('T34 Reiter: Übersicht, Anmeldungen, Schichten, Verlauf; Tabelle über das
     const hole = async (pfad: string) => (await fetch(`${app.url}${pfad}`, { headers: { cookie }, redirect: 'manual' })).text();
 
     const seite = await hole(`/einsaetze/${s.einsatzId}/schichten`);
-    for (const r of ['Übersicht', 'Anmeldungen', 'Schichten', 'Verlauf']) assert.match(seite, new RegExp(`>${r}<`));
+    for (const r of ['Übersicht', 'Besetzen', 'Schichten', 'Verlauf']) assert.match(seite, new RegExp(`>${r}<`));
     assert.match(seite, /Noch niemand zugeteilt\./);
     assert.match(seite, /Schichten bearbeiten/);
     assert.match(seite, new RegExp(`name="z\\[s${s.schichtId}\\]\\[name\\]"`));
