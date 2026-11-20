@@ -83,6 +83,40 @@ const migrationen: { version: number; anweisungen: () => string[] }[] = [
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin`,
     ],
   },
+  // Version 7 (Wunsch Yann 20.11.2026): Jedes Ausfüllen des Formulars als Eingang, mit den gewählten Schichten.
+  // Ältere Formular-Anmeldungen trägt die Migration nach (gleiche Zeit und gleicher Name = ein Eingang, ohne Bemerkung).
+  {
+    version: 7,
+    anweisungen: () => [
+      `CREATE TABLE formular_eingang (
+        id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        zeit VARCHAR(30) NOT NULL,
+        name VARCHAR(255),
+        person_id INT,
+        treffer VARCHAR(255),
+        nachgetragen TINYINT NOT NULL DEFAULT 0,
+        CONSTRAINT fk_eingang_person FOREIGN KEY (person_id) REFERENCES person(clubdesk_id) ON DELETE SET NULL,
+        INDEX idx_eingang_zeit (zeit)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin`,
+      `CREATE TABLE formular_eingang_schicht (
+        eingang_id INT NOT NULL,
+        schicht_id INT NOT NULL,
+        anmeldung_id INT,
+        neu TINYINT NOT NULL DEFAULT 1,
+        bemerkung TEXT,
+        PRIMARY KEY (eingang_id, schicht_id),
+        CONSTRAINT fk_fes_eingang FOREIGN KEY (eingang_id) REFERENCES formular_eingang(id) ON DELETE CASCADE,
+        CONSTRAINT fk_fes_schicht FOREIGN KEY (schicht_id) REFERENCES schicht(id) ON DELETE CASCADE,
+        CONSTRAINT fk_fes_anmeldung FOREIGN KEY (anmeldung_id) REFERENCES anmeldung(id) ON DELETE SET NULL
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin`,
+      `INSERT INTO formular_eingang (zeit, name, person_id, nachgetragen)
+         SELECT DISTINCT erstellt_am, name_text, person_id, 1 FROM anmeldung WHERE kanal = 'formular'`,
+      `INSERT IGNORE INTO formular_eingang_schicht (eingang_id, schicht_id, anmeldung_id, neu)
+         SELECT e.id, a.schicht_id, a.id, 1 FROM anmeldung a
+           JOIN formular_eingang e ON e.zeit = a.erstellt_am AND e.name = a.name_text AND e.person_id <=> a.person_id
+          WHERE a.kanal = 'formular'`,
+    ],
+  },
 ];
 
 export async function migriere(db: Db): Promise<number> {

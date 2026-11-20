@@ -134,6 +134,15 @@ export async function verarbeiteFormular(db: Db, e: FormularEingabe): Promise<Fo
 
     const zeit = jetztIso();
     const ids: number[] = [];
+    // Eingang: jedes Ausfüllen des Formulars, so wie die Person es eingegeben hat (Wunsch Yann 20.11.2026).
+    const eingang = await schreibe(c, 'INSERT INTO formular_eingang (zeit, name, person_id, treffer) VALUES (?, ?, ?, ?)', [
+      zeit, `${vorname} ${nachname}`, personId, treffer.length > 1 ? treffer.join(', ') : null,
+    ]);
+    const merke = (schichtId: number, anmeldungId: number, neu: boolean) => schreibe(
+      c,
+      'INSERT INTO formular_eingang_schicht (eingang_id, schicht_id, anmeldung_id, neu, bemerkung) VALUES (?, ?, ?, ?, ?)',
+      [eingang.insertId, schichtId, anmeldungId, neu ? 1 : 0, haengeAn(bemerkungAlle, bemerkungJeEinsatz.get(einsatzVon.get(schichtId)!) ?? null)],
+    );
     for (const schichtId of schichtIds) {
       const bemerkung = bemerkungFuer(schichtId);
       // Bestehenden Eintrag suchen: bekannte Person über person_id, unbekannte über Name und E-Mail (leer = leer).
@@ -155,6 +164,7 @@ export async function verarbeiteFormular(db: Db, e: FormularEingabe): Promise<Fo
         const neu = haengeAn(vorhanden.bemerkung, bemerkung ?? 'Erneute Anmeldung über das Formular.');
         await schreibe(c, 'UPDATE anmeldung SET bemerkung = ?, geaendert_am = ?, version = version + 1 WHERE id = ?', [neu, zeit, vorhanden.id]);
         await schreibeLog(c, vorhanden.id, null, 'bemerkung', vorhanden.bemerkung, neu, zeit);
+        await merke(schichtId, vorhanden.id, false);
         ids.push(vorhanden.id);
         continue;
       }
@@ -167,6 +177,7 @@ export async function verarbeiteFormular(db: Db, e: FormularEingabe): Promise<Fo
       );
       // Regel 15.3.7: Log-Eintrag mit benutzer_id leer.
       await schreibeLog(c, r.insertId, null, 'erstellt', null, 'angemeldet', zeit);
+      await merke(schichtId, r.insertId, true);
       ids.push(r.insertId);
     }
     return { personId, anmeldungIds: ids };

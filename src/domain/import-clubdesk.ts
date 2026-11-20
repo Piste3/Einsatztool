@@ -280,6 +280,18 @@ export async function loeschePersonendaten(c: Db, id: number, benutzerId: number
        essenseinschraenkung = NULL, geloescht_am = ? WHERE clubdesk_id = ?`,
     [zeit, id],
   );
+  // Eingänge aus dem Formular: Name und Bemerkung leeren (auch Eingänge, die erst später zugeordnet wurden).
+  const eingaenge = await alle<{ id: number }>(
+    c,
+    `SELECT id FROM formular_eingang WHERE person_id = ?
+     UNION SELECT f.eingang_id FROM formular_eingang_schicht f JOIN anmeldung a ON a.id = f.anmeldung_id WHERE a.person_id = ?`,
+    [id, id],
+  );
+  if (eingaenge.length) {
+    const eids = eingaenge.map((e) => e.id);
+    await schreibe(c, 'UPDATE formular_eingang SET name = ?, treffer = NULL WHERE id IN (?)', [`Gelöschte Person ${id}`, eids]);
+    await schreibe(c, 'UPDATE formular_eingang_schicht SET bemerkung = NULL WHERE eingang_id IN (?)', [eids]);
+  }
   const anmeldungen = await alle<{ id: number }>(c, 'SELECT id FROM anmeldung WHERE person_id = ?', [id]);
   if (!anmeldungen.length) return;
   const ids = anmeldungen.map((a) => a.id);

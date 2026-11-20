@@ -980,3 +980,24 @@ body.druck { background: var(--hg); padding: 1rem; }
 .rueck thead { position: sticky; top: 0; z-index: 3; }
 .rueck thead th, .rueck thead tr.einsatz-zeile th { position: static; }
 .rueck thead th.name-spalte, .rueck thead tr.einsatz-zeile th.name-spalte { position: sticky; left: 0; top: auto; z-index: 4; }
+
+/* ---------- Seite «Formular» (Wunsch Yann 20.11.2026) ---------- */
+.formular-kopf { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 1rem; margin-bottom: 1.2rem; padding: .9rem 1rem; border: 1px solid var(--linie); border-radius: 10px; background: var(--flaeche); }
+.formular-kopf label, .formular-sichtbar h3 { display: block; font-size: .72rem; text-transform: uppercase; letter-spacing: .06em; color: var(--gedämpft); font-weight: 600; margin: 0 0 .35rem; }
+.formular-link .zeilen-form { display: flex; gap: .4rem; }
+.formular-link input { min-width: 0; }
+.formular-sichtbar ul { margin: 0; padding: 0; list-style: none; display: grid; gap: .25rem; font-size: .88rem; }
+.formular-sichtbar .leer { margin: 0; }
+.eingang-tabelle td { vertical-align: top; }
+.eingang-schichten { list-style: none; margin: 0; padding: 0; display: grid; gap: .35rem; }
+.eingang-schicht { display: flex; gap: .5rem; align-items: center; }
+.eingang-schicht > a, .eingang-schicht .kachel-leer { flex: none; display: inline-flex; }
+.eingang-schicht-text { font-size: .86rem; min-width: 0; }
+.eingang-bemerkung .bemerkung { margin: 0 0 .3rem; font-size: .85rem; }
+@media (max-width: 760px) {
+  .formular-kopf { grid-template-columns: minmax(0, 1fr); }
+  .eingang-tabelle thead { display: none; }
+  .eingang-tabelle, .eingang-tabelle tbody, .eingang-tabelle tr, .eingang-tabelle td { display: block; }
+  .eingang-tabelle tr { padding: .6rem .7rem; border-bottom: 1px solid var(--linie); }
+  .eingang-tabelle td { border: 0; padding: .15rem 0; }
+}

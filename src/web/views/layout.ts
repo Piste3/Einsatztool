@@ -6,7 +6,7 @@ import { symbol, type SymbolName } from './symbole.js';
 import { aenderungsStand } from '../../db/aenderungen.js';
 
 export type Bereich =
-  | 'start' | 'einsaetze' | 'rueckmeldungen' | 'personen' | 'unbekannt' | 'archiv'
+  | 'start' | 'einsaetze' | 'rueckmeldungen' | 'formular' | 'personen' | 'unbekannt' | 'archiv'
   | 'import' | 'export' | 'benutzer' | 'einstellungen' | 'konfiguration' | 'update';
 
 /** Ändert sich bei jedem Start. So lädt der Browser nach einem Update das neue CSS und Skript. */
@@ -62,6 +62,7 @@ ${kopfDaten(`${titel} · Einsatzplaner`)}
     ${link('start', aktiv, '/', 'Cockpit', 'cockpit', k.zaehler.unbestaetigt)}
     ${link('einsaetze', aktiv, '/einsaetze', 'Einsätze', 'kalender')}
     ${link('rueckmeldungen', aktiv, '/rueckmeldungen', 'Rückmeldungen', 'posteingang')}
+    ${link('formular', aktiv, '/formular', 'Formular', 'formular')}
     ${link('unbekannt', aktiv, '/anmeldungen/unbekannt', 'Unbekannte', 'frage', k.zaehler.unbekannt)}
     ${link('personen', aktiv, '/personen', 'Personen', 'personen')}
     ${link('archiv', aktiv, '/einsaetze?ansicht=archiv', 'Archiv', 'archiv')}
