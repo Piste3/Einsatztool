@@ -111,7 +111,7 @@ export function leseKonfiguration(env: NodeJS.ProcessEnv = process.env): Konfigu
     bestaetigungStunde: zahl(env.BESTAETIGUNG_STUNDE, 18),
     exportStunde: zahl(env.EXPORT_HOUR, 2),
     clubdeskIcalUrl: env.CLUBDESK_ICAL_URL || '',
-    formAllowedOrigin: env.FORM_ALLOWED_ORIGIN || '',
+    formAllowedOrigin: herkunft(env.FORM_ALLOWED_ORIGIN),
     sharepoint: {
       siteId: env.SHAREPOINT_SITE_ID || '',
       driveId: env.SHAREPOINT_DRIVE_ID || '',
@@ -123,4 +123,19 @@ export function leseKonfiguration(env: NodeJS.ProcessEnv = process.env): Konfigu
     // Cookie «Secure» nur bei HTTPS (Entscheid Yann).
     cookieSecure: baseUrl.startsWith('https://'),
   };
+}
+
+/**
+ * Herkunft für CSP `frame-ancestors`: nur Schema, Host und Port (z. B. https://web.kkb.ch).
+ * Ein Pfad wie /termine/einsaetze würde in manchen Browsern die Einbettung sperren. Ungültig = leer (nicht einbettbar).
+ */
+export function herkunft(wert: string | undefined): string {
+  const w = (wert ?? '').trim();
+  if (!w) return '';
+  try {
+    const u = new URL(w);
+    return u.protocol === 'https:' || u.protocol === 'http:' ? u.origin : '';
+  } catch {
+    return '';
+  }
 }

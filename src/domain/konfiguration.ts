@@ -53,7 +53,7 @@ export const DEFINITIONEN: Definition[] = [
   { schluessel: 'BESTAETIGUNG_STUNDE', gruppe: 'Mail', titel: 'Stunde der Bestätigungsmail', hilfe: 'Lokale Zeit, 0 bis 23.', art: 'stunde', standard: '18', pflicht: true },
 
   { schluessel: 'CLUBDESK_ICAL_URL', gruppe: 'Clubdesk', titel: 'Adresse des iCal-Feeds', hilfe: 'Aus Clubdesk › Kalender › Abonnieren.', art: 'url', standard: '' },
-  { schluessel: 'FORM_ALLOWED_ORIGIN', gruppe: 'Clubdesk', titel: 'Seite mit dem Anmeldeformular', hilfe: 'Nur diese Seite darf das Formular einbetten, z. B. https://www.kkb.ch.', art: 'url', standard: '' },
+  { schluessel: 'FORM_ALLOWED_ORIGIN', gruppe: 'Clubdesk', titel: 'Seite mit dem Anmeldeformular', hilfe: 'Nur diese Website darf das Formular im iframe einbetten, z. B. https://web.kkb.ch. Ein Pfad zählt nicht.', art: 'url', standard: '' },
 
   { schluessel: 'EXPORT_HOUR', gruppe: 'Tagesexport und SharePoint', titel: 'Stunde des Tagesexports', hilfe: 'Lokale Zeit, 0 bis 23.', art: 'stunde', standard: '2', pflicht: true },
   { schluessel: 'SHAREPOINT_SITE_ID', gruppe: 'Tagesexport und SharePoint', titel: 'SharePoint Site-ID', hilfe: 'Leer = kein Hochladen nach SharePoint.', art: 'text', standard: '' },
