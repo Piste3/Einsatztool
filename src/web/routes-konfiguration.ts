@@ -1,4 +1,4 @@
-// Admin › Konfiguration: alle Werte aus einsatzplaner.env sehen und ändern (Entscheid Yann 19.11.2026).
+// Admin › Einstellungen (Reiter Mail, Login, Clubdesk und Export, Server, Protokoll): alle Werte aus einsatzplaner.env sehen und ändern (Entscheid Yann 19.11.2026).
 // Nur für Admins. Jede Änderung steht im Protokoll. Geheimnisse gehen nie an den Browser zurück.
 import type { Express, Request, Response } from 'express';
 import nodemailer from 'nodemailer';
@@ -7,7 +7,7 @@ import { nurAdmin, zurueck } from './app.js';
 import { ausUmgebung, envDateiPfad } from '../config.js';
 import { testeVerbindung } from '../db/db.js';
 import {
-  DatenbankNichtErreichbar, GRUPPEN, KonfigKonflikt, erstelleQuelle, kuenftigeWerte, letzteKonfigAenderungen, speichereKonfiguration, zeilen,
+  DEFINITIONEN, DatenbankNichtErreichbar, KonfigKonflikt, erstelleQuelle, kuenftigeWerte, letzteKonfigAenderungen, speichereKonfiguration, zeilen,
   type Quelle, type Zeile,
 } from '../domain/konfiguration.js';
 import { Eingabefehler } from '../domain/eingabe.js';
@@ -70,25 +70,81 @@ function feld(z: Zeile, eingaben: Record<string, unknown> | undefined): Roh {
   return html`<div class="feld">${kopf}${eingabe}${hilfe}</div>`;
 }
 
-async function konfigSeite(deps: Abhaengigkeiten, kx: Kontext, q: Quelle, z: Zustand = {}): Promise<string> {
+/** Reiter der Seite Admin › Einstellungen (Wunsch Yann 20.11.2026, wie die Reiter im Einsatz). */
+export type EinstellungReiter = 'stammdaten' | 'vorlagen' | 'mail' | 'login' | 'clubdesk' | 'server' | 'protokoll';
+
+const REITER: { id: EinstellungReiter; text: string; href: string; gruppen?: string[] }[] = [
+  { id: 'stammdaten', text: 'Stammdaten', href: '/admin/einstellungen' },
+  { id: 'vorlagen', text: 'Vorlagen', href: '/admin/einstellungen/vorlagen' },
+  { id: 'mail', text: 'Mail', href: '/admin/einstellungen/mail', gruppen: ['Mail'] },
+  { id: 'login', text: 'Login', href: '/admin/einstellungen/login', gruppen: ['Login mit Microsoft Entra'] },
+  { id: 'clubdesk', text: 'Clubdesk und Export', href: '/admin/einstellungen/clubdesk', gruppen: ['Clubdesk', 'Tagesexport und SharePoint'] },
+  { id: 'server', text: 'Server', href: '/admin/einstellungen/server', gruppen: ['Server', 'Datenbank', 'Ordner', 'Update'] },
+  { id: 'protokoll', text: 'Protokoll', href: '/admin/einstellungen/protokoll' },
+];
+
+export function reiterPfad(r: EinstellungReiter): string {
+  return REITER.find((x) => x.id === r)!.href;
+}
+
+function istKonfigReiter(r: unknown): r is EinstellungReiter {
+  return REITER.some((x) => x.id === r && x.gruppen);
+}
+
+/** Ohne Angabe: der Reiter des ersten Felds im Formular. */
+function reiterAusFeldern(eingaben: Record<string, unknown>): EinstellungReiter {
+  const feld = Object.keys(eingaben).find((x) => x.startsWith('w_'));
+  const gruppe = feld ? DEFINITIONEN.find((d) => `w_${d.schluessel}` === feld)?.gruppe : undefined;
+  return REITER.find((r) => gruppe && r.gruppen?.includes(gruppe))?.id ?? 'server';
+}
+
+const quellen = new WeakMap<Abhaengigkeiten, Quelle>();
+
+/** Datei und Startwerte. Ohne Angabe gilt der Stand beim ersten Aufruf als «laufend». */
+function quelleVon(deps: Abhaengigkeiten): Quelle {
+  if (deps.konfigQuelle) return deps.konfigQuelle;
+  let q = quellen.get(deps);
+  if (!q) {
+    q = erstelleQuelle(envDateiPfad(), process.env, ausUmgebung);
+    quellen.set(deps, q);
+  }
+  return q;
+}
+
+/** Rahmen aller Reiter: Kopf mit Reitern, Hinweis «Neustart nötig», Inhalt. */
+export function einstellungenSeite(deps: Abhaengigkeiten, kx: Kontext, aktiv: EinstellungReiter, inhalt: Roh): string {
+  const neustart = zeilen(quelleVon(deps)).zeilen.some((x) => x.neustartNoetig);
+  const titel = REITER.find((x) => x.id === aktiv)!.text;
+  return seite(kx, `Einstellungen · ${titel}`, 'einstellungen', html`
+${seitenKopf({ titel: 'Einstellungen', reiter: REITER.map((r) => ({ text: r.text, href: r.href, aktiv: r.id === aktiv })) })}
+${neustart ? html`<div class="meldung hinweis">Einige Werte sind gespeichert, aber noch nicht aktiv. <a href="${reiterPfad('server')}#neustart">Starte den Server neu.</a></div>` : ''}
+${inhalt}`);
+}
+
+/** Reiter mit Werten aus einsatzplaner.env: nur die Gruppen dieses Reiters. */
+function konfigReiter(deps: Abhaengigkeiten, kx: Kontext, reiter: EinstellungReiter, z: Zustand = {}): string {
+  const q = quelleVon(deps);
   const stand = zeilen(q);
-  const protokoll = await letzteKonfigAenderungen(deps.db);
-  const neustart = stand.zeilen.some((x) => x.neustartNoetig);
-  return seite(kx, 'Konfiguration', 'konfiguration', html`
-<p><a href="/admin/einstellungen">← Einstellungen</a></p>
-${seitenKopf({ titel: 'Konfiguration' })}
-<p>Diese Werte stehen in der Datei <code>${q.pfad}</code>. Die Seite liest und schreibt diese Datei. Änderungen wirken erst nach einem Neustart des Servers.</p>
-<p class="unter">Passwörter und Schlüssel zeigt die Seite nie an. Ein leeres Feld lässt den Wert unverändert. Der alte Stand der Datei bleibt als <code>.vorher</code> daneben.</p>
-${neustart ? html`<div class="meldung hinweis">Einige Werte sind gespeichert, aber noch nicht aktiv. <a href="#neustart">Starte den Server neu.</a></div>` : ''}
+  const r = REITER.find((x) => x.id === reiter)!;
+  return einstellungenSeite(deps, kx, reiter, html`
+<p class="unter">Diese Werte stehen in der Datei <code>${q.pfad}</code>. Änderungen wirken erst nach einem Neustart des Servers. Passwörter und Schlüssel zeigt die Seite nie an. Ein leeres Feld lässt den Wert unverändert.</p>
 ${z.fehler ? html`<div class="meldung fehler" role="alert">${z.fehler}</div>` : ''}
 <form method="post" action="${PFAD}" class="stapel">
-  ${formFelder(kx)}
+  ${formFelder(kx, r.href)}
+  <input type="hidden" name="reiter" value="${reiter}">
   <input type="hidden" name="version" value="${z.version ?? stand.version}">
-  ${GRUPPEN.map((g) => html`<section class="abschnitt"><h2>${g}</h2>${stand.zeilen.filter((x) => x.d.gruppe === g).map((x) => feld(x, z.eingaben))}</section>`)}
+  ${r.gruppen!.map((g) => html`<section class="abschnitt"><h2>${g}</h2>${stand.zeilen.filter((x) => x.d.gruppe === g).map((x) => feld(x, z.eingaben))}</section>`)}
   ${z.dbFehler ? html`<label class="haken wichtig"><input type="checkbox" name="trotzdem" value="1"> Trotzdem speichern. Nach dem Neustart startet der Server vermutlich nicht.</label>` : ''}
   <div class="knopfreihe"><button type="submit" class="knopf haupt">Speichern</button></div>
 </form>
-<section class="abschnitt" id="neustart">
+${reiter === 'mail' ? html`<section class="abschnitt" id="smtp">
+  <h2>SMTP testen</h2>
+  <p>Das Tool sendet eine Testmail mit den gespeicherten Werten. Speichere neue Werte zuerst.</p>
+  <form method="post" action="${PFAD}/smtp-test" class="zeilen-form">${formFelder(kx)}
+    <input name="an" type="email" required maxlength="200" value="${kx.benutzer!.email ?? ''}" aria-label="Empfänger">
+    <button type="submit" class="knopf">Testmail senden</button></form>
+</section>` : ''}
+${reiter === 'server' ? html`<section class="abschnitt" id="neustart">
   <h2>Server neu starten</h2>
   ${deps.neustart
     ? html`<p>Der Server beendet sich. Das Startskript startet ihn nach 3 Sekunden neu. Laufende Arbeit anderer Benutzer geht nicht verloren, offene Formulare müssen sie neu senden.</p>
@@ -96,51 +152,53 @@ ${z.fehler ? html`<div class="meldung fehler" role="alert">${z.fehler}</div>` : 
     <label class="haken wichtig"><input type="checkbox" name="bestaetigt" value="1" required> Server jetzt neu starten.</label>
     <button type="submit" class="knopf">Neu starten</button></form>`
     : html`<p class="unter">Ein Neustart über diese Seite ist hier nicht möglich.</p>`}
-</section>
-<section class="abschnitt" id="smtp">
-  <h2>SMTP testen</h2>
-  <p>Das Tool sendet eine Testmail mit den gespeicherten Werten. Speichere neue Werte zuerst.</p>
-  <form method="post" action="${PFAD}/smtp-test" class="zeilen-form">${formFelder(kx)}
-    <input name="an" type="email" required maxlength="200" value="${kx.benutzer!.email ?? ''}" aria-label="Empfänger">
-    <button type="submit" class="knopf">Testmail senden</button></form>
-</section>
-<section class="abschnitt" id="protokoll">
-  <h2>Protokoll</h2>
-  ${protokoll.length
+</section>` : ''}`);
+}
+
+async function protokollReiter(deps: Abhaengigkeiten, kx: Kontext): Promise<string> {
+  const protokoll = await letzteKonfigAenderungen(deps.db);
+  return einstellungenSeite(deps, kx, 'protokoll', html`
+<p class="unter">Wer hat wann welchen Wert oder welche Vorlage geändert. Geheimnisse stehen hier nur als «(gesetzt)» oder «(leer)».</p>
+${protokoll.length
     ? html`<div class="rahmen"><table class="tabelle"><thead><tr><th>Zeit</th><th>Benutzer</th><th>Wert</th><th>Alt</th><th>Neu</th></tr></thead><tbody>
     ${protokoll.map((p) => html`<tr><td>${datumZeit(p.zeit)}</td><td>${p.benutzer ?? ''}</td><td><code>${p.schluessel}</code></td><td>${p.alt || '–'}</td><td>${p.neu || '–'}</td></tr>`)}
     </tbody></table></div>`
-    : html`<p class="unter">Noch keine Änderung über diese Seite.</p>`}
-</section>`);
+    : html`<p class="unter">Noch keine Änderung.</p>`}`);
 }
 
 export function registriereKonfiguration(app: Express, deps: Abhaengigkeiten): void {
-  const quelle = (): Quelle => deps.konfigQuelle ?? erstelleQuelle(envDateiPfad(), process.env, ausUmgebung);
-  // Ohne Angabe gilt der Stand beim Erstellen der App als «laufend».
-  const q0 = quelle();
-  const q = () => deps.konfigQuelle ?? q0;
+  const q = () => quelleVon(deps);
 
-  app.get(PFAD, nurAdmin, async (_req, res) => {
-    res.send(await konfigSeite(deps, k(res), q()));
+  // Alte Adresse: Die Werte stehen jetzt in den Reitern von Admin › Einstellungen.
+  app.get(PFAD, nurAdmin, (_req, res) => res.redirect(302, reiterPfad('server')));
+  for (const r of REITER) {
+    if (!r.gruppen) continue;
+    app.get(r.href, nurAdmin, (_req, res) => {
+      res.send(konfigReiter(deps, k(res), r.id));
+    });
+  }
+  app.get(reiterPfad('protokoll'), nurAdmin, async (_req, res) => {
+    res.send(await protokollReiter(deps, k(res)));
   });
 
   app.post(PFAD, nurAdmin, async (req: Request, res: Response) => {
     const kx = k(res);
     const eingaben = (req.body ?? {}) as Record<string, unknown>;
+    const reiter: EinstellungReiter = istKonfigReiter(eingaben.reiter) ? eingaben.reiter : reiterAusFeldern(eingaben);
     try {
       const aenderungen = await speichereKonfiguration(deps.db, q(), eingaben, kx.benutzer!.id, {
         testeDatenbank: testeVerbindung,
         trotzdem: eingaben.trotzdem === '1',
       });
       if (aenderungen.length) log('info', `Konfiguration geändert von ${kx.benutzer!.name}: ${aenderungen.map((a) => a.schluessel).join(', ')}.`);
-      zurueck(req, res, PFAD, aenderungen.length
+      zurueck(req, res, reiterPfad(reiter), aenderungen.length
         ? `Gespeichert: ${aenderungen.length} Wert${aenderungen.length === 1 ? '' : 'e'}. Die Änderung wirkt nach einem Neustart.`
         : 'Keine Änderung.');
     } catch (e) {
       if (!(e instanceof Eingabefehler)) throw e;
       // Die Eingaben bleiben stehen. Nach einem Konflikt überschreibt ein zweites Speichern bewusst.
       const konflikt = e instanceof KonfigKonflikt;
-      res.status(konflikt ? 409 : 400).send(await konfigSeite(deps, kx, q(), {
+      res.status(konflikt ? 409 : 400).send(konfigReiter(deps, kx, reiter, {
         eingaben,
         fehler: `${e.message}${konflikt ? '' : ' Gib Passwörter und Schlüssel erneut ein.'}`,
         version: konflikt ? e.aktuelleVersion : typeof eingaben.version === 'string' ? eingaben.version : undefined,
@@ -152,10 +210,10 @@ export function registriereKonfiguration(app: Express, deps: Abhaengigkeiten): v
   app.post(`${PFAD}/neustart`, nurAdmin, (req, res) => {
     if (!deps.neustart) throw new Eingabefehler('Ein Neustart über diese Seite ist hier nicht möglich.');
     if (req.body?.bestaetigt !== '1') throw new Eingabefehler('Bestätige den Neustart mit dem Häkchen.');
-    log('info', `Neustart über Admin › Konfiguration durch ${k(res).benutzer!.name}.`);
+    log('info', `Neustart über Admin › Einstellungen durch ${k(res).benutzer!.name}.`);
     // Die Seite lädt sich nach 10 Sekunden selbst neu (Header «Refresh», kein Skript nötig).
-    res.setHeader('Refresh', `10; url=${PFAD}`);
-    res.send(seite(k(res), 'Neustart', 'konfiguration', html`${seitenKopf({ titel: 'Neustart' })}<p class="meldung hinweis">Der Server startet neu. Die Seite lädt sich in 10 Sekunden neu.</p>`));
+    res.setHeader('Refresh', `10; url=${reiterPfad('server')}`);
+    res.send(seite(k(res), 'Neustart', 'einstellungen', html`${seitenKopf({ titel: 'Neustart' })}<p class="meldung hinweis">Der Server startet neu. Die Seite lädt sich in 10 Sekunden neu.</p>`));
     const neustart = deps.neustart;
     setTimeout(() => neustart(), 300).unref();
   });
@@ -178,9 +236,9 @@ export function registriereKonfiguration(app: Express, deps: Abhaengigkeiten): v
         subject: 'Testmail Einsatzplaner',
         text: 'Diese Testmail kommt vom Einsatzplaner. Der Mail-Versand funktioniert.',
       });
-      zurueck(req, res, `${PFAD}#smtp`, `Testmail an ${an} gesendet.`);
+      zurueck(req, res, `${reiterPfad('mail')}#smtp`, `Testmail an ${an} gesendet.`);
     } catch (e) {
-      zurueck(req, res, `${PFAD}#smtp`, `Testmail nicht gesendet: ${(e as Error).message}`, 'fehler');
+      zurueck(req, res, `${reiterPfad('mail')}#smtp`, `Testmail nicht gesendet: ${(e as Error).message}`, 'fehler');
     } finally {
       transport.close();
     }

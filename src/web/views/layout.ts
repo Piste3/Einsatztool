@@ -75,7 +75,6 @@ ${kopfDaten(`${titel} · Einsatzplaner`)}
     ${link('export', aktiv, '/admin/export', 'Export', 'export')}
     ${link('benutzer', aktiv, '/admin/benutzer', 'Benutzer', 'benutzer')}
     ${link('einstellungen', aktiv, '/admin/einstellungen', 'Einstellungen', 'zahnrad')}
-    ${link('konfiguration', aktiv, '/admin/konfiguration', 'Konfiguration', 'datei')}
     ${link('update', aktiv, '/admin/update', 'Update', 'update')}
   </ul>`)}
   ${rueckgaengigLeiste(k, 'leiste')}

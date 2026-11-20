@@ -68,7 +68,7 @@ test('T38c Admin bearbeitet die Vorlage in den Einstellungen, die Bausteine steh
     });
     assert.equal((await sende(aufgebot.cookie, { _csrf: aufgebot.csrf, schluessel: CLUBDESK_TERMIN, betreff: 'x', text: 'y', version: '0' })).status, 403);
 
-    const einst = await (await fetch(`${app.url}/admin/einstellungen`, { headers: { cookie: admin.cookie } })).text();
+    const einst = await (await fetch(`${app.url}/admin/einstellungen/vorlagen`, { headers: { cookie: admin.cookie } })).text();
     assert.match(einst, /Text für den Clubdesk-Termin/);
     assert.match(einst, /class="karte bausteine"/);
     assert.match(einst, /\{abtreten\}/);

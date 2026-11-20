@@ -33,7 +33,7 @@ test('T27b Admin ändert Werte, Geheimnisse bleiben verborgen, Protokoll, Konfli
   try {
     const admin = await anmelden(t.db, 'admin');
     const aufgebot = await anmelden(t.db, 'aufgebot');
-    const hole = async (cookie: string) => fetch(`${app.url}/admin/konfiguration`, { headers: { cookie }, redirect: 'manual' });
+    const hole = async (cookie: string, reiter = 'mail') => fetch(`${app.url}/admin/einstellungen/${reiter}`, { headers: { cookie }, redirect: 'manual' });
     const sende = (cookie: string, felder: Record<string, string>) => fetch(`${app.url}/admin/konfiguration`, {
       method: 'POST', redirect: 'manual',
       headers: { cookie, 'content-type': 'application/x-www-form-urlencoded' },
@@ -41,6 +41,14 @@ test('T27b Admin ändert Werte, Geheimnisse bleiben verborgen, Protokoll, Konfli
     });
 
     assert.equal((await hole(aufgebot.cookie)).status, 403);
+    // Die alte Adresse führt auf den Reiter «Server». Jeder Reiter zeigt nur seine Gruppen.
+    const alt = await fetch(`${app.url}/admin/konfiguration`, { headers: { cookie: admin.cookie }, redirect: 'manual' });
+    assert.equal(alt.status, 302);
+    assert.equal(alt.headers.get('location'), '/admin/einstellungen/server');
+    const server = await (await hole(admin.cookie, 'server')).text();
+    assert.match(server, /name="w_PORT"/);
+    assert.doesNotMatch(server, /name="w_SMTP_HOST"/);
+    assert.match(server, /class="reiter"/);
     assert.equal((await sende(aufgebot.cookie, { _csrf: aufgebot.csrf, w_PORT: '1' })).status, 403);
 
     const seite = await (await hole(admin.cookie)).text();
@@ -53,10 +61,12 @@ test('T27b Admin ändert Werte, Geheimnisse bleiben verborgen, Protokoll, Konfli
     assert.equal((await sende(admin.cookie, { w_PORT: '3999' })).status, 403);
 
     // Ungültiger Port: nichts gespeichert, Eingaben bleiben stehen.
-    const falsch = await sende(admin.cookie, { _csrf: admin.csrf, version, w_PORT: '99999', w_SMTP_HOST: 'smtp.neu.ch' });
+    const falsch = await sende(admin.cookie, { _csrf: admin.csrf, version, reiter: 'mail', w_SMTP_PORT: '99999', w_SMTP_HOST: 'smtp.neu.ch' });
     assert.equal(falsch.status, 400);
-    assert.match(await falsch.text(), /smtp\.neu\.ch/);
-    assert.match(readFileSync(pfad, 'utf8'), /PORT=3010/);
+    const falschText = await falsch.text();
+    assert.match(falschText, /smtp\.neu\.ch/);
+    assert.match(falschText, /<title>Einstellungen · Mail/);
+    assert.match(readFileSync(pfad, 'utf8'), /SMTP_HOST=smtp\.alt\.ch/);
 
     // Speichern: Port und SMTP-Passwort neu, leeres Geheimnis bleibt, Umgebungsvariable ist gesperrt.
     const ok = await sende(admin.cookie, {
@@ -138,7 +148,7 @@ test('T27e Admin bearbeitet die Vorlage in den Einstellungen: Version, Konflikt,
     });
     assert.equal((await sende(aufgebot.cookie, { _csrf: aufgebot.csrf, betreff: 'x', text: 'y', version: '0' })).status, 403);
 
-    const seite = await (await fetch(`${app.url}/admin/einstellungen`, { headers: { cookie: admin.cookie } })).text();
+    const seite = await (await fetch(`${app.url}/admin/einstellungen/vorlagen`, { headers: { cookie: admin.cookie } })).text();
     assert.match(seite, /Vorlage «Änderung melden»/);
     assert.match(seite, /\{clubdesk_id\}/);
 

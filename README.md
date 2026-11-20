@@ -750,9 +750,21 @@ Alle Werte stehen in `.env.example` mit einer kurzen Erklärung. Das Tool liest 
 Umgebungsvariablen haben Vorrang vor der Datei.
 Nach jeder Änderung an der Datei startest du den Einsatzplaner neu.
 
-### Konfiguration im Browser (Admin › Konfiguration)
+### Konfiguration im Browser (Admin › Einstellungen)
 
-Ein Admin sieht und ändert alle Werte der Datei auch im Browser, unter Admin › Konfiguration.
+Ein Admin sieht und ändert alle Werte der Datei auch im Browser, unter Admin › Einstellungen.
+Die Seite hat Reiter:
+
+| Reiter | Inhalt |
+|---|---|
+| Stammdaten | Ränge und Rollen |
+| Vorlagen | Mail «Änderung melden» und Text für den Clubdesk-Termin |
+| Mail | SMTP, Aufgebotsadresse, Adresse der Informatik, Stunde der Bestätigungsmail, «Testmail senden» |
+| Login | Microsoft Entra |
+| Clubdesk und Export | iCal-Feed, Seite mit dem Formular, Tagesexport, SharePoint |
+| Server | Port, Adressen, Sitzungsschlüssel, Datenbank, Ordner, Update, «Neu starten» |
+| Protokoll | Wer hat wann welchen Wert oder welche Vorlage geändert |
+
 
 - Die Seite schreibt direkt in `einsatzplaner.env`. Es gibt keine zweite Quelle.
 - Den alten Stand legt das Tool als `einsatzplaner.env.vorher` daneben.

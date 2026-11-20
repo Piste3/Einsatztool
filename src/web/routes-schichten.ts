@@ -195,7 +195,7 @@ ${seitenKopf({ pfad: schichtPfad(s, 'ICS-Export'), titel: 'ICS-Export' })}
     const zeilen = Math.min(30, Math.max(8, t.text.split('\n').length + 1));
     res.send(seite(kx, 'Termintext', 'einsaetze', html`
 ${seitenKopf({ pfad: schichtPfad(s, 'Termintext'), titel: 'Text für den Clubdesk-Termin' })}
-<p class="unter">Das Tool füllt die Vorlage mit den Angaben dieser Schicht. ${kx.benutzer?.rolle === 'admin' ? html`Die Vorlage bearbeitest du in <a href="/admin/einstellungen#clubdesk">Admin › Einstellungen</a>.` : 'Die Vorlage bearbeitet ein Admin in den Einstellungen.'}</p>
+<p class="unter">Das Tool füllt die Vorlage mit den Angaben dieser Schicht. ${kx.benutzer?.rolle === 'admin' ? html`Die Vorlage bearbeitest du in <a href="/admin/einstellungen/vorlagen#clubdesk">Admin › Einstellungen</a>.` : 'Die Vorlage bearbeitet ein Admin in den Einstellungen.'}</p>
 <div class="feld"><label for="titel">Titel</label><input id="titel" readonly value="${t.titel}"></div>
 <p><button type="button" class="knopf" data-kopieren="#titel">Titel kopieren</button></p>
 <div class="feld"><label for="termintext">Text</label><textarea id="termintext" readonly rows="${zeilen}">${t.text}</textarea></div>

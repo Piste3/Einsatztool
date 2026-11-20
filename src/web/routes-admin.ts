@@ -21,6 +21,7 @@ import { letzterLauf } from '../jobs/taeglich.js';
 import { html, Roh } from './html.js';
 import { k } from './kontext.js';
 import { formFelder, seite, seitenKopf } from './views/layout.js';
+import { einstellungenSeite } from './routes-konfiguration.js';
 import { datumZeit, knopfPost, zeitraum } from './views/teile.js';
 import type { HochgeladeneDatei } from './multipart.js';
 
@@ -215,27 +216,13 @@ ${liste.map((b) => html`<tr><td>${b.name}</td><td>${b.email}</td><td>${b.rolle =
   });
 
   // ---------- Einstellungen: Ränge und Rollen ----------
-  const zeigeEinstellungen = async (res: Response, eingabe: { schluessel?: string; betreff?: string; text?: string; version?: number; fehler?: string } = {}) => {
+  // Reiter «Stammdaten»: Ränge und Rollen.
+  const zeigeStammdaten = async (res: Response) => {
     const kx = k(res);
     const r = await raenge(db);
     const ro = await rollen(db);
-    const vo = await ladeVorlage(db);
-    const cv = await ladeVorlage(db, CLUBDESK_TERMIN);
-    // Eingaben nach einem Fehler gehören nur zum Formular, das gesendet hat.
-    const vz = eingabe.schluessel === AENDERUNG_MELDEN ? eingabe : {};
-    const cz = eingabe.schluessel === CLUBDESK_TERMIN ? eingabe : {};
-    // Vorschau: nächste kommende Schicht, sonst die zuletzt beendete.
-    const beispiel = await eine<{ id: number; titel: string }>(
-      db,
-      `SELECT s.id, CONCAT(e.name, ' – ', s.name) AS titel FROM schicht s JOIN einsatz e ON e.id = s.einsatz_id
-        ORDER BY (s.end_zeit < ?), CASE WHEN s.end_zeit < ? THEN '' ELSE s.start_zeit END, s.end_zeit DESC, s.id LIMIT 1`,
-      [jetztIso(), jetztIso()],
-    );
-    const vorschau = beispiel ? await clubdeskText(db, beispiel.id, konfig.baseUrl) : null;
     const z = '/admin/einstellungen';
-    res.send(seite(kx, 'Einstellungen', 'einstellungen', html`
-${seitenKopf({ titel: 'Einstellungen' })}
-<p>Server, Login, Mail, SharePoint und Datenbank: siehe <a href="/admin/konfiguration">Konfiguration</a>.</p>
+    res.send(einstellungenSeite(deps, kx, 'stammdaten', html`
 <section class="abschnitt" id="raenge">
   <h2>Ränge</h2>
   <p class="unter">Der oberste Rang ist der höchste. Ein neuer Rang kommt ans Ende (tiefster Rang). Der Import ordnet den Rang über den Namen zu.</p>
@@ -265,7 +252,27 @@ ${seitenKopf({ titel: 'Einstellungen' })}
     </td></tr>`)}
   </tbody></table></div>
   <form method="post" action="/admin/rollen" class="zeilen-form">${formFelder(kx, z)}<input type="hidden" name="aktion" value="anlegen"><input name="name" required maxlength="100" placeholder="Neue Rolle" aria-label="Neue Rolle"><label class="haken"><input type="checkbox" name="zaehlt" value="1" checked> zählt als Teilnehmer</label><button class="knopf" type="submit">Rolle anlegen</button></form>
-</section>
+</section>`));
+  };
+
+  // Reiter «Vorlagen»: «Änderung melden» und Clubdesk-Termin.
+  const zeigeVorlagen = async (res: Response, eingabe: { schluessel?: string; betreff?: string; text?: string; version?: number; fehler?: string } = {}) => {
+    const kx = k(res);
+    const vo = await ladeVorlage(db);
+    const cv = await ladeVorlage(db, CLUBDESK_TERMIN);
+    // Eingaben nach einem Fehler gehören nur zum Formular, das gesendet hat.
+    const vz = eingabe.schluessel === AENDERUNG_MELDEN ? eingabe : {};
+    const cz = eingabe.schluessel === CLUBDESK_TERMIN ? eingabe : {};
+    // Vorschau: nächste kommende Schicht, sonst die zuletzt beendete.
+    const beispiel = await eine<{ id: number; titel: string }>(
+      db,
+      `SELECT s.id, CONCAT(e.name, ' – ', s.name) AS titel FROM schicht s JOIN einsatz e ON e.id = s.einsatz_id
+        ORDER BY (s.end_zeit < ?), CASE WHEN s.end_zeit < ? THEN '' ELSE s.start_zeit END, s.end_zeit DESC, s.id LIMIT 1`,
+      [jetztIso(), jetztIso()],
+    );
+    const vorschau = beispiel ? await clubdeskText(db, beispiel.id, konfig.baseUrl) : null;
+    const z = '/admin/einstellungen/vorlagen';
+    res.send(einstellungenSeite(deps, kx, 'vorlagen', html`
 <section class="abschnitt" id="vorlage">
   <h2>Vorlage «Änderung melden»</h2>
   <p class="unter">Der Knopf «Änderung melden» auf der Personenseite öffnet eine Mail an die Informatik mit diesem Text. ${vo.version === 0 ? 'Zurzeit gilt die Standardvorlage.' : ''}</p>
@@ -305,7 +312,8 @@ ${seitenKopf({ titel: 'Einstellungen' })}
   <div class="karte vorschau-text"><strong>${vorschau.titel}</strong><pre>${vorschau.text}</pre></div>` : ''}
 </section>`));
   };
-  const einstellungen = async (_req: Request, res: Response) => zeigeEinstellungen(res);
+  const einstellungen = async (_req: Request, res: Response) => zeigeStammdaten(res);
+  app.get('/admin/einstellungen/vorlagen', nurAdmin, async (_req, res) => zeigeVorlagen(res));
   app.get('/admin/einstellungen', nurAdmin, einstellungen);
   app.get('/admin/raenge', nurAdmin, einstellungen);
   app.get('/admin/rollen', nurAdmin, einstellungen);
@@ -317,12 +325,12 @@ ${seitenKopf({ titel: 'Einstellungen' })}
     const anker = schluessel === CLUBDESK_TERMIN ? 'clubdesk' : 'vorlage';
     try {
       const geaendert = await speichereVorlage(db, { betreff: b.betreff, text: b.text, version: b.version, standard: b.standard === '1' }, k(res).benutzer!.id, schluessel);
-      zurueck(req, res, `/admin/einstellungen#${anker}`, geaendert ? (b.standard === '1' ? 'Standardvorlage wiederhergestellt.' : 'Vorlage gespeichert.') : 'Keine Änderung.');
+      zurueck(req, res, `/admin/einstellungen/vorlagen#${anker}`, geaendert ? (b.standard === '1' ? 'Standardvorlage wiederhergestellt.' : 'Vorlage gespeichert.') : 'Keine Änderung.');
     } catch (e) {
       if (!(e instanceof Eingabefehler)) throw e;
       // Die Eingaben bleiben stehen. Nach einem Konflikt überschreibt ein zweites Speichern bewusst.
       res.status(e instanceof Konflikt ? 409 : 400);
-      await zeigeEinstellungen(res, {
+      await zeigeVorlagen(res, {
         schluessel,
         betreff: typeof b.betreff === 'string' ? b.betreff : undefined,
         text: typeof b.text === 'string' ? b.text : undefined,
@@ -364,7 +372,7 @@ ${seitenKopf({ titel: 'Einstellungen' })}
     const kx = k(res);
     const u = deps.updater;
     if (!konfig.updateErlaubt || !u) {
-      res.send(seite(kx, 'Update', 'update', html`${seitenKopf({ titel: 'Update', live: false })}<p>Das Update über diese Seite ist ausgeschaltet. Setze <code>UPDATE_ERLAUBT=1</code> in der <a href="/admin/konfiguration">Konfiguration</a> und starte den Server neu.</p>`, { ohneLive: true }));
+      res.send(seite(kx, 'Update', 'update', html`${seitenKopf({ titel: 'Update', live: false })}<p>Das Update über diese Seite ist ausgeschaltet. Setze <code>UPDATE_ERLAUBT=1</code> unter <a href="/admin/einstellungen/server">Einstellungen › Server</a> und starte den Server neu.</p>`, { ohneLive: true }));
       return;
     }
     const z = u.zustand;
