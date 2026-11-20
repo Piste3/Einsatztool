@@ -137,7 +137,7 @@ ${p.geloescht_am ? html`<p class="meldung hinweis">Die Personendaten sind gelös
     };
     res.send(seite(kx, 'Rückmeldungen', 'rueckmeldungen', html`
 ${seitenKopf({ titel: 'Rückmeldungen', angaben: ['Wer hat sich wofür gemeldet: alle kommenden Schichten im Zeitraum.'] })}
-<form method="get" action="/rueckmeldungen" class="filter-form zeilen-form">
+<form method="get" action="/rueckmeldungen" class="filter-form zeilen-form" data-sofort>
   <label>Zeitraum <select name="monate">${[1, 3, 6, 12].map((m) => html`<option value="${m}"${auswahl(String(m), String(monate))}>${m} ${m === 1 ? 'Monat' : 'Monate'}</option>`)}</select></label>
   <label>Sortierung <select name="sort"><option value="rang"${auswahl('rang', o.sortierung)}>Rang</option><option value="name"${auswahl('name', o.sortierung)}>Name</option></select></label>
   <label class="haken"><input type="checkbox" name="offen" value="1"${o.nurOffen ? new Roh(' checked') : ''}> Nur mit offenen Schichten</label>

@@ -380,6 +380,16 @@
 
   var lese = function (text) { return new DOMParser().parseFromString(text, 'text/html'); };
 
+  // ---------- Filter: sofort anwenden ----------
+  // Ein Filterformular mit data-sofort sendet sich bei jeder Änderung selbst (Auswahl, Häkchen, Datum, Name nach Enter
+  // oder beim Verlassen des Felds). Der Server speichert die Filter je Benutzer. Ohne Skript gilt der Knopf «Anzeigen».
+  document.addEventListener('change', function (ev) {
+    var feld = ev.target;
+    var form = feld && feld.form;
+    if (!form || !form.hasAttribute('data-sofort')) return;
+    if (form.requestSubmit) form.requestSubmit(); else form.submit();
+  });
+
   // ---------- Rückmeldungen: Fenster zum Eintragen ----------
   // Ein Klick auf ein Feld lädt das Formular in ein Fenster. Speichern läuft über die
   // bestehenden Routen (Konfliktschutz, Warnungen, Live, Toast). Ohne Skript öffnet der Link eine Seite.

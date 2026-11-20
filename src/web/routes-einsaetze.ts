@@ -100,7 +100,7 @@ ${seitenKopf({
     { text: 'Archiv', href: '/einsaetze?ansicht=archiv', aktiv: archiv },
   ],
 })}
-<form method="get" action="/einsaetze" class="filter-form zeilen-form einsatz-filter">
+<form method="get" action="/einsaetze" class="filter-form zeilen-form einsatz-filter" data-sofort>
   ${archiv ? html`<input type="hidden" name="ansicht" value="archiv">` : ''}
   <label>Status <select name="status"><option value="alle"${gewaehlt('alle')}>Entwürfe und veröffentlichte</option><option value="publiziert"${gewaehlt('publiziert')}>Nur im Formular</option><option value="entwurf"${gewaehlt('entwurf')}>Nur Entwürfe</option></select></label>
   <label>von <input type="date" name="von" value="${filter.von ?? ''}"></label>
