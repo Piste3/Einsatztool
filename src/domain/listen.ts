@@ -328,6 +328,7 @@ export interface PersonEintrag {
   rolle: string | null;
   kanal: string;
   bemerkung: string | null;
+  version: number;
 }
 
 /** Personenseite: kommende Einträge, offene Schichten (nicht gefragt) und vergangene Einträge. */
@@ -340,7 +341,7 @@ export async function personUebersicht(db: Db, personId: number): Promise<{
   const eintraege = await alle<PersonEintrag>(
     db,
     `SELECT a.id, s.id AS schicht_id, s.name AS schicht, e.name AS einsatz, e.id AS einsatz_id, s.start_zeit, s.end_zeit,
-            a.status, a.rolle, a.kanal, a.bemerkung
+            a.status, a.rolle, a.kanal, a.bemerkung, a.version
        FROM anmeldung a JOIN schicht s ON s.id = a.schicht_id JOIN einsatz e ON e.id = s.einsatz_id
       WHERE a.person_id = ? ORDER BY s.start_zeit`,
     [personId],

@@ -67,3 +67,23 @@ test('T41 Eingänge: ein Eingang je Ausfüllen, Schichten, Bemerkung, Filter, L�
     await t.ende();
   }
 });
+
+test('T41 Personenseite: «Nächste Einsätze» öffnet das normale Fenster statt direkt anzumelden', async () => {
+  const t = await neueDatenbank();
+  const app = await starteApp(t.db);
+  try {
+    const s = await einsatz(t.db, 'Stadtlauf', inTagen(5, 12), inTagen(5, 16));
+    const tag = lokalesDatum(inTagen(5, 12));
+    const abend = await erstelleSchicht(t.db, s.einsatzId, { name: 'Abend', start_datum: tag, start_zeit: '18:00', end_datum: tag, end_zeit: '22:00' });
+    await person(t.db, 4, { vorname: 'Ben', nachname: 'Test' });
+    await verarbeiteFormular(t.db, { vorname: 'Ben', nachname: 'Test', schichten: [String(s.schichtId)] });
+    const { cookie } = await anmelden(t.db, 'aufgebot');
+    const html = await (await fetch(`${app.url}/personen/4`, { headers: { cookie } })).text();
+    assert.doesNotMatch(html, /\/anmeldungen" class="zeilen-form"/);
+    assert.match(html, new RegExp(`href="/rueckmeldungen/eintrag\\?schicht=${abend}&amp;person=4[^"]*" data-eintrag>Eintragen`));
+    assert.match(html, new RegExp(`href="/rueckmeldungen/eintrag\\?schicht=${s.schichtId}&amp;person=4[^"]*" data-eintrag data-bestaetigen=`));
+  } finally {
+    await app.stopp();
+    await t.ende();
+  }
+});

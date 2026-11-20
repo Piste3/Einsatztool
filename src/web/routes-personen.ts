@@ -54,9 +54,12 @@ ${seitenKopf({ titel: 'Personen', angaben: [`${liste.length} Personen`, 'Die Dat
     const mailto = konfig.mailInformatik
       ? aenderungMailto(konfig.mailInformatik, aenderungMailText(p, name, await ladeVorlage(db)))
       : null;
+    // Ein Klick öffnet das normale Fenster zum Eintragen (Wunsch Yann 20.11.2026), wie in Rückmeldungen und Besetzen.
+    const fensterLink = (schichtId: number, inhalt: Roh, text: string, frage: Roh = new Roh('')) => html`<a class="person-kachel" href="/rueckmeldungen/eintrag?schicht=${schichtId}&amp;person=${p.clubdesk_id}&amp;zurueck=${encodeURIComponent(hier)}" data-eintrag${frage} title="${text} – Klick zum Eintragen">${inhalt}<span class="sr">${text}</span></a>`;
     const gruppe = (titel: string, liste: typeof u.kommend) => liste.length
-      ? html`<h3>${titel} (${liste.length})</h3><ul class="liste">${liste.map((e) => html`<li>
-          <a href="/schichten/${e.schicht_id}">${e.einsatz}${e.einsatz === e.schicht ? '' : ` – ${e.schicht}`}</a> · ${zeitraum(e.start_zeit, e.end_zeit)} · ${statusText(e.status)}${e.rolle ? ` · ${e.rolle}` : ''}
+      ? html`<h3>${titel} (${liste.length})</h3><ul class="liste person-schichten">${liste.map((e) => html`<li>
+          ${fensterLink(e.schicht_id, kachel(e.status), STATUS_TEXT[e.status], bestaetigenFrage(e, name))}
+          <span class="wachsen"><a href="/schichten/${e.schicht_id}">${e.einsatz}${e.einsatz === e.schicht ? '' : ` – ${e.schicht}`}</a> · ${zeitraum(e.start_zeit, e.end_zeit)}${e.rolle ? ` · ${e.rolle}` : ''}</span>
         </li>`)}</ul>`
       : '';
     const zeigen = (feld: string, wert: unknown) => (wert ? html`<tr><th>${feld}</th><td>${wert as string}</td></tr>` : '');
@@ -88,15 +91,10 @@ ${p.geloescht_am ? html`<p class="meldung hinweis">Die Personendaten sind gelös
   ${gruppe('Unsicher', u.kommend.filter((e) => e.status === 'unsicher'))}
   ${gruppe('Nachricht gesendet', u.kommend.filter((e) => e.status === 'nachricht_gesendet'))}
   ${gruppe('Abgemeldet', u.kommend.filter((e) => e.status === 'abgemeldet'))}
-  ${!p.geloescht_am && u.offen.length ? html`<h3>Offen – nicht gefragt (${u.offen.length})</h3><ul class="liste">${u.offen.map((s) => html`<li class="zeilen-form">
+  ${!p.geloescht_am && u.offen.length ? html`<h3>Offen – nicht gefragt (${u.offen.length})</h3><ul class="liste person-schichten">${u.offen.map((s) => html`<li>
+    ${fensterLink(s.id, kachel(null), 'nicht gefragt')}
     <span class="wachsen"><a href="/schichten/${s.id}">${s.einsatz}${s.einsatz === s.name ? '' : ` – ${s.name}`}</a> · ${zeitraum(s.start_zeit, s.end_zeit)}${s.publiziert ? '' : html` <span class="pille grau">intern</span>`}</span>
-    <form method="post" action="/schichten/${s.id}/anmeldungen" class="zeilen-form">
-      ${formFelder(kx, hier)}
-      <input type="hidden" name="person" value="${p.clubdesk_id}">
-      <input type="hidden" name="status" value="angemeldet">
-      ${kanalAuswahl('kanal', 'telefon', true)}
-      <button type="submit" class="knopf klein">Eintragen</button>
-    </form></li>`)}</ul>` : ''}
+    <a class="knopf klein" href="/rueckmeldungen/eintrag?schicht=${s.id}&amp;person=${p.clubdesk_id}&amp;zurueck=${encodeURIComponent(hier)}" data-eintrag>Eintragen …</a></li>`)}</ul>` : ''}
 </section>
 </div>
 <details class="gruppe"><summary><h2>Vergangene Einsätze (${u.vergangen.length})</h2></summary>

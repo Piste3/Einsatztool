@@ -1028,3 +1028,8 @@ body.druck { background: var(--hg); padding: 1rem; }
   .eingang-tabelle tr { padding: .6rem .7rem; border-bottom: 1px solid var(--linie); }
   .eingang-tabelle td { border: 0; padding: .15rem 0; }
 }
+
+/* Personenseite: Kachel öffnet das Fenster zum Eintragen (Wunsch Yann 20.11.2026) */
+.person-schichten li { display: flex; gap: .55rem; align-items: center; }
+.person-schichten .person-kachel { flex: none; display: inline-flex; border-radius: 6px; }
+.person-schichten .wachsen { min-width: 0; flex: 1; }
