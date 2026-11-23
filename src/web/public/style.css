@@ -1248,7 +1248,9 @@ form.inline:has(> .handy-breit) { display: block; }
   border: 1px solid var(--linie); border-radius: 50%; color: var(--gruen);
 }
 .handy-tel:hover { background: var(--gruen-hg); }
-.handy-tel.leer { border-color: transparent; }
+.handy-kontakt { flex: none; display: inline-flex; gap: .4rem; }
+.handy-wa { color: #128c4a; }
+.handy-wa:hover { background: var(--gruen-hg); }
 .hz-knoepfe { display: flex; flex-wrap: wrap; gap: .4rem; margin: .5rem 0 0 calc(40px + .7rem); }
 .hz-knoepfe .knopf.klein { padding: .38rem .75rem; font-size: .85rem; }
 .hz-knoepfe .a-an { color: var(--gruen); }

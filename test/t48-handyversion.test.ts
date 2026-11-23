@@ -100,6 +100,7 @@ test('T48 Handyversion im Web: Weiterleitung, Wechsel, Eintragen, Person, Maskie
     assert.match(leer, /aria-current="page">Nicht gefragt <span class="zahl">1<\/span>/);
     assert.match(leer, /Baumann &lt;b&gt;/);
     assert.match(leer, /href="tel:0791234567"/);
+    assert.match(leer, /class="handy-tel handy-wa" href="https:\/\/wa.me\/41791234567"/);
     assert.match(leer, new RegExp(`href="/rueckmeldungen/eintrag\\?schicht=${s.schichtId}&amp;person=7&amp;zurueck=`));
     assert.match(leer, new RegExp(`action="/schichten/${s.schichtId}/sammelstatus"`));
     assert.match(leer, /href="\/m\/personen\/7"/);

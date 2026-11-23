@@ -33,7 +33,12 @@ const an = (a: BesetzenEintrag | undefined) => !!a && (a.status === 'angemeldet'
 /** Knopf «Anrufen» als Symbol. Ohne Nummer leer. */
 function anrufen(p: { telefon: string | null; telefon_privat: string | null }, name: string): Roh {
   const n = hauptnummer(p);
-  return n ? html`<a class="handy-tel" href="tel:${telLink(n)}" title="${name} anrufen: ${n}" aria-label="${name} anrufen">${symbol('telefon')}</a>` : html`<span class="handy-tel leer" aria-hidden="true"></span>`;
+  if (!n) return html`<span class="handy-kontakt leer" aria-hidden="true"></span>`;
+  // WhatsApp öffnet den Chat mit dieser Nummer direkt (Wunsch Yann 23.11.2026).
+  const wa = whatsappNummer(n);
+  return html`<span class="handy-kontakt"><a class="handy-tel" href="tel:${telLink(n)}" title="${name} anrufen: ${n}" aria-label="${name} anrufen">${symbol('telefon')}</a>${wa
+    ? html`<a class="handy-tel handy-wa" href="https://wa.me/${wa}" rel="noopener noreferrer" target="_blank" title="WhatsApp-Chat mit ${name}" aria-label="WhatsApp-Chat mit ${name}">${symbol('chat')}</a>`
+    : ''}</span>`;
 }
 
 export function registriereHandy(app: Express, deps: Abhaengigkeiten): void {
