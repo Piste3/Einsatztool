@@ -480,27 +480,46 @@ input, select, textarea {
   font: inherit; font-size: .9rem; color: var(--text); background: var(--flaeche);
   border: 1px solid var(--linie-stark); border-radius: var(--radius-klein); padding: .38rem .55rem; max-width: 100%;
 }
-input[type="checkbox"], input[type="radio"] { accent-color: var(--haupt); }
+input[type="radio"] { accent-color: var(--haupt); }
+/* Häkchen: klein, eckig, mit Haken. Gleich im hellen und dunklen Modus. */
+input[type="checkbox"] {
+  appearance: none; -webkit-appearance: none; flex: none; box-sizing: border-box;
+  width: 1.05rem; height: 1.05rem; margin: 0; padding: 0; vertical-align: middle;
+  border: 1.5px solid var(--linie-stark); border-radius: 4px; background: var(--flaeche);
+  display: inline-grid; place-content: center; cursor: pointer; transition: background .12s, border-color .12s;
+}
+input[type="checkbox"]::after {
+  content: ''; width: .28rem; height: .55rem; border: solid var(--haupt-text); border-width: 0 2px 2px 0;
+  transform: translateY(-1px) rotate(45deg); opacity: 0;
+}
+input[type="checkbox"]:hover { border-color: var(--gedämpft); }
+input[type="checkbox"]:checked { background: var(--haupt); border-color: var(--haupt); }
+input[type="checkbox"]:checked::after { opacity: 1; }
+input[type="checkbox"]:indeterminate { background: var(--haupt); border-color: var(--haupt); }
+input[type="checkbox"]:indeterminate::after { width: .5rem; height: 0; border-width: 0 0 2px 0; transform: none; opacity: 1; }
+input[type="checkbox"]:focus-visible { outline: 2px solid var(--akzent); outline-offset: 2px; }
+input[type="checkbox"]:disabled { opacity: .5; cursor: not-allowed; }
+input[type="checkbox"]:focus:not(:focus-visible) { outline: none; }
 input:focus, select:focus, textarea:focus, button:focus-visible, a:focus-visible, summary:focus-visible { outline: 2px solid var(--akzent); outline-offset: 1px; }
 textarea { width: 100%; }
 .feld { display: flex; flex-direction: column; gap: .25rem; margin-bottom: .85rem; }
 .feld label { font-weight: 500; font-size: .85rem; }
 .formular-raster { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0 1rem; padding: 1.2rem; max-width: 860px; }
 .formular-raster .breit { grid-column: 1 / -1; }
-.formular-raster input, .formular-raster select { width: 100%; }
+.formular-raster input:not([type="checkbox"]):not([type="radio"]), .formular-raster select { width: 100%; }
 .formular-raster .aktionen { border-top: 1px solid var(--linie); padding-top: .9rem; margin-top: .3rem; display: flex; justify-content: flex-end; gap: .5rem; }
 .stapel { display: flex; flex-direction: column; gap: .7rem; align-items: flex-start; }
 .zeilen-form { display: flex; flex-wrap: wrap; gap: .5rem; align-items: flex-end; margin: .3rem 0; }
 .zeilen-form label { display: flex; flex-direction: column; gap: .15rem; font-size: .78rem; color: var(--gedämpft); }
 .zeilen-form .wachsen { flex: 1 1 14rem; }
-.zeilen-form label.wachsen input { width: 100%; }
+.zeilen-form label.wachsen input:not([type="checkbox"]):not([type="radio"]) { width: 100%; }
 .filter-form { margin-bottom: .8rem; }
-.haken { display: inline-flex !important; flex-direction: row !important; align-items: center; gap: .4rem; font-size: .88rem !important; color: var(--text) !important; }
+.haken { display: inline-flex !important; flex-direction: row !important; align-items: center; gap: .5rem; cursor: pointer; font-weight: 400 !important; width: fit-content; max-width: 100%; font-size: .88rem !important; color: var(--text) !important; }
 .haken.wichtig { background: var(--orange-hg); padding: .5rem .8rem; border-radius: var(--radius-klein); }
 .rollen-bedarf { border: 1px solid var(--linie); border-radius: var(--radius-klein); display: flex; flex-wrap: wrap; gap: .6rem 1.2rem; padding: .6rem .9rem; margin: 0 0 .85rem; }
 .rollen-bedarf legend { font-size: .85rem; font-weight: 500; padding: 0 .3rem; }
 .rollen-bedarf label { display: flex; align-items: center; gap: .4rem; font-size: .88rem; }
-.rollen-bedarf input { width: 5rem; }
+.rollen-bedarf input:not([type="checkbox"]):not([type="radio"]) { width: 5rem; }
 .mini-form {
   display: flex; flex-direction: column; gap: .45rem; background: var(--flaeche); border: 1px solid var(--linie);
   border-radius: var(--radius); padding: .75rem; box-shadow: var(--schatten-menue); min-width: 15rem; text-align: left; white-space: normal;
@@ -834,7 +853,7 @@ body.druck { background: var(--hg); padding: 1rem; }
 .schicht-karte2.vergangen { opacity: .6; }
 .bearbeiten-tabelle td { padding: .35rem .3rem; vertical-align: middle; }
 .bearbeiten-tabelle th { padding-left: .3rem; padding-right: .3rem; }
-.bearbeiten-tabelle input { width: 100%; min-width: 0; padding: .3rem .4rem; font-size: .85rem; }
+.bearbeiten-tabelle input:not([type="checkbox"]):not([type="radio"]) { width: 100%; min-width: 0; padding: .3rem .4rem; font-size: .85rem; }
 .bearbeiten-tabelle input[name$="[name]"] { min-width: 8rem; }
 .bearbeiten-tabelle input[type="date"] { min-width: 8.5rem; }
 .bearbeiten-tabelle input[type="time"] { min-width: 5.5rem; }
@@ -930,7 +949,7 @@ body.druck { background: var(--hg); padding: 1rem; }
 .akk-gruppe legend { padding: 0 0 .3rem; font-size: .72rem; text-transform: uppercase; letter-spacing: .06em; color: var(--gedämpft); font-weight: 600; }
 .akk-gruppe .feld { display: grid; gap: .15rem; min-width: 0; }
 .akk-gruppe .feld label { font-size: .78rem; color: var(--gedämpft); }
-.akk-gruppe .feld input, .akk-gruppe .feld select, .akk-gruppe .feld textarea { width: 100%; min-width: 0; box-sizing: border-box; }
+.akk-gruppe .feld input:not([type="checkbox"]):not([type="radio"]), .akk-gruppe .feld select, .akk-gruppe .feld textarea { width: 100%; min-width: 0; box-sizing: border-box; }
 .akk-gruppe small { font-size: .72rem; color: var(--gedämpft); }
 .akk-reihe { display: grid; grid-template-columns: repeat(auto-fit, minmax(5.5rem, 1fr)); gap: .5rem; }
 .akk-reihe.zwei { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -939,7 +958,7 @@ body.druck { background: var(--hg); padding: 1rem; }
 .neue-schicht { display: grid; grid-template-columns: minmax(0, 2fr) repeat(3, minmax(0, 1fr)) auto; gap: .5rem; align-items: end; padding: .75rem .9rem; border: 1px dashed var(--linie-stark); border-radius: 10px; }
 .neue-schicht .feld { display: grid; gap: .15rem; min-width: 0; }
 .neue-schicht .feld label { font-size: .78rem; color: var(--gedämpft); }
-.neue-schicht .feld input { width: 100%; min-width: 0; box-sizing: border-box; }
+.neue-schicht .feld input:not([type="checkbox"]):not([type="radio"]) { width: 100%; min-width: 0; box-sizing: border-box; }
 .neue-schicht .breit { grid-column: 1 / -1; }
 @media (max-width: 760px) {
   .akk-aktionen { position: static; padding: .6rem .9rem 0; justify-content: flex-end; }
@@ -998,7 +1017,7 @@ body.druck { background: var(--hg); padding: 1rem; }
 .bausteine dd { margin: 0; color: var(--gedämpft); }
 .vorschau-text pre { margin: .5rem 0 0; }
 #clubdesk .haupt-und-seite form > .feld { align-self: stretch; }
-#clubdesk .haupt-und-seite form .feld input, #clubdesk .haupt-und-seite form .feld textarea { width: 100%; min-width: 0; box-sizing: border-box; }
+#clubdesk .haupt-und-seite form .feld input:not([type="checkbox"]):not([type="radio"]), #clubdesk .haupt-und-seite form .feld textarea { width: 100%; min-width: 0; box-sizing: border-box; }
 
 /* ---------- Feste Seite (Rückmeldungen): Nur die Tabelle scrollt (Wunsch Yann) ---------- */
 @media (min-width: 861px) {
