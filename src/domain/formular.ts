@@ -52,13 +52,33 @@ export interface FormularSchicht {
 }
 
 /** Regel 13.4: publizierte Schichten mit Ende in der Zukunft, gruppiert nach Einsatz. */
+/** Spalten einer Schicht, so wie das Formular sie zeigt. Auch für die Ansicht eines Eingangs. */
+export const FORMULAR_SCHICHT_SQL = `SELECT s.id, s.name, s.start_zeit, s.end_zeit, s.ort, s.bemerkung_extern, s.min_alter, r.name AS min_rang_name,
+            e.id AS einsatz_id, e.name AS einsatz_name, e.bemerkung_extern AS einsatz_bemerkung_extern,
+            e.formular_mehrere AS einsatz_formular_mehrere
+       FROM schicht s JOIN einsatz e ON e.id = s.einsatz_id LEFT JOIN rang r ON r.id = s.min_rang_id`;
+
+/** Momentaufnahme des Formulars beim Absenden (Spalte `formular_eingang.formular`). Ohne Personendaten. */
+export interface FormularMomentaufnahme {
+  v: 1;
+  schichten: FormularSchicht[];
+  gewaehlt: number[];
+}
+
+/** Eingabe der Person (Spalte `formular_eingang.eingabe`). Beim Löschen der Personendaten leert das Tool sie. */
+export interface FormularEingabeAufnahme {
+  vorname: string;
+  nachname: string;
+  /** Bemerkung je Einsatz, Schlüssel = Einsatz-ID. Auch für Einsätze ohne gewählte Schicht. */
+  bemerkungen: Record<string, string>;
+  /** Bemerkung für alle Schichten (älteres Formular). */
+  bemerkung: string | null;
+}
+
 export async function sichtbareSchichten(db: Db): Promise<FormularSchicht[]> {
   return alle<FormularSchicht>(
     db,
-    `SELECT s.id, s.name, s.start_zeit, s.end_zeit, s.ort, s.bemerkung_extern, s.min_alter, r.name AS min_rang_name,
-            e.id AS einsatz_id, e.name AS einsatz_name, e.bemerkung_extern AS einsatz_bemerkung_extern,
-            e.formular_mehrere AS einsatz_formular_mehrere
-       FROM schicht s JOIN einsatz e ON e.id = s.einsatz_id LEFT JOIN rang r ON r.id = s.min_rang_id
+    `${FORMULAR_SCHICHT_SQL}
       WHERE s.publiziert = 1 AND s.end_zeit > ?
       ORDER BY (SELECT MIN(x.start_zeit) FROM schicht x WHERE x.einsatz_id = e.id AND x.publiziert = 1), e.id, s.start_zeit, s.id`,
     [jetztIso()],
@@ -146,8 +166,13 @@ export async function verarbeiteFormular(db: Db, e: FormularEingabe): Promise<Fo
     const zeit = jetztIso();
     const ids: number[] = [];
     // Eingang: jedes Ausfüllen des Formulars, so wie die Person es eingegeben hat (Wunsch Yann 20.11.2026).
-    const eingang = await schreibe(c, 'INSERT INTO formular_eingang (zeit, name, person_id, treffer) VALUES (?, ?, ?, ?)', [
-      zeit, `${vorname} ${nachname}`, personId, treffer.length > 1 ? treffer.join(', ') : null,
+    // Momentaufnahme (Wunsch Yann 23.11.2026): das Formular und die Eingabe, so wie sie beim Absenden waren.
+    const momentaufnahme: FormularMomentaufnahme = { v: 1, schichten: await sichtbareSchichten(c), gewaehlt: schichtIds };
+    const bemerkungenText: Record<string, string> = {};
+    for (const [id, b] of bemerkungJeEinsatz) if (b) bemerkungenText[String(id)] = b;
+    const eingabe: FormularEingabeAufnahme = { vorname, nachname, bemerkungen: bemerkungenText, bemerkung: bemerkungAlle };
+    const eingang = await schreibe(c, 'INSERT INTO formular_eingang (zeit, name, person_id, treffer, formular, eingabe) VALUES (?, ?, ?, ?, ?, ?)', [
+      zeit, `${vorname} ${nachname}`, personId, treffer.length > 1 ? treffer.join(', ') : null, JSON.stringify(momentaufnahme), JSON.stringify(eingabe),
     ]);
     const merke = (schichtId: number, anmeldungId: number, neu: boolean) => schreibe(
       c,

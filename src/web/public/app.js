@@ -410,6 +410,8 @@
             document.body.appendChild(fenster);
           }
           fenster.innerHTML = text;
+          // Breites Fenster für die Ansicht eines Formular-Eingangs (data-fenster="breit").
+          fenster.classList.toggle('fenster-breit', link.getAttribute('data-fenster') === 'breit');
           if (!fenster.open) fenster.showModal();
           var erstes = fenster.querySelector('input[type="radio"]:checked');
           if (erstes) erstes.focus();

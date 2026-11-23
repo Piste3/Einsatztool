@@ -289,7 +289,7 @@ export async function loeschePersonendaten(c: Db, id: number, benutzerId: number
   );
   if (eingaenge.length) {
     const eids = eingaenge.map((e) => e.id);
-    await schreibe(c, 'UPDATE formular_eingang SET name = ?, treffer = NULL WHERE id IN (?)', [`Gelöschte Person ${id}`, eids]);
+    await schreibe(c, 'UPDATE formular_eingang SET name = ?, treffer = NULL, eingabe = NULL WHERE id IN (?)', [`Gelöschte Person ${id}`, eids]);
     await schreibe(c, 'UPDATE formular_eingang_schicht SET bemerkung = NULL WHERE eingang_id IN (?)', [eids]);
   }
   const anmeldungen = await alle<{ id: number }>(c, 'SELECT id FROM anmeldung WHERE person_id = ?', [id]);

@@ -135,6 +135,15 @@ const migrationen: { version: number; anweisungen: () => string[] }[] = [
     version: 9,
     anweisungen: () => ['ALTER TABLE einsatz ADD COLUMN formular_mehrere TINYINT NOT NULL DEFAULT 1'],
   },
+  // Version 10 (Wunsch Yann 23.11.2026): Momentaufnahme je Eingang. «formular» = die sichtbaren Schichten
+  // und die gewählten Schichten beim Absenden (ohne Personendaten). «eingabe» = Name und Bemerkungen, wie eingegeben.
+  // Ältere Eingänge haben keine Momentaufnahme. Die Ansicht rekonstruiert sie und kennzeichnet das.
+  {
+    version: 10,
+    anweisungen: () => [
+      'ALTER TABLE formular_eingang ADD COLUMN formular MEDIUMTEXT NULL, ADD COLUMN eingabe TEXT NULL',
+    ],
+  },
 ];
 
 export async function migriere(db: Db): Promise<number> {

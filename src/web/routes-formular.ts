@@ -11,6 +11,10 @@ import { k, aktuellerPfad } from './kontext.js';
 import { seite, seitenKopf } from './views/layout.js';
 import { bestaetigenFrage, datumZeit, kachel, punktMarke, zeitraum } from './views/teile.js';
 import { besetzenPfad } from './views/besetzen.js';
+import { formularAnsicht } from '../domain/formular-ansicht.js';
+import { id as leseId } from '../domain/eingabe.js';
+import { sicheresZiel } from './kontext.js';
+import { anmeldeformularHtml } from './views/anmeldeformular.js';
 
 const GRENZE = 300;
 
@@ -75,7 +79,7 @@ ${seitenKopf({
   angaben: ['Jedes Ausfüllen des Anmeldeformulars einzeln, das neueste zuerst.'],
   aktionen: html`<a class="knopf haupt" href="/anmeldung" target="_blank" rel="noopener">Formular öffnen</a>`,
 })}
-<section class="formular-kopf" aria-labelledby="fk-titel">
+<section class="formular-uebersicht" aria-labelledby="fk-titel">
   <h2 id="fk-titel" class="sr">Formular</h2>
   <div class="formular-link">
     <label for="formular-link">Link zum Formular</label>
@@ -94,12 +98,49 @@ ${seitenKopf({
 ${!liste.length ? html`<p class="leer">${alleEingaenge.length ? 'Kein Eingang in diesem Filter.' : 'Noch niemand hat das Formular ausgefüllt.'}</p>` : html`<div class="rahmen"><table class="tabelle eingang-tabelle">
   <thead><tr><th>Eingang</th><th>Eingegeben</th><th>Person</th><th>Schichten</th><th>Bemerkung</th></tr></thead>
   <tbody>${liste.map((e) => html`<tr data-suche="${`${e.name ?? ''} ${e.person_vorname ?? ''} ${e.person_nachname ?? ''} ${e.schichten.map((s) => `${s.einsatz_name} ${s.schicht_name}`).join(' ')}`.toLowerCase()}">
-    <td class="nowrap">${datumZeit(e.zeit)}${e.nachgetragen ? html`<br><span class="unter" title="Eingang vor dem 20.11.2026. Die Bemerkung ist nicht bekannt.">nachgetragen</span>` : ''}</td>
+    <td class="nowrap">${datumZeit(e.zeit)}${e.nachgetragen ? html`<br><span class="unter" title="Eingang vor dem 20.11.2026. Die Bemerkung ist nicht bekannt.">nachgetragen</span>` : ''}
+      <br><a class="knopf klein eingang-ansicht" href="/formular/eingang/${e.id}?zurueck=${encodeURIComponent(hier)}" data-eintrag data-fenster="breit" title="Formular so zeigen, wie es ausgefüllt war">Ansicht</a></td>
     <td><strong>${e.name ?? ''}</strong></td>
     <td>${person(e)}</td>
     <td><ul class="eingang-schichten">${e.schichten.map((s) => schichtZeile(e, s))}</ul></td>
     <td class="eingang-bemerkung">${bemerkungen(e)}</td>
   </tr>`)}</tbody>
 </table></div>${alleEingaenge.length >= GRENZE ? html`<p class="unter">Die Seite zeigt die ${GRENZE} neuesten Eingänge.</p>` : ''}`}`, { breit: true }));
+  });
+
+  // Ansicht eines Eingangs (Wunsch Yann 23.11.2026): das Formular so, wie es beim Ausfüllen aussah. Nur lesen.
+  // Mit Header «X-Fragment: 1» nur der Inhalt (für das Fenster), sonst eine ganze Seite (ohne Skript).
+  app.get('/formular/eingang/:id', nurAufgebot, async (req, res) => {
+    const kx = k(res);
+    const ziel = sicheresZiel(req.query.zurueck, '/formular');
+    const a = await formularAnsicht(db, leseId(req.params.id, 'Eingang'));
+    const name = a.geloescht ? (a.name ?? '') : `${a.vorname} ${a.nachname}`.trim() || (a.name ?? '');
+    const hinweis = a.art === 'momentaufnahme'
+      ? html`<p class="meldung ok">So sah das Formular beim Absenden aus (Momentaufnahme vom ${datumZeit(a.zeit)}).</p>`
+      : html`<div class="meldung hinweis"><p><strong>Rekonstruiert.</strong> Dieser Eingang ist älter als die Momentaufnahme. Das Tool zeigt die Einsätze und Schichten mit ihren heutigen Angaben.</p>
+  <p>Gezeigt sind die gewählten Schichten und die heute publizierten Schichten, die beim Eingang noch nicht vorbei waren. Welche Schichten damals wirklich publiziert waren, ist nicht bekannt. Gelöschte Schichten fehlen.</p>
+  ${a.vorname || a.nachname ? html`<p>Vorname und Nachname sind beim ersten Leerzeichen getrennt.</p>` : ''}
+  ${a.bemerkungAusProtokoll ? html`<p>Die Bemerkung stammt aus dem Statusprotokoll der Anmeldung (erster Wert).</p>` : a.nachgetragen ? html`<p>Die Bemerkung ist für Eingänge vor dem 20.11.2026 nicht immer bekannt.</p>` : ''}</div>`;
+    const inhalt = html`<div class="eintrag-fenster formular-ansicht">
+  <header class="eintrag-kopf">
+    <div>
+      <h2>Formular von ${name}</h2>
+      <p class="unter">Ausgefüllt am ${datumZeit(a.zeit)}${a.person_id !== null ? html` · <a href="/personen/${a.person_id}">Personenseite</a>` : ''}</p>
+    </div>
+    <button type="button" class="toast-zu" data-fenster-zu aria-label="Fenster schliessen">×</button>
+  </header>
+  ${hinweis}
+  ${a.geloescht ? html`<p class="meldung hinweis">Die Personendaten sind gelöscht. Name und Bemerkungen fehlen.</p>` : ''}
+  ${a.spaeter.length ? html`<div class="meldung hinweis bemerkung-geaendert"><p><strong>Bemerkung später bearbeitet.</strong> Das Formular unten zeigt die Original-Bemerkung.</p>
+    <ul>${a.spaeter.map((x) => html`<li><span class="unter">${x.einsatz_name}${x.schicht_name !== x.einsatz_name ? ` · ${x.schicht_name}` : ''} · ${datumZeit(x.zeit)}${x.benutzer ? ` · ${x.benutzer}` : ''}</span>
+      <div class="bemerkung-vergleich"><div><span class="unter">Original</span><p>${x.original ? mehrzeilig(x.original) : '–'}</p></div><div><span class="unter">Heute</span><p>${x.aktuell ? mehrzeilig(x.aktuell) : '–'}</p></div></div></li>`)}</ul></div>` : ''}
+  <div class="formular-vorschau">${anmeldeformularHtml(a.schichten, { vorname: a.vorname, nachname: a.nachname, bemerkungen: a.bemerkungen, schichten: a.gewaehlt.map(String) }, { art: 'ansicht' })}</div>
+  <p class="knopfreihe"><a class="knopf" href="${ziel}" data-fenster-zu>Schliessen</a></p>
+</div>`;
+    if (req.get('x-fragment') === '1') {
+      res.type('html').send(inhalt.toString());
+      return;
+    }
+    res.send(seite(kx, `Formular von ${name}`, 'formular', html`${seitenKopf({ pfad: [{ text: 'Formular', href: ziel }, { text: name }], titel: 'Eingang' })}<div class="karte eintrag-seite">${inhalt}</div>`));
   });
 }

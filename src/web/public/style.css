@@ -550,7 +550,7 @@ p.bemerkung:not(.intern) { border-left: 3px solid var(--linie-stark); padding: .
 .schritte li.ok strong { color: var(--gruen); }
 
 /* ---------- Anmeldeformular (eingebettet in Clubdesk): hell und schlicht, auch im dunklen Modus ---------- */
-body.formular {
+body.formular, .formular-vorschau {
   color-scheme: light;
   --hg: #ffffff; --flaeche: #ffffff; --flaeche-2: #fafafa; --text: #18181b; --gedämpft: #71717a; --linie: #e4e4e7; --linie-stark: #d4d4d8;
   --haupt: #18181b; --haupt-text: #ffffff; --akzent: #2563eb; --akzent-text: #fff;
@@ -1012,8 +1012,8 @@ body.druck { background: var(--hg); padding: 1rem; }
 .rueck thead th.name-spalte, .rueck thead tr.einsatz-zeile th.name-spalte { position: sticky; left: 0; top: auto; z-index: 4; }
 
 /* ---------- Seite «Formular» (Wunsch Yann 20.11.2026) ---------- */
-.formular-kopf { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 1rem; margin-bottom: 1.2rem; padding: .9rem 1rem; border: 1px solid var(--linie); border-radius: 10px; background: var(--flaeche); }
-.formular-kopf label, .formular-sichtbar h3 { display: block; font-size: .72rem; text-transform: uppercase; letter-spacing: .06em; color: var(--gedämpft); font-weight: 600; margin: 0 0 .35rem; }
+.formular-uebersicht { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 1rem; margin-bottom: 1.2rem; padding: .9rem 1rem; border: 1px solid var(--linie); border-radius: 10px; background: var(--flaeche); }
+.formular-uebersicht label, .formular-sichtbar h3 { display: block; font-size: .72rem; text-transform: uppercase; letter-spacing: .06em; color: var(--gedämpft); font-weight: 600; margin: 0 0 .35rem; }
 .formular-link .zeilen-form { display: flex; gap: .4rem; }
 .formular-link input { min-width: 0; }
 .formular-sichtbar ul { margin: 0; padding: 0; list-style: none; display: grid; gap: .25rem; font-size: .88rem; }
@@ -1025,7 +1025,7 @@ body.druck { background: var(--hg); padding: 1rem; }
 .eingang-schicht-text { font-size: .86rem; min-width: 0; }
 .eingang-bemerkung .bemerkung { margin: 0 0 .3rem; font-size: .85rem; }
 @media (max-width: 760px) {
-  .formular-kopf { grid-template-columns: minmax(0, 1fr); }
+  .formular-uebersicht { grid-template-columns: minmax(0, 1fr); }
   .eingang-tabelle thead { display: none; }
   .eingang-tabelle, .eingang-tabelle tbody, .eingang-tabelle tr, .eingang-tabelle td { display: block; }
   .eingang-tabelle tr { padding: .6rem .7rem; border-bottom: 1px solid var(--linie); }
@@ -1077,4 +1077,24 @@ tr.ordnen-zeile.zieht { opacity: .45; }
 @media (max-width: 640px) {
   .tenue-feld { flex-wrap: wrap; }
   .tenue-feld select { max-width: none; flex: 1 1 100%; }
+}
+
+/* ---------- Ansicht eines Eingangs (Wunsch Yann 23.11.2026): Formular so, wie es ausgefüllt war ---------- */
+.fenster.fenster-breit { width: min(760px, calc(100vw - 1.5rem)); }
+.formular-vorschau { border: 1px solid var(--linie); border-radius: 12px; padding: .8rem .9rem; }
+.formular-vorschau .formular-kopf { padding: .2rem .2rem .8rem; }
+.formular-vorschau .formular-kopf h1 { font-size: 1.3rem; }
+.formular-vorschau .schicht-wahl { cursor: default; }
+.formular-vorschau .schicht-wahl:hover { border-color: var(--linie); background: transparent; }
+.formular-vorschau .schicht-wahl:has(input:checked):hover { border-color: var(--akzent); background: var(--blau-hg); }
+.formular-vorschau input[readonly], .formular-vorschau textarea[readonly] { background: var(--flaeche-2); color: var(--text); }
+.formular-ansicht .meldung p { margin: 0 0 .3rem; }
+.formular-ansicht .meldung p:last-child { margin-bottom: 0; }
+.bemerkung-geaendert ul { list-style: none; margin: .4rem 0 0; padding: 0; display: grid; gap: .5rem; }
+.bemerkung-vergleich { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: .6rem; margin-top: .2rem; }
+.bemerkung-vergleich p { margin: .1rem 0 0; white-space: normal; }
+.eingang-ansicht { margin-top: .3rem; }
+@media (max-width: 520px) {
+  .bemerkung-vergleich { grid-template-columns: minmax(0, 1fr); }
+  .formular-vorschau { padding: .5rem; }
 }
