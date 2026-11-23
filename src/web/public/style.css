@@ -958,6 +958,10 @@ body.druck { background: var(--hg); padding: 1rem; }
 .akk-gruppe small { font-size: .72rem; color: var(--gedämpft); }
 .akk-reihe { display: grid; grid-template-columns: repeat(auto-fit, minmax(5.5rem, 1fr)); gap: .5rem; }
 .akk-reihe.zwei { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.akk-reihe.bedarf { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .4rem; }
+.akk-reihe.bedarf .feld label { font-size: .74rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.akk-reihe.bedarf .feld:first-child label { color: var(--text); font-weight: 600; }
+.akk-reihe.alter-rang { grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); }
 .akk-fuss { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; justify-content: space-between; }
 .akk-fuss .unter { font-size: .78rem; }
 .neue-schicht { display: grid; grid-template-columns: minmax(0, 2fr) repeat(3, minmax(0, 1fr)) auto; gap: .5rem; align-items: end; padding: .75rem .9rem; border: 1px dashed var(--linie-stark); border-radius: 10px; }

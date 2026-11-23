@@ -353,12 +353,18 @@ ${!schichten.length ? html`<p class="leer">Keine Schichten.</p>` : html`<div cla
             <small>Ende vor Beginn = Folgetag. Leer = «Zeit offen».</small>
           </fieldset>
           <fieldset class="akk-gruppe"><legend>Wer</legend>
-            <div class="akk-reihe zwei">
-              ${feld('soll_anzahl', 'Soll (Teilnehmende)', eingabe('soll_anzahl', 'number', ' min="0" max="100000"'))}
-              ${feld('min_alter', 'Mindestalter', eingabe('min_alter', 'number', ' min="0" max="120"'))}
+            ${rollen.length
+              // Soll und Bedarf je Rolle in einer Reihe (Wunsch Yann 23.11.2026). Rollen sind frei benannt, darum keine Symbole.
+              ? html`<div class="akk-reihe bedarf">
+              ${feld('soll_anzahl', 'Soll TN', html`<input id="${id('soll_anzahl')}" name="soll_anzahl" type="number" min="0" max="100000" value="${v('soll_anzahl')}" title="Soll Teilnehmende gesamt">`)}
+              ${rollen.map((r, ri) => html`<div class="feld"><label for="${id(`rolle-${ri}`)}" title="${r.name}">${r.name}</label><input id="${id(`rolle-${ri}`)}" type="number" min="0" max="10000" name="rollen[${r.name}]" value="${rolleWert(r.name)}" placeholder="–"></div>`)}
             </div>
-            ${feld('min_rang_id', 'Mindestrang', html`<select id="${id('min_rang_id')}" name="min_rang_id"><option value="">– keiner –</option>${raengeListe.map((r) => html`<option value="${r.id}"${String(r.id) === v('min_rang_id') ? new Roh(' selected') : ''}>${r.name}</option>`)}</select>`)}
-            ${rollen.length ? html`<div class="akk-reihe">${rollen.map((r, ri) => html`<div class="feld"><label for="${id(`rolle-${ri}`)}">${r.name}</label><input id="${id(`rolle-${ri}`)}" type="number" min="0" max="10000" name="rollen[${r.name}]" value="${rolleWert(r.name)}" placeholder="–"></div>`)}</div><small>Bedarf je Rolle.</small>` : ''}
+            <small>Soll TN = Teilnehmende gesamt. Daneben der Bedarf je Rolle.</small>`
+              : feld('soll_anzahl', 'Soll (Teilnehmende)', eingabe('soll_anzahl', 'number', ' min="0" max="100000"'))}
+            <div class="akk-reihe alter-rang">
+              ${feld('min_alter', 'Mindestalter', eingabe('min_alter', 'number', ' min="0" max="120"'))}
+              ${feld('min_rang_id', 'Mindestrang', html`<select id="${id('min_rang_id')}" name="min_rang_id"><option value="">– keiner –</option>${raengeListe.map((r) => html`<option value="${r.id}"${String(r.id) === v('min_rang_id') ? new Roh(' selected') : ''}>${r.name}</option>`)}</select>`)}
+            </div>
           </fieldset>
           <fieldset class="akk-gruppe"><legend>Wo und was</legend>
             ${feld('ort', 'Antreten', html`<input id="${id('ort')}" name="ort" maxlength="255" value="${v('ort')}" placeholder="${e.ort ?? ''}">`)}
