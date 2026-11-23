@@ -245,34 +245,34 @@ ${liste.map((b) => html`<tr><td>${b.name}</td><td>${b.email}</td><td>${b.rolle =
     res.send(einstellungenSeite(deps, kx, 'stammdaten', html`
 <section class="abschnitt" id="raenge">
   <h2>Ränge</h2>
-  <p class="unter">Der oberste Rang ist der höchste. Zieh einen Rang am Griff ⠿ an die richtige Stelle. Auf dem Handy: ⋮ antippen. Ein neuer Rang kommt ans Ende (tiefster Rang). Der Import ordnet den Rang über den Namen zu.</p>
+  <p class="unter">Der oberste Rang ist der höchste. Zieh einen Rang am Griff ⠿ an die richtige Stelle. Auf dem Handy: ⋮ antippen. Ein neuer Rang kommt ans Ende (tiefster Rang). Nur ein Rang ohne Personen und ohne Schichten lässt sich löschen. Der Import ordnet den Rang über den Namen zu.</p>
   ${ordnenForm(kx, '/admin/raenge', z, 'ranglisten')}
-  <div class="rahmen"><table class="tabelle"><thead><tr><th class="ordnen-griff-kopf"><span class="sr">Ziehen</span></th><th>Rang</th><th>Personen</th><th>Schichten</th><th></th></tr></thead><tbody data-ordnen="ranglisten">
+  <div class="rahmen"><table class="tabelle mittig"><thead><tr><th class="ordnen-griff-kopf"><span class="sr">Ziehen</span></th><th>Rang</th><th>Personen</th><th>Schichten</th><th></th></tr></thead><tbody data-ordnen="ranglisten">
   ${r.map((x, i) => html`<tr class="ordnen-zeile" data-ordnen-wert="${x.id}">
     <td class="ordnen-griff" title="Ziehen, um die Reihenfolge zu ändern" aria-hidden="true">⠿</td>
     <td><form method="post" action="/admin/raenge" class="zeilen-form">${formFelder(kx, z)}<input type="hidden" name="aktion" value="umbenennen"><input type="hidden" name="id" value="${x.id}"><input name="name" value="${x.name}" required maxlength="100" aria-label="Name"><button class="knopf klein" type="submit">Umbenennen</button></form></td>
     <td>${x.personen}</td><td>${x.schichten}</td>
-    <td class="knopfreihe">
+    <td class="aktionen-rechts"><div class="knopfreihe">
       ${ordnenMenue(kx, '/admin/raenge', x.name, i > 0 ? { aktion: 'hoeher', id: String(x.id) } : null, i < r.length - 1 ? { aktion: 'tiefer', id: String(x.id) } : null, z)}
-      ${Number(x.personen) + Number(x.schichten) === 0 ? knopfPost(kx, '/admin/raenge', 'Löschen', { aktion: 'loeschen', id: String(x.id) }, 'knopf klein gefahr', z) : ''}
-    </td></tr>`)}
+      ${Number(x.personen) + Number(x.schichten) === 0 ? knopfPost(kx, '/admin/raenge', 'Löschen', { aktion: 'loeschen', id: String(x.id) }, 'knopf klein gefahr', z) : html`<button type="button" class="knopf klein" disabled title="In Gebrauch: ${x.personen} Personen, ${x.schichten} Schichten. Nur ein unbenutzter Rang lässt sich löschen.">Löschen</button>`}
+    </div></td></tr>`)}
   </tbody></table></div>
   <form method="post" action="/admin/raenge" class="zeilen-form">${formFelder(kx, z)}<input type="hidden" name="aktion" value="anlegen"><input name="name" required maxlength="100" placeholder="Neuer Rang" aria-label="Neuer Rang"><button class="knopf" type="submit">Rang anlegen</button></form>
 </section>
 <section class="abschnitt" id="rollen">
   <h2>Rollen</h2>
-  <p class="unter">Zieh eine Rolle am Griff ⠿ an die richtige Stelle. Auf dem Handy: ⋮ antippen. Rollen ohne Teilnehmerzählung (z. B. Sektorchef) zählen beim Essen, aber nicht als Teilnehmende. Umbenennen geht nicht.</p>
+  <p class="unter">Zieh eine Rolle am Griff ⠿ an die richtige Stelle. Auf dem Handy: ⋮ antippen. Rollen ohne Teilnehmerzählung (z. B. Sektorchef) zählen beim Essen, aber nicht als Teilnehmende. Umbenennen geht nicht. Nur eine unbenutzte Rolle lässt sich löschen.</p>
   ${ordnenForm(kx, '/admin/rollen', z, 'rollenliste')}
-  <div class="rahmen"><table class="tabelle"><thead><tr><th class="ordnen-griff-kopf"><span class="sr">Ziehen</span></th><th>Rolle</th><th>Zählt als Teilnehmer</th><th>Gebraucht</th><th></th></tr></thead><tbody data-ordnen="rollenliste">
+  <div class="rahmen"><table class="tabelle mittig"><thead><tr><th class="ordnen-griff-kopf"><span class="sr">Ziehen</span></th><th>Rolle</th><th>Zählt als Teilnehmer</th><th>Gebraucht</th><th></th></tr></thead><tbody data-ordnen="rollenliste">
   ${ro.map((x, i) => html`<tr class="ordnen-zeile" data-ordnen-wert="${x.name}">
     <td class="ordnen-griff" title="Ziehen, um die Reihenfolge zu ändern" aria-hidden="true">⠿</td>
     <td>${x.name}</td>
     <td>${knopfPost(kx, '/admin/rollen', x.zaehlt_teilnehmer ? 'ja' : 'nein', { aktion: 'zaehlt', name: x.name, zaehlt: x.zaehlt_teilnehmer ? '0' : '1' }, `schalter${x.zaehlt_teilnehmer ? ' an' : ''}`, z)}</td>
     <td>${x.nutzung}</td>
-    <td class="knopfreihe">
+    <td class="aktionen-rechts"><div class="knopfreihe">
       ${ordnenMenue(kx, '/admin/rollen', x.name, i > 0 ? { aktion: 'hoch', name: x.name } : null, i < ro.length - 1 ? { aktion: 'runter', name: x.name } : null, z)}
-      ${Number(x.nutzung) === 0 ? knopfPost(kx, '/admin/rollen', 'Löschen', { aktion: 'loeschen', name: x.name }, 'knopf klein gefahr', z) : ''}
-    </td></tr>`)}
+      ${Number(x.nutzung) === 0 ? knopfPost(kx, '/admin/rollen', 'Löschen', { aktion: 'loeschen', name: x.name }, 'knopf klein gefahr', z) : html`<button type="button" class="knopf klein" disabled title="In Gebrauch: ${x.nutzung} Mal. Nur eine unbenutzte Rolle lässt sich löschen.">Löschen</button>`}
+    </div></td></tr>`)}
   </tbody></table></div>
   <form method="post" action="/admin/rollen" class="zeilen-form">${formFelder(kx, z)}<input type="hidden" name="aktion" value="anlegen"><input name="name" required maxlength="100" placeholder="Neue Rolle" aria-label="Neue Rolle"><label class="haken"><input type="checkbox" name="zaehlt" value="1" checked> zählt als Teilnehmer</label><button class="knopf" type="submit">Rolle anlegen</button></form>
 </section>
@@ -280,15 +280,15 @@ ${liste.map((b) => html`<tr><td>${b.name}</td><td>${b.email}</td><td>${b.rolle =
   <h2>Tenue-Vorlagen</h2>
   <p class="unter">In Schicht und Einsatz wählst du eine Vorlage neben dem Feld «Tenue». Das Tool kopiert den Text ins Feld. Danach kannst du ihn ändern. Ändern oder Löschen einer Vorlage ändert keine Schicht. <code>**fett**</code> ergibt Fettdruck. Zieh eine Vorlage am Griff ⠿ an die richtige Stelle.</p>
   ${tv.length ? html`${ordnenForm(kx, '/admin/tenue', `${z}#tenue`, 'tenueliste')}
-  <div class="rahmen"><table class="tabelle"><thead><tr><th class="ordnen-griff-kopf"><span class="sr">Ziehen</span></th><th>Name und Text</th><th>Vorschau</th><th></th></tr></thead><tbody data-ordnen="tenueliste">
+  <div class="rahmen"><table class="tabelle mittig"><thead><tr><th class="ordnen-griff-kopf"><span class="sr">Ziehen</span></th><th>Name und Text</th><th>Vorschau</th><th></th></tr></thead><tbody data-ordnen="tenueliste">
   ${tv.map((x, i) => html`<tr class="ordnen-zeile" data-ordnen-wert="${x.id}">
     <td class="ordnen-griff" title="Ziehen, um die Reihenfolge zu ändern" aria-hidden="true">⠿</td>
     <td><form method="post" action="/admin/tenue" class="zeilen-form tenue-form">${formFelder(kx, `${z}#tenue`)}<input type="hidden" name="aktion" value="aendern"><input type="hidden" name="id" value="${x.id}"><input name="name" value="${x.name}" required maxlength="100" aria-label="Name" class="tenue-name"><input name="text" value="${x.text}" required maxlength="255" aria-label="Text" class="tenue-text"><button class="knopf klein" type="submit">Speichern</button></form></td>
     <td class="formatiert">${new Roh(zeileAlsHtml(x.text))}</td>
-    <td class="knopfreihe">
+    <td class="aktionen-rechts"><div class="knopfreihe">
       ${ordnenMenue(kx, '/admin/tenue', x.name, i > 0 ? { aktion: 'hoch', id: String(x.id) } : null, i < tv.length - 1 ? { aktion: 'runter', id: String(x.id) } : null, `${z}#tenue`)}
       <form method="post" action="/admin/tenue" class="inline" data-bestaetigen="Vorlage «${x.name}» löschen? Schichten behalten ihr Tenue.">${formFelder(kx, `${z}#tenue`)}<input type="hidden" name="aktion" value="loeschen"><input type="hidden" name="id" value="${x.id}"><button type="submit" class="knopf klein gefahr">Löschen</button></form>
-    </td></tr>`)}
+    </div></td></tr>`)}
   </tbody></table></div>` : html`<p class="unter">Noch keine Vorlage.</p>`}
   <form method="post" action="/admin/tenue" class="zeilen-form tenue-form">${formFelder(kx, `${z}#tenue`)}<input type="hidden" name="aktion" value="anlegen"><input name="name" required maxlength="100" placeholder="Name, z. B. Orange" aria-label="Name der neuen Vorlage" class="tenue-name"><input name="text" required maxlength="255" placeholder="Text, z. B. Orange, VD-Material, **VD-Jacke zwingend!**" aria-label="Text der neuen Vorlage" class="tenue-text"><button class="knopf" type="submit">Vorlage anlegen</button></form>
 </section>`));

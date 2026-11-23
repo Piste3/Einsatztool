@@ -453,6 +453,11 @@ a.zahl-karte:hover { text-decoration: none; border-color: var(--linie-stark); }
 .tabelle tr.vergangen { opacity: .6; }
 .tabelle tr.passt-nicht, .tabelle td.passt-nicht { color: var(--grau); background: var(--grau-hg); }
 .tabelle td.bemerkung { max-width: 18rem; }
+.tabelle.mittig td { vertical-align: middle; }
+.tabelle.mittig .zeilen-form { margin: 0; align-items: center; }
+/* Nie display:flex auf einer Zelle: Die Zelle verliesse sonst das Tabellenraster (Linien und Spalten verrutschen). */
+td.aktionen-rechts .knopfreihe { justify-content: flex-end; flex-wrap: nowrap; }
+.knopf:disabled { opacity: .45; cursor: not-allowed; }
 .aktionen-zelle { min-width: 9rem; text-align: right; }
 .aktionen-zelle > * { margin: .1rem 0; }
 .aktionen-zelle .aufklapp { text-align: left; }
