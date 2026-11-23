@@ -52,10 +52,11 @@ export function seite(k: Kontext, titel: string, aktiv: Bereich | null, inhalt: 
 <head>
 ${kopfDaten(`${titel} · Einsatzplaner`)}
 </head>
-<body class="mit-leiste" data-live-nr="${aenderungsStand()}" data-start="${VERSION}"${w ? html` data-wartung="${w.grund}"` : ''}${extra.ohneLive ? new Roh(' data-ohne-live') : ''}>
+<body class="mit-leiste" data-layout="voll" data-live-nr="${aenderungsStand()}" data-start="${VERSION}"${w ? html` data-wartung="${w.grund}"` : ''}${extra.ohneLive ? new Roh(' data-ohne-live') : ''}>
 <header class="kopf-mobil">
   <button type="button" class="knopf-menue" aria-controls="leiste" aria-expanded="false" aria-label="Menü öffnen">${symbol('menue')}</button>
   <span class="marke-klein">Einsatzplaner</span>
+  <a class="knopf klein handy-wechsel" href="/m/handy" data-normal>Handyversion</a>
   ${rueckgaengigLeiste(k, 'mobil')}
 </header>
 <nav id="leiste" class="leiste" aria-label="Hauptmenü">
@@ -100,6 +101,44 @@ ${kopfDaten(`${titel} · Einsatzplaner`)}
     : k.meldung.wiederholen ? toastKnopf(k, 'wiederholen', k.meldung.wiederholen) : undefined) : ''}
   ${inhalt}
 </main>
+</body>
+</html>`}`;
+}
+
+/** Bereiche der Handyversion (Leiste unten). */
+export type HandyBereich = 'einsaetze' | 'personen' | 'mehr';
+
+/**
+ * Seite der Handyversion (Wunsch Yann 23.11.2026). Kopf oben mit Zurück, Titel und Rückgängig,
+ * Leiste unten mit Einsätze, Personen und Mehr. Live, Toast, Fenster und Update-Sperre laufen wie in der vollen Version.
+ * data-layout="handy": app.js tauscht nur Seiten mit derselben Art aus. Ein Wechsel zur vollen Version lädt neu.
+ */
+export function handySeite(k: Kontext, titel: string, aktiv: HandyBereich | null, inhalt: Roh, extra: { zurueck?: string; unter?: string } = {}): string {
+  const w = wartung();
+  const tab = (bereich: HandyBereich, href: string, text: string, icon: SymbolName) => html`<a href="${href}"${wenn(bereich === aktiv, new Roh(' aria-current="page" class="aktiv"'))}>${symbol(icon)}<span>${text}</span></a>`;
+  return `<!doctype html>${html`<html lang="de">
+<head>
+${kopfDaten(`${titel} · Einsatzplaner`)}
+</head>
+<body class="handy" data-layout="handy" data-live-nr="${aenderungsStand()}" data-start="${VERSION}"${w ? html` data-wartung="${w.grund}"` : ''}>
+<header class="handy-kopf">
+  ${extra.zurueck ? html`<a class="handy-zurueck" href="${extra.zurueck}" aria-label="Zurück">${symbol('zurueck')}</a>` : html`<img class="marke-zeichen" src="/static/logo.png?v=${VERSION}" alt="" width="28" height="28">`}
+  <span class="handy-titel"><strong>${titel}</strong>${extra.unter ? html`<small>${extra.unter}</small>` : ''}</span>
+  <span class="live" data-live title="Die Seite zeigt Änderungen aller Benutzer sofort an."><span class="live-punkt" aria-hidden="true"></span><span class="sr">Live</span></span>
+  ${rueckgaengigLeiste(k, 'mobil')}
+</header>
+<main class="inhalt handy-inhalt">
+  ${w ? html`<p class="meldung hinweis wartung-hinweis" role="status">${wartungsText(w)} Änderungen speichert das Tool erst danach.</p>` : ''}
+  ${k.meldung ? toast(k.meldung.art, k.meldung.text, k.meldung.rueckgaengig
+    ? toastKnopf(k, 'rueckgaengig', k.meldung.rueckgaengig)
+    : k.meldung.wiederholen ? toastKnopf(k, 'wiederholen', k.meldung.wiederholen) : undefined) : ''}
+  ${inhalt}
+</main>
+<nav id="leiste" class="handy-leiste" aria-label="Hauptmenü">
+  ${tab('einsaetze', '/m', 'Einsätze', 'kalender')}
+  ${tab('personen', '/m/personen', 'Personen', 'personen')}
+  ${tab('mehr', '/m/mehr', 'Mehr', 'mehr')}
+</nav>
 </body>
 </html>`}`;
 }

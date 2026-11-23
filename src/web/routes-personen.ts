@@ -14,7 +14,7 @@ import { sicheresZiel } from './kontext.js';
 import { STATUS_TEXT, KANAELE, KANAL_TEXT, id as leseId, type Kanal, type Status } from '../domain/eingabe.js';
 import { html, Roh } from './html.js';
 import { k, aktuellerPfad } from './kontext.js';
-import { formFelder, seite, seitenKopf } from './views/layout.js';
+import { formFelder, handySeite, seite, seitenKopf } from './views/layout.js';
 import { bestaetigenFrage, datumZeit, istSoll, kachel, kachelLegende, KACHEL_TEXT, kanalAuswahl, legende, rolleAuswahl, statusMarke, statusText, telefon, warnungen, zeitraum } from './views/teile.js';
 import { verlaufListe } from './routes-schichten.js';
 import { alterAm, datumCh, datumChVonIso, lokalesDatum, lokaleZeit, wochentagKurz } from '../domain/zeit.js';
@@ -170,6 +170,8 @@ ${r.schichten.length === 0 ? html`<p class="leer">Keine kommenden Schichten im Z
     const s = await ladeSchicht(db, leseId(req.query.schicht, 'Schicht'));
     const p = await ladePerson(db, leseId(req.query.person, 'Person'));
     const ziel = sicheresZiel(req.query.zurueck, '/rueckmeldungen');
+    // Aus der Handyversion: Links und Seite bleiben in der Handyversion.
+    const handy = ziel === '/m' || ziel.startsWith('/m/') || ziel.startsWith('/m?');
     const a = await anmeldungVonPerson(db, s.id, p.clubdesk_id);
     const logs = a ? (await verlauf(db, [a.id])).get(a.id) : undefined;
     const wl = a ? (await warnungenFuerSchicht(db, s.id)).anmeldungen.get(a.id) : undefined;
@@ -198,10 +200,10 @@ ${r.schichten.length === 0 ? html`<p class="leer">Keine kommenden Schichten im Z
     </div>
     <button type="button" class="toast-zu" data-fenster-zu aria-label="Fenster schliessen">×</button>
   </header>
-  <p class="eintrag-person">${telefon(p)}${p.geburtsdatum ? html` <span class="unter">· ${alterAm(p.geburtsdatum, lokalesDatum(s.start_zeit))} Jahre</span>` : ''} <a href="/personen/${p.clubdesk_id}">Personenseite</a></p>
+  <p class="eintrag-person">${telefon(p)}${p.geburtsdatum ? html` <span class="unter">· ${alterAm(p.geburtsdatum, lokalesDatum(s.start_zeit))} Jahre</span>` : ''} <a href="${handy ? `/m/personen/${p.clubdesk_id}` : `/personen/${p.clubdesk_id}`}">Personenseite</a></p>
   ${passt ? '' : html`<p class="meldung hinweis">Die Person passt nicht zu Mindestalter oder Mindestrang der Schicht. Eintragen geht trotzdem.</p>`}
   <div class="eintrag-aktuell">${a
-    ? html`<strong>Aktuell:</strong> ${statusText(a.status as Status)} · ${KANAL_TEXT[a.kanal as Kanal]}${a.rolle ? ` · ${a.rolle}` : ''} · geändert ${datumZeit(a.geaendert_am)} · <a href="/schichten/${s.id}">zur Schicht</a>`
+    ? html`<strong>Aktuell:</strong> ${statusText(a.status as Status)} · ${KANAL_TEXT[a.kanal as Kanal]}${a.rolle ? ` · ${a.rolle}` : ''} · geändert ${datumZeit(a.geaendert_am)} · <a href="${handy ? `/m/einsaetze/${s.einsatz_id}?schicht=${s.id}&filter=alle` : `/schichten/${s.id}`}">zur Schicht</a>`
     : html`<strong>Aktuell:</strong> nicht gefragt. Es gibt noch keinen Eintrag.`}</div>
   ${warnungen(wl)}
   ${andere.length ? html`<div class="eintrag-andere"><span class="unter">Andere Schichten dieses Einsatzes:</span>
@@ -223,6 +225,10 @@ ${r.schichten.length === 0 ? html`<p class="leer">Keine kommenden Schichten im Z
 </div>`;
     if (req.get('x-fragment') === '1') {
       res.type('html').send(inhalt.toString());
+      return;
+    }
+    if (handy) {
+      res.send(handySeite(kx, name, null, html`<div class="karte eintrag-seite">${inhalt}</div>`, { zurueck: ziel, unter: 'Eintragen' }));
       return;
     }
     res.send(seite(kx, `${name} · ${s.name}`, 'rueckmeldungen', html`${seitenKopf({ pfad: [{ text: 'Rückmeldungen', href: ziel }, { text: name }], titel: 'Eintragen' })}<div class="karte eintrag-seite">${inhalt}</div>`));

@@ -26,6 +26,7 @@ import { registriereSchichten } from './routes-schichten.js';
 import { registriereAnmeldungen } from './routes-anmeldungen.js';
 import { registriereFormular } from './routes-formular.js';
 import { registrierePersonen } from './routes-personen.js';
+import { registriereHandy } from './routes-handy.js';
 import { registriereAdmin } from './routes-admin.js';
 import { registriereLive, LIVE_PFAD } from './routes-live.js';
 import type { Updater } from '../jobs/update.js';
@@ -290,6 +291,7 @@ export function erstelleApp(deps: Abhaengigkeiten): express.Express {
   registriereAnmeldungen(app, deps);
   registriereFormular(app, deps);
   registrierePersonen(app, deps);
+  registriereHandy(app, deps);
   registriereAdmin(app, deps);
   registriereKonfiguration(app, deps);
   registriereLive(app, deps);

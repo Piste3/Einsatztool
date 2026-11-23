@@ -1,7 +1,8 @@
 // Startseite «Cockpit» mit «Zu tun» (Abschnitt 3 des Auftrags, 14.1 GET /).
 import type { Express } from 'express';
 import type { Abhaengigkeiten } from './app.js';
-import { nurAufgebot } from './app.js';
+import { leseCookies, nurAufgebot } from './app.js';
+import { ANSICHT_COOKIE, startInHandy } from '../domain/handy.js';
 import { startUebersicht } from '../domain/listen.js';
 import { html, type Roh } from './html.js';
 import { k } from './kontext.js';
@@ -26,8 +27,14 @@ function tageBis(iso: string): number {
 }
 
 export function registriereStart(app: Express, deps: Abhaengigkeiten): void {
-  app.get('/', nurAufgebot, async (_req, res) => {
+  app.get('/', nurAufgebot, async (req, res) => {
     const kx = k(res);
+    // Handyversion (Wunsch Yann 23.11.2026): Auf einem Smartphone öffnet die Startseite die Handyversion,
+    // ausser der Benutzer hat die volle Version gewählt (Cookie «ansicht=voll»).
+    if (startInHandy(req.get('user-agent'), leseCookies(req)[ANSICHT_COOKIE])) {
+      res.redirect(302, '/m');
+      return;
+    }
     const u = await startUebersicht(deps.db);
     const jetzt = jetztIso();
 

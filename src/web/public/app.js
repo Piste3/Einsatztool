@@ -341,9 +341,13 @@
     // Navigation: Zähler und markierte Seite. Das Menü auf dem Handy bleibt offen oder zu.
     altLeiste.innerHTML = neuLeiste.innerHTML;
     // Knopf «Rückgängig» im Kopf auf dem Handy.
-    var neuMobil = neu.querySelector('.kopf-mobil .rueckgaengig-reihe');
-    var altMobil = document.querySelector('.kopf-mobil .rueckgaengig-reihe');
+    var neuMobil = neu.querySelector('.kopf-mobil .rueckgaengig-reihe, .handy-kopf .rueckgaengig-reihe');
+    var altMobil = document.querySelector('.kopf-mobil .rueckgaengig-reihe, .handy-kopf .rueckgaengig-reihe');
     if (neuMobil && altMobil) altMobil.replaceWith(document.importNode(neuMobil, true));
+    // Handyversion: Der Kopf trägt Titel und Zurück-Knopf der Seite.
+    var neuKopf = neu.querySelector('.handy-kopf');
+    var altKopf = document.querySelector('.handy-kopf');
+    if (neuKopf && altKopf) altKopf.replaceWith(document.importNode(neuKopf, true));
     themaZeigen(themaLesen());
     altMain.className = neuMain.className;
     // Tabellen mit eigenem Scrollbereich behalten ihre Position (z. B. Rückmeldungen nach einem Eintrag).
@@ -761,8 +765,10 @@
           var ziel = new URL(r.url || adresse, location.href);
           if (ziel.hash === '' && adresse.indexOf('#') >= 0) ziel.hash = adresse.slice(adresse.indexOf('#'));
           var neueSeite = ziel.pathname !== vorherPfad;
+          // Handyversion und volle Version haben einen anderen Rahmen: Ein Wechsel lädt die Seite normal.
           var passt = neu.body && neu.body.hasAttribute('data-live-nr') && !neu.body.hasAttribute('data-ohne-live') &&
-            stilVersion(neu) === stilVersion(document);
+            stilVersion(neu) === stilVersion(document) &&
+            (neu.body.getAttribute('data-layout') || '') === (body.getAttribute('data-layout') || '');
           if (!passt || !tausche(neu, { neueSeite: neueSeite })) {
             location.assign(ziel.href);
             return;
@@ -820,9 +826,21 @@
     return true;
   };
 
+  // Handyversion: «Zurück» im Kopf geht im Verlauf zurück, wenn die vorige Seite aus dem Tool kam.
+  // So landet man nach der Ansicht einer Person wieder im Einsatz. Sonst gilt der Link (übergeordnete Seite).
+  var imToolTiefe = 0;
+  document.addEventListener('click', function (ev) {
+    var z = ev.target && ev.target.closest ? ev.target.closest('a.handy-zurueck') : null;
+    if (!z || imToolTiefe < 1 || ev.button !== 0 || ev.ctrlKey || ev.metaKey || ev.shiftKey) return;
+    ev.preventDefault();
+    imToolTiefe--;
+    history.back();
+  });
+
   document.addEventListener('click', function (ev) {
     var a = ev.target && ev.target.closest ? ev.target.closest('a[href]') : null;
     if (!a || !linkImTool(a, ev)) return;
+    if (!a.classList.contains('handy-zurueck')) imToolTiefe++;
     ev.preventDefault();
     var url = new URL(a.href, location.href);
     navigiere(url.pathname + url.search + url.hash, { verlauf: 'push' });
