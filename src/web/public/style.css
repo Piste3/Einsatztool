@@ -1303,3 +1303,5 @@ form.inline:has(> .handy-breit) { display: block; }
 /* Fenster auf dem Handy: ganze Breite, unten angedockt */
 body.handy .fenster { width: 100vw; max-width: 100vw; margin: auto 0 0; border-radius: 14px 14px 0 0; max-height: 92vh; }
 body.handy .frage-fenster { margin: auto; width: calc(100vw - 1.5rem); border-radius: 12px; }
+.handy-chips a .chip-zeit { font-weight: 600; color: var(--text); }
+.he-schicht-name { color: var(--text); font-weight: 600; }

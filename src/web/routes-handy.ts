@@ -24,6 +24,10 @@ import { bestaetigenFrage, istSoll, kachel, KACHEL_TEXT, knopfPost, punktMarke, 
 /** Kurzes Datum, z. B. «Sa 28.11.». */
 const tag = (iso: string) => `${wochentagKurz(iso)} ${datumChVonIso(iso).slice(0, 6)}`;
 
+/** Beginn und Ende, z. B. «13:00–18:00». Ohne Zeiten «Zeit offen». */
+const uhr = (s: { start_zeit: string; end_zeit: string; zeit_offen?: number | boolean }) =>
+  s.zeit_offen && Number(s.zeit_offen) ? 'Zeit offen' : `${lokaleZeit(s.start_zeit)}–${lokaleZeit(s.end_zeit)}`;
+
 const an = (a: BesetzenEintrag | undefined) => !!a && (a.status === 'angemeldet' || a.status === 'bestaetigt');
 
 /** Knopf «Anrufen» als Symbol. Ohne Nummer leer. */
@@ -59,7 +63,7 @@ export function registriereHandy(app: Express, deps: Abhaengigkeiten): void {
   <span class="he-kopf"><span class="he-datum">${tag(erste.start_zeit)}${kommend.length > 1 && lokalesDatum(kommend[kommend.length - 1].start_zeit) !== lokalesDatum(erste.start_zeit) ? ` – ${tag(kommend[kommend.length - 1].start_zeit)}` : ''}</span>
     ${e.unbestaetigt ? punktMarke(`${e.unbestaetigt} neu`, 'blau') : ''}${publiziert ? '' : punktMarke('Entwurf', 'grau')}</span>
   <strong class="he-name">${e.name}</strong>
-  <span class="he-schichten">${kommend.map((s) => html`<span class="he-schicht"><span>${kommend.length > 1 ? s.name : zeitraum(s.start_zeit, s.end_zeit)}</span>${istSoll(s.zahlen.teilnehmende, s.soll_anzahl)}</span>`)}</span>
+  <span class="he-schichten">${kommend.map((s) => html`<span class="he-schicht"><span>${kommend.length > 1 ? html`<strong class="he-schicht-name">${s.name}</strong> ${lokalesDatum(s.start_zeit) !== lokalesDatum(erste.start_zeit) ? `${tag(s.start_zeit)} ` : ''}${uhr(s)}` : zeitraum(s.start_zeit, s.end_zeit)}</span>${istSoll(s.zahlen.teilnehmende, s.soll_anzahl)}</span>`)}</span>
 </a></li>`;
     });
     res.send(handySeite(kx, 'Einsätze', 'einsaetze', html`
@@ -98,7 +102,7 @@ ${karten.length ? html`<ul class="handy-karten">${karten}</ul>` : html`<p class=
     // Schicht wählen: waagrecht scrollende Chips mit Ist / Soll.
     const schichtWahl = schichten.length > 1 ? html`<nav class="handy-chips" aria-label="Schicht wählen">
   <a href="${pfad(filter, 'alle')}"${gewaehlt ? '' : new Roh(' aria-current="page"')}><strong>Alle</strong><small>${schichten.length} Schichten</small></a>
-  ${schichten.map((s) => { const z = zahlen.get(s.id)!; return html`<a href="${pfad(filter, s.id)}"${gewaehlt?.id === s.id ? new Roh(' aria-current="page"') : ''}><strong>${s.name}</strong><small>${tag(s.start_zeit)}${s.zeit_offen ? '' : ` ${lokaleZeit(s.start_zeit)}`}</small>${istSoll(z.teilnehmende, s.soll_anzahl)}</a>`; })}
+  ${schichten.map((s) => { const z = zahlen.get(s.id)!; return html`<a href="${pfad(filter, s.id)}"${gewaehlt?.id === s.id ? new Roh(' aria-current="page"') : ''}><strong>${s.name}</strong><small>${tag(s.start_zeit)}</small><small class="chip-zeit">${uhr(s)}</small>${istSoll(z.teilnehmende, s.soll_anzahl)}</a>`; })}
 </nav>` : '';
     const info = gewaehlt ? html`<p class="handy-info">${zeitraum(gewaehlt.start_zeit, gewaehlt.end_zeit, gewaehlt.zeit_offen)}${gewaehlt.ort ? html` · ${gewaehlt.ort}` : ''}${gewaehlt.min_alter !== null ? ` · ab ${gewaehlt.min_alter} J.` : ''}${gewaehlt.min_rang_name ? ` · ab ${gewaehlt.min_rang_name}` : ''}${schichten.length === 1 ? html` ${istSoll(zahlen.get(gewaehlt.id)!.teilnehmende, gewaehlt.soll_anzahl)}` : ''}${gewaehlt.publiziert ? '' : html` ${punktMarke('Nicht publiziert', 'grau')}`}</p>` : '';
     const filterChips = html`<nav class="handy-filter" aria-label="Filter">${BESETZEN_FILTER
@@ -169,7 +173,7 @@ ${karten.length ? html`<ul class="handy-karten">${karten}</ul>` : html`<p class=
 
     // Alle Schichten: je Person eine Zeile mit einer Kachel je Schicht (wie Rückmeldungen).
     const listeAlle = html`<div class="handy-matrix">
-<div class="hm-zeile hm-kopf" aria-hidden="true"><span class="hm-name"></span><span class="hm-kacheln">${schichten.map((s) => html`<a href="${pfad(filter, s.id)}" title="${s.name} · ${zeitraum(s.start_zeit, s.end_zeit, s.zeit_offen)}"><span>${s.name}</span><small>${tag(s.start_zeit).replace(/\.$/, '')}</small></a>`)}</span></div>
+<div class="hm-zeile hm-kopf" aria-hidden="true"><span class="hm-name"></span><span class="hm-kacheln">${schichten.map((s) => html`<a href="${pfad(filter, s.id)}" title="${s.name} · ${zeitraum(s.start_zeit, s.end_zeit, s.zeit_offen)}"><span>${s.name}</span><small>${tag(s.start_zeit).replace(/\.$/, '')}</small><small>${s.zeit_offen ? 'offen' : lokaleZeit(s.start_zeit)}</small><small>${s.zeit_offen ? '' : lokaleZeit(s.end_zeit)}</small></a>`)}</span></div>
 <ul class="handy-zeilen">${liste.map((z) => html`<li class="hm-zeile" data-suche="${suche(z)}"><span class="hm-name">${nameBlock(z)}</span><span class="hm-kacheln">${schichten.map((s) => feld(z, s))}</span></li>`)}</ul>
 </div>`;
 
@@ -184,7 +188,9 @@ ${alleBestaetigen}
 ${!liste.length ? html`<p class="leer">${leer}</p>` : gewaehlt ? listeEine(gewaehlt) : listeAlle}
 <p class="unter handy-fuss">Tipp auf eine Kachel: eintragen oder ändern. Tipp auf den Namen: alle Einsätze der Person.</p>`, {
       zurueck: '/m',
-      unter: gewaehlt && schichten.length > 1 ? `${gewaehlt.name} · ${tag(gewaehlt.start_zeit)}` : tag(schichten[0].start_zeit),
+      unter: gewaehlt
+        ? `${schichten.length > 1 ? `${gewaehlt.name} · ` : ''}${tag(gewaehlt.start_zeit)} ${uhr(gewaehlt)}`
+        : `${tag(schichten[0].start_zeit)} ${lokaleZeit(schichten[0].start_zeit)} – ${tag(schichten[schichten.length - 1].end_zeit)} ${lokaleZeit(schichten[schichten.length - 1].end_zeit)}`,
     }));
   });
 
