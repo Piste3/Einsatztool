@@ -120,6 +120,11 @@ test('T32 Einsatzansicht: Steckbrief, Schichten-Tabelle, Kacheln bei mehreren Sc
     assert.match(zwei, /<dt>Einsatzleitung<\/dt><dd><span class="rang">Kad<\/span> Nina Baumann/);
     assert.match(zwei, /Abend: 1 Person fehlt\./);
     assert.match(zwei, /Keine Einsatzleitung eingeteilt: Stadtlauf\./);
+    // Cockpit: «Zu tun» nur mit sofortigem Handeln (Wunsch Yann 23.11.2026). Keine fehlenden Personen, keine Warnungen.
+    const cockpit = await hole('/');
+    const zuTun = cockpit.slice(cockpit.indexOf('zu-tun-titel'), cockpit.indexOf('zahl-karten'));
+    assert.match(zuTun, /Stadtlauf: 1 Anmeldung bestätigen/);
+    assert.doesNotMatch(zuTun, /fehlt|fehlen|Warnung/);
 
     // Alte Links führen auf «Besetzen». Filter «Neu»: nur Personen mit unbestätigtem Eintrag.
     const alt = await fetch(`${app.url}/einsaetze/${s.einsatzId}?personen=offen`, { headers: { cookie }, redirect: 'manual' });

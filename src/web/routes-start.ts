@@ -39,7 +39,8 @@ export function registriereStart(app: Express, deps: Abhaengigkeiten): void {
     const u = await startUebersicht(deps.db);
     const jetzt = jetztIso();
 
-    // «Zu tun»: konkrete Punkte aus denselben Zahlen wie bisher. Ein Klick öffnet die passende Seite.
+    // «Zu tun»: nur Punkte, die sofortiges Handeln brauchen (Wunsch Yann 23.11.2026).
+    // Fehlende Personen und Warnungen zeigen die Zahlenkarten und die Einsätze darunter.
     const punkte: Roh[] = [];
     const punkt = (marke: Roh, text: string, href: string) => html`<li><a href="${href}">${marke}<span>${text}</span></a></li>`;
     if (u.unbekannt > 0) {
@@ -47,17 +48,6 @@ export function registriereStart(app: Express, deps: Abhaengigkeiten): void {
     }
     for (const e of u.einsaetze) {
       if (e.unbestaetigt > 0) punkte.push(punkt(punktMarke('Bestätigen', 'blau'), `${e.name}: ${e.unbestaetigt} ${e.unbestaetigt === 1 ? 'Anmeldung' : 'Anmeldungen'} bestätigen`, `/einsaetze/${e.id}`));
-    }
-    for (const e of u.einsaetze) {
-      for (const s of e.schichten) {
-        if (s.end_zeit <= jetzt || s.soll_anzahl === null || s.zahlen.teilnehmende >= s.soll_anzahl) continue;
-        const fehlt = s.soll_anzahl - s.zahlen.teilnehmende;
-        const name = e.schichten.length > 1 ? `${e.name} – ${s.name}` : e.name;
-        punkte.push(punkt(punktMarke('Nachfassen', 'rot'), `${name}: ${fehlt} ${fehlt === 1 ? 'Person fehlt' : 'Personen fehlen'}`, `/schichten/${s.id}/anrufliste`));
-      }
-    }
-    for (const e of u.einsaetze) {
-      if (e.warnungen > 0) punkte.push(punkt(punktMarke('Warnungen', 'orange'), `${e.name}: ${e.warnungen} ${e.warnungen === 1 ? 'Warnung' : 'Warnungen'} prüfen`, `/einsaetze/${e.id}`));
     }
     const naechster = u.einsaetze.find((e) => e.schichten.some((s) => s.end_zeit > jetzt));
     const naechsterStart = naechster?.schichten.find((s) => s.end_zeit > jetzt)?.start_zeit;
