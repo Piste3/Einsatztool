@@ -11,6 +11,8 @@ import {
   type Quelle, type Zeile,
 } from '../domain/konfiguration.js';
 import { Eingabefehler } from '../domain/eingabe.js';
+import { ablaufText, entraAblauf, inZweiJahren, type EntraAblauf } from '../domain/entra-schluessel.js';
+import { datumCh } from '../domain/zeit.js';
 import { ABSENDER_NAME } from '../domain/mail-vorlagen.js';
 import { smtpOptionen } from '../jobs/mail-worker.js';
 import { log } from '../log.js';
@@ -62,6 +64,10 @@ function feld(z: Zeile, eingaben: Record<string, unknown> | undefined): Roh {
     case 'mail':
       eingabe = html`<input id="${id}" name="${id}" type="email" maxlength="1000" value="${wert}"${d.pflicht ? new Roh(' required') : ''}>`;
       break;
+    case 'datum':
+      eingabe = html`<span class="knopfreihe"><input id="${id}" name="${id}" type="date" value="${wert}">${
+        d.schluessel === 'ENTRA_SECRET_ABLAUF' ? plusZweiJahreKnopf(id) : ''}</span>`;
+      break;
     case 'url':
       eingabe = html`<input id="${id}" name="${id}" type="url" maxlength="1000" value="${wert}"${d.pflicht ? new Roh(' required') : ''}>`;
       break;
@@ -69,6 +75,11 @@ function feld(z: Zeile, eingaben: Record<string, unknown> | undefined): Roh {
       eingabe = html`<input id="${id}" name="${id}" maxlength="1000" value="${wert}"${d.pflicht ? new Roh(' required') : ''}>`;
   }
   return html`<div class="feld">${kopf}${eingabe}${hilfe}</div>`;
+}
+
+/** Knopf «Heute + 2 Jahre» (Wunsch Yann 23.11.2026). app.js setzt das Datum ins Feld. Der Server rechnet es aus. */
+function plusZweiJahreKnopf(ziel: string): Roh {
+  return html`<button type="button" class="knopf" data-datum-setzen="${inZweiJahren()}" data-datum-ziel="${ziel}">Heute + 2 Jahre</button>`;
 }
 
 /** Reiter der Seite Admin › Einstellungen (Wunsch Yann 20.11.2026, wie die Reiter im Einsatz). */
@@ -102,7 +113,7 @@ function reiterAusFeldern(eingaben: Record<string, unknown>): EinstellungReiter 
 const quellen = new WeakMap<Abhaengigkeiten, Quelle>();
 
 /** Datei und Startwerte. Ohne Angabe gilt der Stand beim ersten Aufruf als «laufend». */
-function quelleVon(deps: Abhaengigkeiten): Quelle {
+export function quelleVon(deps: Abhaengigkeiten): Quelle {
   if (deps.konfigQuelle) return deps.konfigQuelle;
   let q = quellen.get(deps);
   if (!q) {
@@ -110,6 +121,30 @@ function quelleVon(deps: Abhaengigkeiten): Quelle {
     quellen.set(deps, q);
   }
   return q;
+}
+
+/** Stand des Entra-Schlüssels nach den Werten in der Datei (Umgebungsvariablen haben Vorrang). */
+export function entraAblaufVon(deps: Abhaengigkeiten): EntraAblauf {
+  return entraAblauf(kuenftigeWerte(quelleVon(deps)));
+}
+
+export const ANLEITUNG_ENTRA = '/admin/einstellungen/login/entra-schluessel';
+
+/**
+ * Warnung ab 30 Tagen vor dem Ablauf, mit Knopf zur Anleitung (Wunsch Yann 23.11.2026).
+ * Ohne Ablaufdatum: nur mit «auchOhneDatum» (Reiter Login).
+ */
+export function entraWarnung(a: EntraAblauf, auchOhneDatum = false): Roh | '' {
+  if (a.stufe === 'ohne_login' || (a.stufe === 'fehlt' && !auchOhneDatum)) return '';
+  if (a.stufe === 'ok') {
+    return auchOhneDatum ? html`<div class="meldung ok entra-warnung">Der Entra-Schlüssel gilt bis ${datumCh(a.datum)} (noch ${a.tage} Tage).
+      <a href="${ANLEITUNG_ENTRA}">Anleitung zum Erneuern</a></div>` : '';
+  }
+  const klasse = a.stufe === 'abgelaufen' ? 'fehler' : 'hinweis';
+  return html`<div class="meldung ${klasse} entra-warnung" role="${a.stufe === 'abgelaufen' ? 'alert' : 'status'}">
+  <span>${ablaufText(a, datumCh)}${a.stufe === 'fehlt' ? ' Trage es ein. Dann warnt das Cockpit 30 Tage vorher.' : ''}</span>
+  <a class="knopf${a.stufe === 'fehlt' ? '' : ' haupt'}" href="${ANLEITUNG_ENTRA}">Anleitung zum Erneuern</a>
+</div>`;
 }
 
 /** Rahmen aller Reiter: Kopf mit Reitern, Hinweis «Neustart nötig», Inhalt. */
@@ -129,6 +164,7 @@ function konfigReiter(deps: Abhaengigkeiten, kx: Kontext, reiter: EinstellungRei
   const r = REITER.find((x) => x.id === reiter)!;
   return einstellungenSeite(deps, kx, reiter, html`
 <p class="unter">Diese Werte stehen in der Datei <code>${q.pfad}</code>. Änderungen wirken erst nach einem Neustart des Servers. Passwörter und Schlüssel zeigt die Seite nie an. Ein leeres Feld lässt den Wert unverändert.</p>
+${reiter === 'login' ? entraWarnung(entraAblaufVon(deps), true) : ''}
 ${z.fehler ? html`<div class="meldung fehler" role="alert">${z.fehler}</div>` : ''}
 <form method="post" action="${PFAD}" class="stapel">
   ${formFelder(kx, r.href)}
@@ -154,6 +190,58 @@ ${reiter === 'server' ? html`<section class="abschnitt" id="neustart">
     <button type="submit" class="knopf">Neu starten</button></form>`
     : html`<p class="unter">Ein Neustart über diese Seite ist hier nicht möglich.</p>`}
 </section>` : ''}`);
+}
+
+/** Link direkt zu «Zertifikate und Geheimnisse» der App im Entra Admin Center. Nur mit einer gültigen Client-ID. */
+function entraLink(clientId: string): string {
+  return /^[0-9a-fA-F-]{36}$/.test(clientId)
+    ? `https://entra.microsoft.com/#view/Microsoft_AAD_RegisteredApps/ApplicationMenuBlade/~/Credentials/appId/${clientId}`
+    : 'https://entra.microsoft.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade';
+}
+
+/** Anleitung: Entra-Schlüssel erneuern und den neuen Wert direkt hier eintragen (Wunsch Yann 23.11.2026). */
+function anleitungEntra(deps: Abhaengigkeiten, kx: Kontext): string {
+  const q = quelleVon(deps);
+  const stand = zeilen(q);
+  const w = kuenftigeWerte(q);
+  const geheim = stand.zeilen.find((x) => x.d.schluessel === 'ENTRA_CLIENT_SECRET')!;
+  const ablauf = stand.zeilen.find((x) => x.d.schluessel === 'ENTRA_SECRET_ABLAUF')!;
+  const gesperrt = geheim.gesperrt || ablauf.gesperrt;
+  return einstellungenSeite(deps, kx, 'login', html`
+${entraWarnung(entraAblaufVon(deps), true)}
+<section class="abschnitt">
+  <h2>Entra-Schlüssel erneuern</h2>
+  <p>Der Login braucht einen geheimen Clientschlüssel aus Microsoft Entra. Er gilt höchstens 2 Jahre. Erneuere ihn vor dem Ablauf. Du brauchst dazu keinen Zugang zum Server.</p>
+  <ol class="schritte anleitung">
+    <li>Öffne das <a href="${entraLink(w.ENTRA_CLIENT_ID)}" target="_blank" rel="noopener noreferrer">Microsoft Entra Admin Center</a> und melde dich mit einem Admin-Konto an. Du brauchst die Rolle «Anwendungsadministrator» oder höher.</li>
+    <li>Wähle <strong>Entra ID › App-Registrierungen › Alle Anwendungen</strong>. Öffne die App mit der Anwendungs-ID <code>${w.ENTRA_CLIENT_ID || '(nicht gesetzt)'}</code>. Der Link oben öffnet sie meist direkt.</li>
+    <li>Wähle links <strong>Zertifikate und Geheimnisse</strong>, dann den Reiter <strong>Geheime Clientschlüssel</strong>.</li>
+    <li>Klicke <strong>Neuer geheimer Clientschlüssel</strong>. Schreibe als Beschreibung z. B. «Einsatzplaner ${inZweiJahren().slice(0, 4)}». Wähle als Ablauf <strong>24 Monate</strong>. Klicke <strong>Hinzufügen</strong>.</li>
+    <li>Kopiere sofort die Spalte <strong>Wert</strong>, nicht die «Geheime ID». Entra zeigt den Wert nur jetzt. Später ist er verborgen.</li>
+    <li>Füge den Wert unten ein. Setze das Ablaufdatum aus der Spalte <strong>Läuft ab</strong>. Bei 24 Monaten hilft der Knopf «Heute + 2 Jahre».</li>
+    <li>Klicke <strong>Speichern</strong>. Mit dem Häkchen startet der Server danach neu. Erst dann gilt der neue Schlüssel.</li>
+    <li>Melde dich ab und wieder an. So prüfst du den neuen Schlüssel.</li>
+    <li>Lösche den alten Schlüssel in Entra erst nach dieser Prüfung (Papierkorb-Symbol in seiner Zeile). Bis dahin funktionieren beide.</li>
+  </ol>
+  <p class="unter warn-text">Ein falscher Wert sperrt nach dem Neustart den Login. Lösche darum den alten Schlüssel in Entra nicht vorher. Der alte Stand der Datei bleibt als <code>${q.pfad}.vorher</code>.</p>
+</section>
+<section class="abschnitt" id="eintragen">
+  <h2>Neuen Schlüssel eintragen</h2>
+  ${gesperrt
+    ? html`<p class="unter">Schlüssel oder Ablaufdatum kommen aus einer Umgebungsvariablen. Du kannst sie nur auf dem Server ändern.</p>`
+    : html`<form method="post" action="${PFAD}" class="stapel" data-normal>
+    ${formFelder(kx, reiterPfad('login'))}
+    <input type="hidden" name="reiter" value="login">
+    <input type="hidden" name="version" value="${stand.version}">
+    <div class="feld"><label for="w_ENTRA_CLIENT_SECRET">Wert des neuen Schlüssels</label>
+      <input id="w_ENTRA_CLIENT_SECRET" name="w_ENTRA_CLIENT_SECRET" type="password" autocomplete="new-password" required maxlength="1000">
+      <p class="unter">Das Tool speichert den Wert in <code>${q.pfad}</code> und zeigt ihn nie wieder an.</p></div>
+    <div class="feld"><label for="w_ENTRA_SECRET_ABLAUF">Ablaufdatum (Spalte «Läuft ab»)</label>
+      <span class="knopfreihe"><input id="w_ENTRA_SECRET_ABLAUF" name="w_ENTRA_SECRET_ABLAUF" type="date" required value="${ablauf.wert}">${plusZweiJahreKnopf('w_ENTRA_SECRET_ABLAUF')}</span></div>
+    ${deps.neustart ? html`<label class="haken"><input type="checkbox" name="neustart" value="1" checked> Server danach neu starten. Die Seiten anderer Benutzer sind kurz gesperrt.</label>` : ''}
+    <div class="knopfreihe"><button type="submit" class="knopf haupt">Speichern</button></div>
+  </form>`}
+</section>`);
 }
 
 async function protokollReiter(deps: Abhaengigkeiten, kx: Kontext): Promise<string> {
@@ -192,8 +280,15 @@ export function registriereKonfiguration(app: Express, deps: Abhaengigkeiten): v
         trotzdem: eingaben.trotzdem === '1',
       });
       if (aenderungen.length) log('info', `Konfiguration geändert von ${kx.benutzer!.name}: ${aenderungen.map((a) => a.schluessel).join(', ')}.`);
+      const mitNeustart = aenderungen.some((a) => !DEFINITIONEN.find((d) => d.schluessel === a.schluessel)?.sofort);
+      // Neuer Entra-Schlüssel über die Anleitung: auf Wunsch gleich neu starten.
+      if (mitNeustart && eingaben.neustart === '1' && deps.neustart) {
+        starteNeu(res, reiterPfad(reiter), `Gespeichert: ${aenderungen.length} Wert${aenderungen.length === 1 ? '' : 'e'}. `);
+        return;
+      }
+      const text = `Gespeichert: ${aenderungen.length} Wert${aenderungen.length === 1 ? '' : 'e'}.`;
       zurueck(req, res, reiterPfad(reiter), aenderungen.length
-        ? `Gespeichert: ${aenderungen.length} Wert${aenderungen.length === 1 ? '' : 'e'}. Die Änderung wirkt nach einem Neustart.`
+        ? mitNeustart ? `${text} Die Änderung wirkt nach einem Neustart.` : text
         : 'Keine Änderung.');
     } catch (e) {
       if (!(e instanceof Eingabefehler)) throw e;
@@ -208,17 +303,26 @@ export function registriereKonfiguration(app: Express, deps: Abhaengigkeiten): v
     }
   });
 
+  /** Antwort «Der Server startet neu» und Neustart nach 300 ms. */
+  const starteNeu = (res: Response, ziel: string, vorher = '') => {
+    const neustart = deps.neustart!;
+    log('info', `Neustart über Admin › Einstellungen durch ${k(res).benutzer!.name}.`);
+    // Die Seite lädt sich nach 10 Sekunden selbst neu (Header «Refresh», kein Skript nötig).
+    res.setHeader('Refresh', `10; url=${ziel}`);
+    res.send(seite(k(res), 'Neustart', 'einstellungen', html`${seitenKopf({ titel: 'Neustart' })}<p class="meldung hinweis">${vorher}Der Server startet neu. Die Seite lädt sich in 10 Sekunden neu.</p>`));
+    // Alle anderen Seiten zeigen bis zum Neustart das Fenster «Bitte warten» und laden danach neu.
+    setzeWartung('neustart');
+    setTimeout(() => neustart(), 300).unref();
+  };
+
+  app.get(ANLEITUNG_ENTRA, nurAdmin, (_req, res) => {
+    res.send(anleitungEntra(deps, k(res)));
+  });
+
   app.post(`${PFAD}/neustart`, nurAdmin, (req, res) => {
     if (!deps.neustart) throw new Eingabefehler('Ein Neustart über diese Seite ist hier nicht möglich.');
     if (req.body?.bestaetigt !== '1') throw new Eingabefehler('Bestätige den Neustart mit dem Häkchen.');
-    log('info', `Neustart über Admin › Einstellungen durch ${k(res).benutzer!.name}.`);
-    // Die Seite lädt sich nach 10 Sekunden selbst neu (Header «Refresh», kein Skript nötig).
-    res.setHeader('Refresh', `10; url=${reiterPfad('server')}`);
-    res.send(seite(k(res), 'Neustart', 'einstellungen', html`${seitenKopf({ titel: 'Neustart' })}<p class="meldung hinweis">Der Server startet neu. Die Seite lädt sich in 10 Sekunden neu.</p>`));
-    // Alle anderen Seiten zeigen bis zum Neustart das Fenster «Bitte warten» und laden danach neu.
-    setzeWartung('neustart');
-    const neustart = deps.neustart;
-    setTimeout(() => neustart(), 300).unref();
+    starteNeu(res, reiterPfad('server'));
   });
 
   app.post(`${PFAD}/smtp-test`, nurAdmin, async (req, res) => {

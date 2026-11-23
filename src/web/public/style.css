@@ -1312,3 +1312,7 @@ body.handy .fenster { width: 100vw; max-width: 100vw; margin: auto 0 0; border-r
 body.handy .frage-fenster { margin: auto; width: calc(100vw - 1.5rem); border-radius: 12px; }
 .handy-chips a .chip-zeit { font-weight: 600; color: var(--text); }
 .he-schicht-name { color: var(--text); font-weight: 600; }
+
+/* Warnung zum Entra-Schlüssel (Wunsch Yann 23.11.2026): Text links, Knopf rechts. */
+.entra-warnung { display: flex; flex-wrap: wrap; gap: .6rem; align-items: center; justify-content: space-between; }
+.anleitung li { margin-bottom: .45rem; }

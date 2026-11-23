@@ -7,9 +7,9 @@ import { copyFileSync, existsSync, readFileSync, renameSync, statSync, writeFile
 import { leseEnvDatei } from '../config.js';
 import { alle, transaktion, type Db } from '../db/db.js';
 import { Eingabefehler } from './eingabe.js';
-import { isoUtc } from './zeit.js';
+import { istDatum, isoUtc } from './zeit.js';
 
-export type Art = 'text' | 'port' | 'stunde' | 'url' | 'urls' | 'mail' | 'geheim' | 'janein' | 'pfad' | 'host' | 'branch' | 'name';
+export type Art = 'text' | 'port' | 'stunde' | 'url' | 'urls' | 'mail' | 'geheim' | 'janein' | 'pfad' | 'host' | 'branch' | 'name' | 'datum';
 
 export interface Definition {
   schluessel: string;
@@ -21,6 +21,8 @@ export interface Definition {
   pflicht?: boolean;
   /** Warnung: Ein falscher Wert sperrt den Zugang zum Tool. */
   heikel?: boolean;
+  /** Der Wert wirkt sofort, ohne Neustart (z. B. ein Datum für eine Warnung). */
+  sofort?: boolean;
 }
 
 export const GRUPPEN = ['Server', 'Datenbank', 'Ordner', 'Login mit Microsoft Entra', 'Mail', 'Clubdesk', 'Tagesexport und SharePoint', 'Update'] as const;
@@ -43,6 +45,7 @@ export const DEFINITIONEN: Definition[] = [
   { schluessel: 'ENTRA_TENANT_ID', gruppe: 'Login mit Microsoft Entra', titel: 'Mandanten-ID (Tenant ID)', hilfe: 'Aus dem Entra Admin Center, App-Registrierung › Übersicht.', art: 'text', standard: '', heikel: true },
   { schluessel: 'ENTRA_CLIENT_ID', gruppe: 'Login mit Microsoft Entra', titel: 'Anwendungs-ID (Client ID)', hilfe: 'Aus dem Entra Admin Center, App-Registrierung › Übersicht.', art: 'text', standard: '', heikel: true },
   { schluessel: 'ENTRA_CLIENT_SECRET', gruppe: 'Login mit Microsoft Entra', titel: 'Geheimer Clientschlüssel', hilfe: 'Aus dem Entra Admin Center, App-Registrierung › Zertifikate und Geheimnisse. Den Wert, nicht die ID.', art: 'geheim', standard: '', heikel: true },
+  { schluessel: 'ENTRA_SECRET_ABLAUF', gruppe: 'Login mit Microsoft Entra', titel: 'Ablaufdatum des Clientschlüssels', hilfe: 'Spalte «Läuft ab» unter Zertifikate und Geheimnisse. Ab 30 Tage vorher warnt das Cockpit. Wirkt sofort, ohne Neustart.', art: 'datum', standard: '', sofort: true },
 
   { schluessel: 'SMTP_HOST', gruppe: 'Mail', titel: 'SMTP-Server', hilfe: 'Für Exchange Online: smtp.office365.com. Leer = keine Mails.', art: 'text', standard: '' },
   { schluessel: 'SMTP_PORT', gruppe: 'Mail', titel: 'SMTP-Port', hilfe: '587 (STARTTLS) oder 465 (TLS).', art: 'port', standard: '587', pflicht: true },
@@ -201,6 +204,13 @@ export function pruefeWert(d: Definition, roh: unknown): string {
     case 'branch':
       if (!/^[A-Za-z0-9._\/-]+$/.test(w) || w.includes('..') || w.startsWith('-')) throw new Eingabefehler(`${feld} enthält unerlaubte Zeichen.`);
       return w;
+    case 'datum': {
+      // Das Datumsfeld sendet JJJJ-MM-TT. Von Hand geht auch TT.MM.JJJJ.
+      const ch = /^(\d{1,2})\.(\d{1,2})\.(\d{4})$/.exec(w);
+      const iso = ch ? `${ch[3]}-${ch[2].padStart(2, '0')}-${ch[1].padStart(2, '0')}` : w;
+      if (!istDatum(iso)) throw new Eingabefehler(`${feld} ist kein gültiges Datum.`);
+      return iso;
+    }
     case 'janein':
       if (w !== '0' && w !== '1') throw new Eingabefehler(`${feld}: Wähle ja oder nein.`);
       return w;
@@ -242,7 +252,7 @@ export function zeilen(q: Quelle): { version: string; zeilen: Zeile[] } {
         wert: d.art === 'geheim' ? '' : gesperrt ? q.laufend[d.schluessel] ?? '' : datei,
         gesetzt: gesperrt ? !!q.laufend[d.schluessel] : !!datei,
         gesperrt,
-        neustartNoetig: !gesperrt && dateiWirksam !== laufend,
+        neustartNoetig: !gesperrt && !d.sofort && dateiWirksam !== laufend,
       };
     }),
   };

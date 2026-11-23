@@ -9,6 +9,7 @@ import { k } from './kontext.js';
 import { seite, seitenKopf } from './views/layout.js';
 import { istSoll, knopfPost, punktMarke, publiziertMarke, zeitraum } from './views/teile.js';
 import { jetztIso } from '../domain/zeit.js';
+import { entraAblaufVon, entraWarnung } from './routes-konfiguration.js';
 
 const WOCHENTAG = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
 const MONAT = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
@@ -63,6 +64,7 @@ export function registriereStart(app: Express, deps: Abhaengigkeiten): void {
 
     const inhalt = html`
 ${seitenKopf({ ueber: heuteText(), titel: 'Cockpit', aktionen: html`<a class="knopf haupt" href="/einsaetze/neu">+ Neuer Einsatz</a>` })}
+${kx.benutzer!.rolle === 'admin' ? entraWarnung(entraAblaufVon(deps)) : ''}
 <section class="karte zu-tun" aria-labelledby="zu-tun-titel">
   <div class="karte-kopf">
     <h2 id="zu-tun-titel">Zu tun <small>${punkte.length} ${punkte.length === 1 ? 'Punkt' : 'Punkte'}</small></h2>

@@ -522,6 +522,17 @@
     ziel.focus();
   });
 
+  // Knopf «Heute + 2 Jahre» beim Ablaufdatum des Entra-Schlüssels (Wunsch Yann 23.11.2026). Der Server rechnet das Datum aus.
+  document.addEventListener('click', function (ev) {
+    var knopf = ev.target.closest ? ev.target.closest('[data-datum-setzen]') : null;
+    if (!knopf) return;
+    var ziel = document.getElementById(knopf.getAttribute('data-datum-ziel'));
+    if (!ziel) return;
+    ziel.value = knopf.getAttribute('data-datum-setzen');
+    ziel.dispatchEvent(new Event('input', { bubbles: true }));
+    ziel.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+
   // ---------- Reiter «Schichten»: Personen verschieben (Wunsch Yann 20.11.2026) ----------
   // Ziehen einer Karte in eine andere Spalte wählt die Schicht im Menü ⇄ und sendet dessen Formular.
   // Ohne Ziehen (Handy, Tastatur, ohne Skript) geht dasselbe über das Menü ⇄.
