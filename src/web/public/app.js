@@ -668,6 +668,12 @@
 
     fetch(form.action, { method: 'POST', body: inhalt, credentials: 'same-origin', headers: { 'X-Live-Formular': '1' } })
       .then(function (r) {
+        if (r.status === 503 && r.headers.get('x-wartung')) {
+          // Update oder Neustart: Der Server speichert nichts. wartung.js merkt sich die Eingaben.
+          freigeben();
+          melde('einsatz:abgelehnt', { form: form, grund: r.headers.get('x-wartung') });
+          return null;
+        }
         var art = r.headers.get('content-type') || '';
         if (art.indexOf('text/html') === -1) {
           // Keine Seite (z. B. eine Datei): normal senden.
@@ -702,6 +708,8 @@
       })
       .catch(function () {
         freigeben();
+        // Während eines Updates zeigt wartung.js das Fenster statt dieser Meldung.
+        if (!melde('einsatz:sendefehler', { form: form })) return;
         meldeFehler('Die Verbindung zum Server ist unterbrochen. Prüfe, ob die Änderung gespeichert ist, und versuche es erneut.');
       });
   });
@@ -913,8 +921,17 @@
     holeNeuenStand();
   };
 
+  // Jede Live-Meldung geht auch an wartung.js (Start-Kennung und Sperre während eines Updates).
+  var melde = function (name, daten) {
+    var e;
+    try { e = new CustomEvent(name, { detail: daten || {}, cancelable: true }); } catch (x) { return true; }
+    return document.dispatchEvent(e);
+  };
   var lies = function (ev) {
-    try { return JSON.parse(ev.data).nr; } catch (e) { return null; }
+    var d = null;
+    try { d = JSON.parse(ev.data); } catch (e) { return null; }
+    melde('einsatz:live', d);
+    return d && d.nr;
   };
 
   // Ersatz: alle 10 Sekunden nachfragen, solange keine Live-Meldung ankommt.
@@ -927,7 +944,7 @@
           if (r.status === 401) { stoppeLive(); return null; }
           return r.ok ? r.json() : null;
         })
-        .then(function (d) { if (d) neueNr(d.nr); })
+        .then(function (d) { if (d) { melde('einsatz:live', d); neueNr(d.nr); } })
         .catch(function () { /* beim nächsten Mal erneut */ });
     }, 10000);
     liveZeigen();
@@ -951,9 +968,11 @@
     quelle.addEventListener('stand', function (ev) { verbunden = true; stoppeAbfrage(); neueNr(lies(ev)); });
     quelle.addEventListener('aenderung', function (ev) { verbunden = true; stoppeAbfrage(); neueNr(lies(ev)); });
     quelle.addEventListener('puls', function (ev) { verbunden = true; stoppeAbfrage(); neueNr(lies(ev)); });
+    quelle.addEventListener('wartung', function (ev) { verbunden = true; stoppeAbfrage(); neueNr(lies(ev)); });
     quelle.addEventListener('error', function () {
       verbunden = false;
       liveZeigen();
+      melde('einsatz:getrennt');
       // 401 oder Server weg: Der Browser versucht es selbst erneut. Bis dahin hilft die Abfrage.
       starteAbfrage();
     });

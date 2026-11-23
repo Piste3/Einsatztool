@@ -5,6 +5,7 @@ import type { Express, Response } from 'express';
 import type { Abhaengigkeiten } from './app.js';
 import { aenderungsStand, hoereAenderungen } from '../db/aenderungen.js';
 import { k } from './kontext.js';
+import { hoereWartung, liveDaten } from './wartung.js';
 
 /** Pfade der Live-Aktualisierung. Sie verlängern die Sitzung nicht. */
 export const LIVE_PFAD = '/live';
@@ -56,20 +57,24 @@ export function registriereLive(app: Express, _deps: Abhaengigkeiten): void {
     };
     // Nach einem Abbruch verbindet sich der Browser nach 3 Sekunden neu.
     res.write('retry: 3000\n\n');
-    sende('stand', { nr: aenderungsStand() });
+    // Jede Meldung trägt die Start-Kennung und die Sperre (Update). So erkennt die Seite die neue Version.
+    sende('stand', { nr: aenderungsStand(), ...liveDaten() });
 
     let zeitgeber: NodeJS.Timeout | null = null;
     const abmelden = hoereAenderungen(() => {
       if (zeitgeber) return;
       zeitgeber = setTimeout(() => {
         zeitgeber = null;
-        sende('aenderung', { nr: aenderungsStand() });
+        sende('aenderung', { nr: aenderungsStand(), ...liveDaten() });
       }, BUENDELN_MS);
     });
-    const puls = setInterval(() => sende('puls', { nr: aenderungsStand() }), PULS_MS);
+    // Beginn und Ende einer Sperre gehen sofort an alle Seiten.
+    const wartungAbmelden = hoereWartung(() => sende('wartung', { nr: aenderungsStand(), ...liveDaten() }));
+    const puls = setInterval(() => sende('puls', { nr: aenderungsStand(), ...liveDaten() }), PULS_MS);
 
     res.on('close', () => {
       abmelden();
+      wartungAbmelden();
       clearInterval(puls);
       if (zeitgeber) clearTimeout(zeitgeber);
       offen.delete(res);
@@ -82,6 +87,6 @@ export function registriereLive(app: Express, _deps: Abhaengigkeiten): void {
       res.status(401).json({ fehler: 'nicht angemeldet' });
       return;
     }
-    res.json({ nr: aenderungsStand() });
+    res.json({ nr: aenderungsStand(), ...liveDaten() });
   });
 }

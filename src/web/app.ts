@@ -17,6 +17,7 @@ import { html } from './html.js';
 import { einfacheSeite } from './views/layout.js';
 import { multipart } from './multipart.js';
 import { k, sicheresZiel, type Kontext, type Meldung } from './kontext.js';
+import { postFrei, wartung, wartungsText } from './wartung.js';
 import { registriereOeffentlich } from './routes-oeffentlich.js';
 import { registriereLogin } from './routes-login.js';
 import { registriereStart } from './routes-start.js';
@@ -268,6 +269,17 @@ export function erstelleApp(deps: Abhaengigkeiten): express.Express {
       return;
     }
     next();
+  });
+
+  // Sperre während eines Updates oder Neustarts: Änderungen angemeldeter Benutzer warten.
+  // Die Seite (wartung.js) merkt sich die Eingaben und setzt sie nach dem Neustart wieder ein.
+  // Das öffentliche Formular bleibt offen. Externe Personen sehen kein Fenster.
+  app.use((req, res, next) => {
+    const w = wartung();
+    if (!w || req.method !== 'POST' || !k(res).benutzer || req.path === '/anmeldung' || postFrei(req.path)) return next();
+    res.status(503).setHeader('X-Wartung', w.grund);
+    res.setHeader('Retry-After', '30');
+    res.send(einfacheSeite('Bitte warten', html`<h1>Bitte warten</h1><p>${wartungsText(w)}</p><p>Deine Eingabe ist noch nicht gespeichert. Gehe zurück und sende sie in einer Minute erneut.</p>`));
   });
 
   registriereOeffentlich(app, deps);

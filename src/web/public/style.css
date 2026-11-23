@@ -1106,3 +1106,17 @@ body.laedt::before {
 }
 @keyframes laedt-balken { from { transform: scaleX(0); } to { transform: scaleX(0.9); } }
 @media (prefers-reduced-motion: reduce) { body.laedt::before { animation: none; transform: scaleX(0.5); } }
+/* Sperre während eines Updates (wartung.js). Das Fenster liegt über allem und sperrt jede Eingabe. */
+.wartung-fenster { width: min(440px, calc(100vw - 1.5rem)); }
+.wartung-fenster::backdrop { background: rgba(10, 10, 12, .6); backdrop-filter: blur(2px); }
+.wartung-inhalt { padding: 1.4rem 1.4rem 1.2rem; display: flex; flex-direction: column; align-items: center; gap: .55rem; text-align: center; }
+.wartung-inhalt h2 { margin: .2rem 0 0; font-size: 1.15rem; }
+.wartung-inhalt p { margin: 0; }
+.wartung-stand { font-weight: 500; }
+.wartung-rad {
+  width: 2.2rem; height: 2.2rem; border-radius: 50%;
+  border: 3px solid var(--linie-stark); border-top-color: var(--akzent);
+  animation: wartung-drehen 1s linear infinite;
+}
+@keyframes wartung-drehen { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .wartung-rad { animation-duration: 3s; } }

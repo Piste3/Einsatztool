@@ -70,6 +70,11 @@ export interface UpdaterOptionen {
   /** Konfigurationsdatei (einsatzplaner.env). Das Update sichert sie vor jeder Änderung. */
   envDatei?: string | null;
   neustart: () => void;
+  /**
+   * Sperre für alle anderen Benutzer: true ab dem Sichern bis zum Neustart.
+   * false, wenn das Update abbricht. Dann arbeiten alle auf dem alten Stand weiter.
+   */
+  wartung?: (aktiv: boolean) => void;
   ausfuehren?: Ausfuehren;
 }
 
@@ -178,7 +183,18 @@ export class Updater {
     this.zustand.laeuft = true;
     this.zustand.phase = 'laeuft';
     this.speichere();
-    void this.fuehreUpdateAus();
+    // Ab hier sperrt das Tool die Eingaben aller anderen Benutzer (Wunsch Yann, 23.11.2026).
+    // Grund: Die Sicherung zeigt den Stand vor dem Update. Nach dem Neustart geht es mit der neuen Version weiter.
+    this.o.wartung?.(true);
+    void this.fuehreUpdateAus()
+      .catch((e: unknown) => {
+        this.notiz('Unerwarteter Fehler', false, (e as Error).message);
+        this.ende('fehler');
+      })
+      .finally(() => {
+        // Ohne Neustart endet die Sperre sofort.
+        if (this.zustand.phase !== 'fertig') this.o.wartung?.(false);
+      });
     return true;
   }
 

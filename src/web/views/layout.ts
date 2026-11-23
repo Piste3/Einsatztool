@@ -5,13 +5,14 @@ import type { Kontext } from '../kontext.js';
 import { symbol, type SymbolName } from './symbole.js';
 import { aenderungsStand } from '../../db/aenderungen.js';
 import { letzteAktion } from '../../domain/rueckgaengig.js';
+import { START_ID, wartung, wartungsText } from '../wartung.js';
 
 export type Bereich =
   | 'start' | 'einsaetze' | 'rueckmeldungen' | 'formular' | 'personen' | 'unbekannt' | 'archiv'
   | 'import' | 'export' | 'benutzer' | 'einstellungen' | 'konfiguration' | 'update';
 
 /** Ändert sich bei jedem Start. So lädt der Browser nach einem Update das neue CSS und Skript. */
-const VERSION = Date.now().toString(36);
+const VERSION = START_ID;
 
 function link(bereich: Bereich, aktiv: Bereich | null, href: string, text: string, icon: SymbolName, zaehler?: number): Roh {
   return html`<li><a href="${href}"${wenn(bereich === aktiv, new Roh(' aria-current="page" class="aktiv"'))}>
@@ -34,6 +35,7 @@ function kopfDaten(titel: string): Roh {
 <script src="/static/thema.js?v=${VERSION}"></script>
 <link rel="icon" type="image/png" href="/static/favicon.png?v=${VERSION}">
 <link rel="stylesheet" href="/static/style.css?v=${VERSION}">
+<script src="/static/wartung.js?v=${VERSION}" defer></script>
 <script src="/static/app.js?v=${VERSION}" defer></script>`;
 }
 
@@ -45,11 +47,12 @@ function kopfDaten(titel: string): Roh {
 export function seite(k: Kontext, titel: string, aktiv: Bereich | null, inhalt: Roh, extra: { breit?: boolean; ohneLive?: boolean; fest?: boolean } = {}): string {
   const b = k.benutzer!;
   const istAdmin = b.rolle === 'admin';
+  const w = wartung();
   return `<!doctype html>${html`<html lang="de">
 <head>
 ${kopfDaten(`${titel} · Einsatzplaner`)}
 </head>
-<body class="mit-leiste" data-live-nr="${aenderungsStand()}"${extra.ohneLive ? new Roh(' data-ohne-live') : ''}>
+<body class="mit-leiste" data-live-nr="${aenderungsStand()}" data-start="${VERSION}"${w ? html` data-wartung="${w.grund}"` : ''}${extra.ohneLive ? new Roh(' data-ohne-live') : ''}>
 <header class="kopf-mobil">
   <button type="button" class="knopf-menue" aria-controls="leiste" aria-expanded="false" aria-label="Menü öffnen">${symbol('menue')}</button>
   <span class="marke-klein">Einsatzplaner</span>
@@ -91,6 +94,7 @@ ${kopfDaten(`${titel} · Einsatzplaner`)}
   </div>
 </nav>
 <main class="inhalt${extra.breit ? ' breit' : ''}${extra.fest ? ' fest' : ''}">
+  ${w && !extra.ohneLive ? html`<p class="meldung hinweis wartung-hinweis" role="status">${wartungsText(w)} Änderungen speichert das Tool erst danach.</p>` : ''}
   ${k.meldung ? toast(k.meldung.art, k.meldung.text, k.meldung.rueckgaengig
     ? toastKnopf(k, 'rueckgaengig', k.meldung.rueckgaengig)
     : k.meldung.wiederholen ? toastKnopf(k, 'wiederholen', k.meldung.wiederholen) : undefined) : ''}

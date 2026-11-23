@@ -1,5 +1,6 @@
 // Start des Einsatzplaners: ein einziger Prozess mit Web-Server und Jobs.
 import { beendeLive } from './web/routes-live.js';
+import { setzeWartung } from './web/wartung.js';
 import type { Server } from 'node:http';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -82,6 +83,7 @@ async function start(): Promise<void> {
         sichern: (datei) => schreibeSicherung(db, datei),
         envDatei: envDateiPfad(),
         neustart: () => beenden(NEUSTART_CODE),
+        wartung: (aktiv) => setzeWartung(aktiv ? 'update' : null),
       })
     : null;
 

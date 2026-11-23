@@ -18,6 +18,7 @@ import { html, Roh } from './html.js';
 import { k, type Kontext } from './kontext.js';
 import { formFelder, seite, seitenKopf } from './views/layout.js';
 import { datumZeit } from './views/teile.js';
+import { setzeWartung } from './wartung.js';
 
 const PFAD = '/admin/konfiguration';
 
@@ -147,7 +148,7 @@ ${reiter === 'mail' ? html`<section class="abschnitt" id="smtp">
 ${reiter === 'server' ? html`<section class="abschnitt" id="neustart">
   <h2>Server neu starten</h2>
   ${deps.neustart
-    ? html`<p>Der Server beendet sich. Das Startskript startet ihn nach 3 Sekunden neu. Laufende Arbeit anderer Benutzer geht nicht verloren, offene Formulare müssen sie neu senden.</p>
+    ? html`<p>Der Server beendet sich. Das Startskript startet ihn nach 3 Sekunden neu. Die Seiten anderer Benutzer sind bis zum Neustart gesperrt. Ihre offenen Eingaben bleiben erhalten.</p>
   <form method="post" action="${PFAD}/neustart" class="stapel" data-normal>${formFelder(kx)}
     <label class="haken wichtig"><input type="checkbox" name="bestaetigt" value="1" required> Server jetzt neu starten.</label>
     <button type="submit" class="knopf">Neu starten</button></form>`
@@ -214,6 +215,8 @@ export function registriereKonfiguration(app: Express, deps: Abhaengigkeiten): v
     // Die Seite lädt sich nach 10 Sekunden selbst neu (Header «Refresh», kein Skript nötig).
     res.setHeader('Refresh', `10; url=${reiterPfad('server')}`);
     res.send(seite(k(res), 'Neustart', 'einstellungen', html`${seitenKopf({ titel: 'Neustart' })}<p class="meldung hinweis">Der Server startet neu. Die Seite lädt sich in 10 Sekunden neu.</p>`));
+    // Alle anderen Seiten zeigen bis zum Neustart das Fenster «Bitte warten» und laden danach neu.
+    setzeWartung('neustart');
     const neustart = deps.neustart;
     setTimeout(() => neustart(), 300).unref();
   });
