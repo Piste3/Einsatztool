@@ -14,56 +14,66 @@ function zahlen(teil: Partial<SchichtZahlen>): SchichtZahlen {
   return { teilnehmende: 0, bestaetigt: 0, unbestaetigt: 0, unsicher: 0, nachricht: 0, abgemeldet: 0, fremd: 0, essen: 0, rollen: [], ...teil };
 }
 
-test('T32 Zu tun: ohne Soll nie «besetzt», fehlende Personen, Unbestätigte, Einsatzleitung', () => {
+test('T32 Zu tun: nur wichtige Punkte, eine Zeile je Art, keine Doppel (Wunsch Yann 23.11.2026)', () => {
   const jetzt = '2026-11-19T12:00:00.000Z';
-  const basis = { jetzt, warnZahl: new Map<number, number>(), schichtWarnungen: new Map() };
 
   // Eine Schicht ohne Soll mit einer Anmeldung: «Kein Soll» und «wartet auf Bestätigung», keine Meldung «besetzt».
   const ohneSoll = einsatzLage({
-    ...basis,
+    jetzt,
     schichten: [{ id: 1, name: 'Stadtlauf', end_zeit: '2026-11-21T22:00:00.000Z', soll_anzahl: null }],
     zahlen: new Map([[1, zahlen({ unbestaetigt: 1 })]]),
     mitEinsatzleitung: null,
   });
-  assert.deepEqual(ohneSoll.punkte.map((p) => p.art), ['kein_soll', 'unbestaetigt']);
-  assert.equal(ohneSoll.punkte[0].text, 'Kein Soll festgelegt.');
-  assert.equal(ohneSoll.punkte[1].text, '1 Anmeldung wartet auf Bestätigung.');
+  assert.deepEqual(ohneSoll.punkte.map((p) => p.art), ['unbestaetigt', 'kein_soll']);
+  assert.equal(ohneSoll.punkte[0].text, '1 Anmeldung wartet auf Bestätigung.');
+  assert.equal(ohneSoll.punkte[1].text, 'Kein Soll festgelegt.');
   assert.equal(ohneSoll.unbestaetigt, 1);
 
-  // Zwei Schichten: Name vor dem Text, keine Nullen, Einsatzleitung fehlt in einer Schicht.
+  // Bild von Yann: Rollenbedarf steht in der Schichten-Tabelle, nicht in «Zu tun». Einsatzleitung nur einmal.
+  const bild = einsatzLage({
+    jetzt,
+    schichten: [{ id: 9, name: 'Messe', end_zeit: '2026-11-21T22:00:00.000Z', soll_anzahl: 5 }],
+    zahlen: new Map([[9, zahlen({ rollen: [{ rolle: 'Busfahrer', ist: 0, soll: 1 }, { rolle: 'Einsatzleitung', ist: 0, soll: 1 }] })]]),
+    mitEinsatzleitung: new Set(),
+  });
+  assert.deepEqual(bild.punkte.map((p) => [p.art, p.text, p.unter]), [
+    ['fehlt', '5 Personen fehlen.', '0 von 5 bestätigt.'],
+    ['einsatzleitung', 'Keine Einsatzleitung eingeteilt.', undefined],
+  ]);
+
+  // Zwei Schichten: eine Zeile je Art, keine Nullen. Unsichere und Warnungen erscheinen nicht.
   const zwei = einsatzLage({
-    ...basis,
-    warnZahl: new Map([[2, 0], [3, 2]]),
+    jetzt,
     schichten: [
       { id: 2, name: 'Tagschicht', end_zeit: '2026-11-23T18:00:00.000Z', soll_anzahl: 10 },
       { id: 3, name: 'Abendschicht', end_zeit: '2026-11-23T22:00:00.000Z', soll_anzahl: 6 },
     ],
-    zahlen: new Map([[2, zahlen({ teilnehmende: 4, unbestaetigt: 2, unsicher: 1 })], [3, zahlen({ teilnehmende: 6 })]]),
+    zahlen: new Map([[2, zahlen({ teilnehmende: 4, unbestaetigt: 2, unsicher: 1 })], [3, zahlen({ teilnehmende: 5, unbestaetigt: 1, nachricht: 2 })]]),
     mitEinsatzleitung: new Set([2]),
   });
-  assert.deepEqual(zwei.punkte.map((p) => p.art), ['fehlt', 'unbestaetigt', 'offen', 'warnung', 'einsatzleitung']);
-  assert.equal(zwei.punkte[0].text, 'Tagschicht: 6 Personen fehlen.');
-  assert.equal(zwei.punkte[2].text, 'Tagschicht: 1 Person ist unsicher.');
-  assert.equal(zwei.punkte[2].status, 'unsicher');
-  assert.equal(zwei.punkte[3].text, 'Abendschicht: 2 Warnungen bei Einträgen.');
-  assert.equal(zwei.punkte[4].text, 'Keine Einsatzleitung eingeteilt: Abendschicht.');
-  assert.equal(zwei.punkte[4].schichtId, 3);
+  assert.deepEqual(zwei.punkte.map((p) => p.art), ['fehlt', 'einsatzleitung', 'unbestaetigt']);
+  assert.equal(zwei.punkte[0].text, '7 Personen fehlen.');
+  assert.equal(zwei.punkte[0].unter, 'Tagschicht 4 von 10, Abendschicht 5 von 6 bestätigt.');
+  assert.equal(zwei.punkte[0].schichtId, null);
+  assert.equal(zwei.punkte[1].text, 'Keine Einsatzleitung eingeteilt: Abendschicht.');
+  assert.equal(zwei.punkte[1].schichtId, 3);
+  assert.equal(zwei.punkte[2].text, '3 Anmeldungen warten auf Bestätigung.');
 
   // Alles besetzt und bestätigt: leere Liste. Vergangene Schichten zählen nicht.
   const fertig = einsatzLage({
-    ...basis,
+    jetzt,
     schichten: [
       { id: 4, name: 'A', end_zeit: '2026-11-23T18:00:00.000Z', soll_anzahl: 2 },
       { id: 5, name: 'B', end_zeit: '2026-11-01T18:00:00.000Z', soll_anzahl: 9 },
     ],
-    zahlen: new Map([[4, zahlen({ teilnehmende: 2 })], [5, zahlen({ unbestaetigt: 3 })]]),
+    zahlen: new Map([[4, zahlen({ teilnehmende: 2, unsicher: 3 })], [5, zahlen({ unbestaetigt: 3 })]]),
     mitEinsatzleitung: null,
   });
   assert.deepEqual(fertig.punkte, []);
   assert.equal(fertig.vorbei, false);
   assert.equal(fertig.unbestaetigt, 0);
 
-  const vorbei = einsatzLage({ ...basis, schichten: [{ id: 5, name: 'B', end_zeit: '2026-11-01T18:00:00.000Z', soll_anzahl: 9 }], zahlen: new Map([[5, zahlen({})]]), mitEinsatzleitung: null });
+  const vorbei = einsatzLage({ jetzt, schichten: [{ id: 5, name: 'B', end_zeit: '2026-11-01T18:00:00.000Z', soll_anzahl: 9 }], zahlen: new Map([[5, zahlen({})]]), mitEinsatzleitung: null });
   assert.equal(vorbei.vorbei, true);
 });
 

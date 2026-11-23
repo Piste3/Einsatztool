@@ -20,6 +20,7 @@ import { tenueVorlagen, type TenueVorlage } from '../domain/tenue.js';
 import { zeileAlsHtml } from '../domain/textformat.js';
 import { Eingabefehler, Konflikt, KANAL_TEXT, STATUS_TEXT, id as leseId, type Kanal, type Status } from '../domain/eingabe.js';
 import { einsatzLage, type ZuTunPunkt } from '../domain/einsatz-lage.js';
+const EINSATZLEITUNG = 'Einsatzleitung';
 import { filterFuerListe } from '../domain/filter.js';
 import { alle } from '../db/db.js';
 import { html, mehrzeilig, Roh } from './html.js';
@@ -31,7 +32,7 @@ import {
 import { datumChVonIso, jetztIso, lokalesDatum, lokaleZeit, wochentagKurz } from '../domain/zeit.js';
 
 /** Name der Rolle für die Einsatzleitung (wie im Aufgebot, Regel 20.3). */
-const EINSATZLEITUNG = 'Einsatzleitung';
+
 import { telefonText, hauptnummer } from '../domain/personen.js';
 import { nachRangTiefZuerst } from '../domain/listen.js';
 
@@ -181,8 +182,6 @@ ${liste.length === 0 ? html`<p class="leer">Keine Einsätze.</p>` : html`
       jetzt,
       schichten,
       zahlen,
-      warnZahl,
-      schichtWarnungen: new Map(ids.map((sid) => [sid, w.get(sid)!.schicht])),
       mitEinsatzleitung: elRolle ? new Set(elEintraege.map((a) => a.schicht_id)) : null,
     });
 
@@ -209,18 +208,16 @@ ${e.bemerkung_extern ? html`<p class="bemerkung"><strong>Extern:</strong> ${mehr
     // ---------- Zu tun ----------
     const symbol = (p: ZuTunPunkt) => {
       const farbe = p.art === 'fehlt' || p.art === 'einsatzleitung' ? 'rot' : 'orange';
-      const text = p.anzahl > 0 ? String(p.anzahl) : p.art === 'offen' ? '?' : '!';
+      const text = p.anzahl > 0 ? String(p.anzahl) : '!';
       return html`<span class="zutun-symbol z-${farbe}" aria-hidden="true">${text}</span>`;
     };
     const knopf = (p: ZuTunPunkt) => {
-      const besetzen = (filter: BesetzenFilter) => besetzenPfad(e.id, schichten.length > 1 ? p.schichtId : null, filter);
+      const besetzen = (filter: BesetzenFilter) => besetzenPfad(e.id, schichten.length > 1 ? (p.schichtId ?? 'alle') : null, filter);
       switch (p.art) {
         case 'fehlt': return html`<a class="knopf klein" href="${besetzen('nicht')}">Anfragen ›</a>`;
         case 'kein_soll': return html`<a class="knopf klein" href="/einsaetze/${e.id}/schichten">Soll setzen</a>`;
         case 'unbestaetigt': return html`<span class="knopfreihe"><a class="knopf klein" href="${besetzenPfad(e.id, schichten.length > 1 ? 'alle' : null, 'neu')}">Ansehen ›</a>${knopfPost(kx, `/einsaetze/${e.id}/alle-bestaetigen`, lage.unbestaetigt === 1 ? 'Bestätigen' : `Alle ${lage.unbestaetigt} bestätigen`, {}, 'knopf klein', hier)}</span>`;
-        case 'offen': return html`<a class="knopf klein" href="${besetzen('offen')}">Nachfassen ›</a>`;
         case 'einsatzleitung': return html`<a class="knopf klein" href="${besetzen('alle')}">Eintragen ›</a>`;
-        case 'warnung': return html`<a class="knopf klein" href="${besetzen('warnung')}">Zeigen ›</a>`;
         case 'zeit_offen': return html`<a class="knopf klein" href="/einsaetze/${e.id}/schichten">Zeiten eintragen</a>`;
         default: return html`<a class="knopf klein" href="${besetzen('alle')}">Zeigen ›</a>`;
       }
