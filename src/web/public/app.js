@@ -2,6 +2,7 @@
 //
 // Live-Aktualisierung:
 // - Formulare speichern im Hintergrund. Die Seite lädt nicht neu.
+// - Links im Tool, Filter und Zurück/Vorwärts laden die neue Seite im Hintergrund (Navigation ohne Neuladen).
 // - Der Server meldet jede Änderung sofort (Server-Sent Events, GET /live).
 //   Dann holt die Seite ihren neuen Stand und tauscht den Inhalt aus.
 // - Offene Eingaben bleiben stehen: ein Formular mit Änderungen, das Feld mit dem Cursor,
@@ -349,10 +350,12 @@
     var scrollStand = Array.prototype.map.call(altMain.querySelectorAll('.rahmen'), function (r) { return [r.scrollTop, r.scrollLeft]; });
     var seitenScroll = window.scrollY;
     altMain.replaceChildren.apply(altMain, Array.prototype.slice.call(neuMain.childNodes));
-    altMain.querySelectorAll('.rahmen').forEach(function (r, i) {
-      if (scrollStand[i]) { r.scrollTop = scrollStand[i][0]; r.scrollLeft = scrollStand[i][1]; }
-    });
-    if (window.scrollY !== seitenScroll) window.scrollTo(0, seitenScroll);
+    if (!o.neueSeite) {
+      altMain.querySelectorAll('.rahmen').forEach(function (r, i) {
+        if (scrollStand[i]) { r.scrollTop = scrollStand[i][0]; r.scrollLeft = scrollStand[i][1]; }
+      });
+      if (window.scrollY !== seitenScroll) window.scrollTo(0, seitenScroll);
+    }
     if (neu.title) document.title = neu.title;
     var nr = neu.body && neu.body.getAttribute('data-live-nr');
     if (nr !== null && nr !== undefined) liveNr = nr;
@@ -682,10 +685,16 @@
           var vorher = location.pathname + location.search;
           var ziel = new URL(r.url, location.href);
           var neueAdresse = r.redirected && ziel.origin === location.origin && (ziel.pathname + ziel.search) !== vorher;
+          if (neu.body && neu.body.hasAttribute('data-ohne-live')) {
+            // Zielseite mit eigenem Neuladen (z. B. Admin › Update).
+            location.assign(ziel.href);
+            return;
+          }
           if (!tausche(neu, { schuetzen: true, ausser: form })) {
             ersetzeAlles(neu);
           } else if (neueAdresse) {
-            history.pushState({ live: true }, '', ziel.pathname + ziel.search + ziel.hash);
+            merkeStand();
+            history.pushState({ live: true, scroll: 0 }, '', ziel.pathname + ziel.search + ziel.hash);
             window.scrollTo(0, 0);
           }
           freigeben();
@@ -697,8 +706,152 @@
       });
   });
 
-  // Zurück und Vorwärts im Browser: die Seite normal laden.
-  window.addEventListener('popstate', function () { location.reload(); });
+  // ---------- Navigation ohne Neuladen ----------
+  // Ein Klick auf einen Link im Tool und ein Filterformular (GET) laden die neue Seite im Hintergrund.
+  // Das Skript tauscht Navigation und Inhalt aus und ändert die Adresse (history.pushState).
+  // Zurück und Vorwärts im Browser laden ebenfalls ohne Neuladen.
+  // Normal geladen werden: neuer Tab, Dateien (CSV, ICS), andere Websites, data-normal,
+  // Seiten ohne Navigation (z. B. Anmeldung) und Seiten mit data-ohne-live (Admin › Update).
+  var stilVersion = function (doc) {
+    var l = doc.querySelector('link[rel="stylesheet"]');
+    return l ? l.getAttribute('href') : '';
+  };
+  var navNr = 0;
+
+  /** Merkt die Scrollposition der aktuellen Seite im Verlauf des Browsers. */
+  var merkeStand = function () {
+    try { history.replaceState({ live: true, scroll: window.scrollY }, '', location.href); } catch (e) { /* ohne Verlauf */ }
+  };
+
+  /**
+   * Lädt eine Seite im Hintergrund und zeigt sie an.
+   * o.verlauf: 'push' (neuer Eintrag), 'keiner' (Zurück/Vorwärts). o.scroll: Position nach Zurück.
+   * o.fokus: [Ziel des Formulars, Feldname] – dieses Feld erhält den Cursor wieder.
+   */
+  var navigiere = function (adresse, o) {
+    o = o || {};
+    var nr = ++navNr;
+    var vorherPfad = location.pathname;
+    if (o.verlauf === 'push') merkeStand();
+    body.classList.add('laedt');
+    fensterZu();
+    if (frage && frage.open) frage.close();
+    var fertig = function () { if (nr === navNr) body.classList.remove('laedt'); };
+    fetch(adresse, { credentials: 'same-origin', headers: { Accept: 'text/html', 'X-Live-Navigation': '1' } })
+      .then(function (r) {
+        if (nr !== navNr) return null;
+        var art = r.headers.get('content-type') || '';
+        if (art.indexOf('text/html') === -1 || r.headers.get('refresh')) {
+          // Datei oder Seite mit eigenem Neuladen: normal öffnen.
+          fertig();
+          location.assign(r.url || adresse);
+          return null;
+        }
+        return r.text().then(function (text) {
+          if (nr !== navNr) return;
+          var neu = lese(text);
+          var ziel = new URL(r.url || adresse, location.href);
+          if (ziel.hash === '' && adresse.indexOf('#') >= 0) ziel.hash = adresse.slice(adresse.indexOf('#'));
+          var neueSeite = ziel.pathname !== vorherPfad;
+          var passt = neu.body && neu.body.hasAttribute('data-live-nr') && !neu.body.hasAttribute('data-ohne-live') &&
+            stilVersion(neu) === stilVersion(document);
+          if (!passt || !tausche(neu, { neueSeite: neueSeite })) {
+            location.assign(ziel.href);
+            return;
+          }
+          if (o.verlauf === 'push') history.pushState({ live: true, scroll: 0 }, '', ziel.pathname + ziel.search + ziel.hash);
+          else if (r.redirected) history.replaceState({ live: true, scroll: 0 }, '', ziel.pathname + ziel.search + ziel.hash);
+          // Menü auf dem Handy schliessen.
+          var leiste = document.getElementById('leiste');
+          if (leiste) leiste.classList.remove('offen');
+          document.querySelectorAll('.knopf-menue').forEach(function (k) { k.setAttribute('aria-expanded', 'false'); });
+          // Cursor im Filterfeld behalten.
+          if (o.fokus) {
+            var feldNeu = null;
+            document.querySelectorAll('main.inhalt form').forEach(function (f) {
+              if (!feldNeu && f.getAttribute('action') === o.fokus[0] && f.elements[o.fokus[1]]) feldNeu = f.elements[o.fokus[1]];
+            });
+            if (feldNeu && feldNeu.focus) { try { feldNeu.focus({ preventScroll: true }); } catch (e) { /* ohne Fokus */ } }
+          }
+          // Scrollen: Zurück = alte Position, Sprungmarke = dorthin, neue Seite = nach oben.
+          var marke = ziel.hash ? document.getElementById(decodeURIComponent(ziel.hash.slice(1))) : null;
+          if (typeof o.scroll === 'number') window.scrollTo(0, o.scroll);
+          else if (marke) marke.scrollIntoView();
+          else if (neueSeite) window.scrollTo(0, 0);
+          // Für Bildschirmleser: Der Titel der neuen Seite erhält den Fokus.
+          if (neueSeite && !o.fokus) {
+            var h = document.querySelector('main.inhalt h1');
+            if (h) { h.setAttribute('tabindex', '-1'); try { h.focus({ preventScroll: true }); } catch (e) { /* ohne Fokus */ } }
+          }
+        });
+      })
+      .catch(function () {
+        // Server nicht erreichbar oder Weiterleitung auf eine andere Website (Login): normal laden.
+        if (nr === navNr) location.assign(adresse);
+      })
+      .then(function () {
+        fertig();
+        if (nr === navNr && liveWartet) holeNeuenStand();
+      });
+  };
+
+  /** Prüft, ob ein Link im Tool ohne Neuladen öffnen darf. */
+  var linkImTool = function (a, ev) {
+    if (ev.defaultPrevented || ev.button !== 0 || ev.ctrlKey || ev.metaKey || ev.shiftKey || ev.altKey) return false;
+    if (a.hasAttribute('download') || a.closest('[data-normal]')) return false;
+    if (a.target && a.target !== '_self') return false;
+    var href = a.getAttribute('href');
+    if (!href || href.charAt(0) === '#') return false;
+    var url;
+    try { url = new URL(a.href, location.href); } catch (e) { return false; }
+    if (url.origin !== location.origin) return false;
+    if (/\.(csv|ics|sql|png|pdf)$/i.test(url.pathname) || url.pathname.indexOf('/static/') === 0) return false;
+    if (/^\/(login|logout|anmeldung)(\/|$)/.test(url.pathname)) return false;
+    // Nur die Sprungmarke ändert sich: Das macht der Browser selbst.
+    if (url.pathname === location.pathname && url.search === location.search && url.hash) return false;
+    return true;
+  };
+
+  document.addEventListener('click', function (ev) {
+    var a = ev.target && ev.target.closest ? ev.target.closest('a[href]') : null;
+    if (!a || !linkImTool(a, ev)) return;
+    ev.preventDefault();
+    var url = new URL(a.href, location.href);
+    navigiere(url.pathname + url.search + url.hash, { verlauf: 'push' });
+  });
+
+  // Formulare mit GET (Filter, Suche): im Hintergrund laden.
+  document.addEventListener('submit', function (ev) {
+    var form = ev.target;
+    if (ev.defaultPrevented || !form || (form.getAttribute('method') || 'get').toLowerCase() !== 'get') return;
+    if (form.closest('[data-normal]') || (form.target && form.target !== '_self')) return;
+    var url;
+    try { url = new URL(form.action, location.href); } catch (e) { return; }
+    if (url.origin !== location.origin) return;
+    ev.preventDefault();
+    var daten;
+    try {
+      daten = new FormData(form, ev.submitter || undefined);
+    } catch (e) {
+      daten = new FormData(form);
+      if (ev.submitter && ev.submitter.name) daten.append(ev.submitter.name, ev.submitter.value);
+    }
+    var suche = new URLSearchParams();
+    daten.forEach(function (w, n) { if (typeof w === 'string') suche.append(n, w); });
+    url.search = suche.toString();
+    var aktiv = document.activeElement;
+    var fokus = aktiv && aktiv.form === form && aktiv.name && aktiv.type !== 'submit' ? [form.getAttribute('action'), aktiv.name] : null;
+    form.removeAttribute('data-geaendert');
+    navigiere(url.pathname + url.search + url.hash, { verlauf: 'push', fokus: fokus });
+  });
+
+  // Zurück und Vorwärts im Browser: Seite im Hintergrund laden, Scrollposition wiederherstellen.
+  try { history.scrollRestoration = 'manual'; } catch (e) { /* älterer Browser */ }
+  merkeStand();
+  window.addEventListener('popstate', function (ev) {
+    var scroll = ev.state && typeof ev.state.scroll === 'number' ? ev.state.scroll : 0;
+    navigiere(location.pathname + location.search + location.hash, { verlauf: 'keiner', scroll: scroll });
+  });
 
   // ---------- Live: Änderungen anderer Benutzer ----------
 
@@ -725,7 +878,7 @@
 
   var holeNeuenStand = function () {
     if (gestoppt) return;
-    if (holtGerade || sendetFormular || document.visibilityState === 'hidden') {
+    if (holtGerade || sendetFormular || body.classList.contains('laedt') || document.visibilityState === 'hidden') {
       liveWartet = true;
       return;
     }

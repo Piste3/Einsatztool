@@ -1098,3 +1098,11 @@ tr.ordnen-zeile.zieht { opacity: .45; }
   .bemerkung-vergleich { grid-template-columns: minmax(0, 1fr); }
   .formular-vorschau { padding: .5rem; }
 }
+/* Navigation ohne Neuladen: Balken oben, solange die neue Seite lädt. */
+body.laedt { cursor: progress; }
+body.laedt::before {
+  content: ""; position: fixed; top: 0; left: 0; height: 3px; width: 100%; z-index: 1000;
+  background: var(--akzent, #2563eb); transform-origin: left; animation: laedt-balken 1.2s ease-out infinite;
+}
+@keyframes laedt-balken { from { transform: scaleX(0); } to { transform: scaleX(0.9); } }
+@media (prefers-reduced-motion: reduce) { body.laedt::before { animation: none; transform: scaleX(0.5); } }
