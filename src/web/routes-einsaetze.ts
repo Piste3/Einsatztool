@@ -36,6 +36,12 @@ import { telefonText, hauptnummer } from '../domain/personen.js';
 import { nachRangTiefZuerst } from '../domain/listen.js';
 
 /** Häkchen «mehrere Schichten»: Formular-Eingabe nach einem Fehler, sonst Wert aus der Datenbank (Vorgabe ja). */
+// Kürzel der üblichen Rollen in der Spalte «Wer» (Wunsch Yann 23.11.2026). Andere Rollen zeigen den vollen Namen.
+const ROLLE_KURZ: Record<string, string> = { Einsatzleitung: 'EL', Busfahrer: 'BF', Sektorchef: 'SC' };
+function rolleKurz(name: string): string | null {
+  return ROLLE_KURZ[name] ?? null;
+}
+
 function mehrereGewaehlt(e: Partial<Record<string, unknown>>): boolean {
   if (e.formular_mehrere_feld !== undefined) return e.formular_mehrere === '1';
   return Number(e.formular_mehrere ?? 1) !== 0;
@@ -321,7 +327,7 @@ ${!schichten.length ? html`<p class="leer">Keine Schichten.</p>` : html`<div cla
       const offen = !!f || offenId === String(s.id) || schichten.length === 1;
       const ziel = `/einsaetze/${e.id}/schichten?offen=${s.id}#schicht-${s.id}`;
       const z = zahlen.get(s.id)!;
-      const feld = (n: string, text: string, eingabe: Roh, hinweis = '') => html`<div class="feld"><label for="${id(n)}">${text}</label>${eingabe}${hinweis ? html`<small>${hinweis}</small>` : ''}</div>`;
+      const feld = (n: string, text: string | Roh, eingabe: Roh, hinweis = '') => html`<div class="feld"><label for="${id(n)}">${text}</label>${eingabe}${hinweis ? html`<small>${hinweis}</small>` : ''}</div>`;
       const eingabe = (n: string, typ = 'text', extra = '') => html`<input id="${id(n)}" name="${n}" type="${typ}" value="${v(n)}"${new Roh(extra)}>`;
       const textfeld = (n: string, max: number) => html`<textarea id="${id(n)}" name="${n}" rows="2" maxlength="${max}">${v(n)}</textarea>`;
       return html`<article class="schicht-akk${s.end_zeit <= jetzt ? ' vergangen' : ''}" id="schicht-${s.id}">
@@ -356,10 +362,10 @@ ${!schichten.length ? html`<p class="leer">Keine Schichten.</p>` : html`<div cla
             ${rollen.length
               // Soll und Bedarf je Rolle in einer Reihe (Wunsch Yann 23.11.2026). Rollen sind frei benannt, darum keine Symbole.
               ? html`<div class="akk-reihe bedarf">
-              ${feld('soll_anzahl', 'Soll TN', html`<input id="${id('soll_anzahl')}" name="soll_anzahl" type="number" min="0" max="100000" value="${v('soll_anzahl')}" title="Soll Teilnehmende gesamt">`)}
-              ${rollen.map((r, ri) => html`<div class="feld"><label for="${id(`rolle-${ri}`)}" title="${r.name}">${r.name}</label><input id="${id(`rolle-${ri}`)}" type="number" min="0" max="10000" name="rollen[${r.name}]" value="${rolleWert(r.name)}" placeholder="–"></div>`)}
+              ${feld('soll_anzahl', html`<abbr title="Soll Teilnehmende gesamt">TN</abbr>`, html`<input id="${id('soll_anzahl')}" name="soll_anzahl" type="number" min="0" max="100000" value="${v('soll_anzahl')}" title="Soll Teilnehmende gesamt">`)}
+              ${rollen.map((r, ri) => html`<div class="feld"><label for="${id(`rolle-${ri}`)}">${rolleKurz(r.name) ? html`<abbr title="${r.name}">${rolleKurz(r.name)}</abbr>` : r.name}</label><input id="${id(`rolle-${ri}`)}" type="number" min="0" max="10000" name="rollen[${r.name}]" value="${rolleWert(r.name)}" placeholder="–"></div>`)}
             </div>
-            <small>Soll TN = Teilnehmende gesamt. Daneben der Bedarf je Rolle.</small>`
+            <small>TN = Soll Teilnehmende gesamt. Daneben der Bedarf je Rolle.</small>`
               : feld('soll_anzahl', 'Soll (Teilnehmende)', eingabe('soll_anzahl', 'number', ' min="0" max="100000"'))}
             <div class="akk-reihe alter-rang">
               ${feld('min_alter', 'Mindestalter', eingabe('min_alter', 'number', ' min="0" max="120"'))}
