@@ -2,6 +2,7 @@
 // Der Admin pflegt Titel und Text in Admin › Einstellungen. Bausteine in geschweiften Klammern,
 // z. B. {ort}, füllt das Tool je Schicht aus. Ohne gespeicherte Vorlage gilt die Standardvorlage.
 // Regel: Eine Zeile mit Bausteinen, die alle leer sind, entfällt (wie «Leere Felder entfallen», 17.1).
+// Ausnahme (Wunsch Yann 24.11.2026): Die Zeile mit der Einsatzleitung bleibt immer, der Wert ist dann leer.
 import { alle, type Db } from '../db/db.js';
 import { ladeSchicht, type SchichtMitEinsatz } from './schicht.js';
 import { terminTitel } from './ics.js';
@@ -50,15 +51,19 @@ export const BAUSTEINE: Record<string, string> = {
 
 export type Bausteinwerte = Record<string, string>;
 
+/** Bausteine, deren Zeile auch ohne Wert stehen bleibt (Wunsch Yann 24.11.2026). */
+const IMMER_ZEIGEN = new Set(['einsatzleitung', 'einsatzleitung_telefon']);
+
 /**
  * Setzt die Werte ein. Eine Zeile mit mindestens einem Baustein, deren Bausteine alle leer sind, entfällt.
+ * Ausnahme: Eine Zeile mit einem Baustein aus IMMER_ZEIGEN bleibt stehen.
  * Unbekannte Bausteine bleiben stehen. Mehr als eine Leerzeile hintereinander wird zu einer.
  */
 export function fuelleClubdeskVorlage(vorlage: string, werte: Bausteinwerte): string {
   const zeilen: string[] = [];
   for (const zeile of vorlage.replace(/\r\n?/g, '\n').split('\n')) {
     const namen = [...zeile.matchAll(/\{([a-z_]+)\}/g)].map((m) => m[1]).filter((n) => n in werte);
-    if (namen.length > 0 && namen.every((n) => !werte[n])) continue;
+    if (namen.length > 0 && namen.every((n) => !werte[n]) && !namen.some((n) => IMMER_ZEIGEN.has(n))) continue;
     // In einer Tabellenzeile wird ein Zeilenumbruch im Wert zu \\ (neue Zeile in der Zelle).
     const tabelle = /^\s*\|/.test(zeile);
     zeilen.push(zeile.replace(/\{([a-z_]+)\}/g, (ganz, n: string) => (n in werte ? (tabelle ? werte[n].replace(/\n/g, ' \\\\ ') : werte[n]) : ganz)));

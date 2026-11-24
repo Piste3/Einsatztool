@@ -16,6 +16,8 @@ test('T38a Eine Zeile mit nur leeren Bausteinen entfällt, Text ohne Baustein bl
   const v = 'Ort: {ort}\nTenue: {tenue}\n\n\n\nFest\n{ort} / {tenue}\n{unbekannt}';
   assert.equal(fuelleClubdeskVorlage(v, { ort: 'Marktplatz', tenue: '' }), 'Ort: Marktplatz\n\nFest\nMarktplatz / \n{unbekannt}');
   assert.equal(fuelleClubdeskVorlage(v, { ort: '', tenue: '' }), 'Fest\n{unbekannt}');
+  // Die Zeile mit der Einsatzleitung bleibt immer, auch ohne Wert (Wunsch Yann 24.11.2026).
+  assert.equal(fuelleClubdeskVorlage('A\n| EL | EL: {einsatzleitung_telefon} |\nLeitung: {einsatzleitung}', { einsatzleitung: '', einsatzleitung_telefon: '' }), 'A\n| EL | EL:  |\nLeitung:');
 });
 
 test('T38b Standardvorlage füllt die Angaben der Schicht aus, gespeicherte Vorlage gilt danach, auch im ICS', async () => {
@@ -23,13 +25,15 @@ test('T38b Standardvorlage füllt die Angaben der Schicht aus, gespeicherte Vorl
   try {
     const s = await einsatz(t.db, 'Basler Stadtlauf', inTagen(5, 12), inTagen(5, 23), 'Marktplatz');
     await schreibe(t.db, 'UPDATE schicht SET tenue = ?, abtreten_ort = ?, bemerkung_extern = ? WHERE id = ?', ['Ausgang', 'Barfi', 'Pünktlich', s.schichtId]);
-    // Standard: Vorlage von Yann (Tabelle mit Antreten, Abtreten, Einsatzleitung, Tenue). Leere Zeilen (Mindestalter, Einsatzleitung) entfallen.
+    // Standard: Vorlage von Yann (Tabelle mit Antreten, Abtreten, Einsatzleitung, Tenue). Leere Zeilen (Mindestalter) entfallen. Die Einsatzleitung bleibt leer stehen.
     const std = await clubdeskText(t.db, s.schichtId, O);
     assert.equal(std.titel, 'Basler Stadtlauf');
     assert.match(std.text, /^Anmerkung: Das unten/);
-    assert.match(std.text, /\nAntreten: \w+, \d\d\.\d\d\.\d{4} \d\d:\d\d, Marktplatz\nAbtreten: \w+, \d\d\.\d\d\.\d{4} \d\d:\d\d, Barfi\nTenue: Ausgang\n/);
+    assert.match(std.text, /\nAntreten: \w+, \d\d\.\d\d\.\d{4} \d\d:\d\d, Marktplatz\nAbtreten: \w+, \d\d\.\d\d\.\d{4} \d\d:\d\d, Barfi\nEinsatzleitung: EL:\nTenue: Ausgang\n/);
     assert.match(std.text, /Deine Teilnahme ist definitiv\. .*aufgebot@kkb\.ch/);
-    assert.doesNotMatch(std.text, /Mindestalter|Einsatzleitung:|\{|\*\*|\[rot\]/);
+    assert.match(std.text, /\nEinsatzleitung: EL:\n/);
+    assert.match(std.html, /<td><strong>Einsatzleitung<\/strong><\/td><td>EL:<\/td>/);
+    assert.doesNotMatch(std.text, /Mindestalter|\{|\*\*|\[rot\]/);
     assert.match(std.html, /<table class="cd-tabelle" border="1"[^>]*><tbody><tr><td><strong>Antreten<\/strong><\/td><td>/);
     assert.match(std.html, /<span class="text-rot" style="color:#e00000">definitiv<\/span>/);
     assert.match(std.html, /<h3>Basler Stadtlauf - Basler Stadtlauf<\/h3>/);
