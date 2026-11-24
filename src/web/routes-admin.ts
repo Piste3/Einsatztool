@@ -15,7 +15,7 @@ import { Eingabefehler, Konflikt, id as leseId, liste } from '../domain/eingabe.
 import { AENDERUNG_MELDEN, CLUBDESK_TERMIN, MAX_BETREFF, MAX_TEXT, MAX_TEXT_CLUBDESK, PLATZHALTER, istVorlage, ladeVorlage, speichereVorlage } from '../domain/vorlagen.js';
 import { BAUSTEINE, clubdeskText } from '../domain/clubdesk-text.js';
 import { AUSZEICHNUNG, fuerVorschau, zeileAlsHtml } from '../domain/textformat.js';
-import { aendereTenueVorlage, legeTenueVorlageAn, loescheTenueVorlage, ordneTenueVorlagen, tenueVorlagen, verschiebeTenueVorlage } from '../domain/tenue.js';
+import { aendereTenueVorlage, legeTenueVorlageAn, loescheTenueVorlage, ordneTenueVorlagen, setzeStandardTenue, tenueVorlagen, verschiebeTenueVorlage } from '../domain/tenue.js';
 import { eine } from '../db/db.js';
 import { jetztIso } from '../domain/zeit.js';
 import { feedStand } from '../domain/ical-abgleich.js';
@@ -278,13 +278,14 @@ ${liste.map((b) => html`<tr><td>${b.name}</td><td>${b.email}</td><td>${b.rolle =
 </section>
 <section class="abschnitt" id="tenue">
   <h2>Tenue-Vorlagen</h2>
-  <p class="unter">In Schicht und Einsatz wählst du eine Vorlage neben dem Feld «Tenue». Das Tool kopiert den Text ins Feld. Danach kannst du ihn ändern. Ändern oder Löschen einer Vorlage ändert keine Schicht. <code>**fett**</code> ergibt Fettdruck. Zieh eine Vorlage am Griff ⠿ an die richtige Stelle.</p>
+  <p class="unter">In Schicht und Einsatz wählst du eine Vorlage neben dem Feld «Tenue». Das Tool kopiert den Text ins Feld. Danach kannst du ihn ändern. Ändern oder Löschen einer Vorlage ändert keine Schicht. Ein neuer Einsatz übernimmt die Vorlage mit «Standard: ja». Höchstens eine Vorlage ist Standard. <code>**fett**</code> ergibt Fettdruck. Zieh eine Vorlage am Griff ⠿ an die richtige Stelle.</p>
   ${tv.length ? html`${ordnenForm(kx, '/admin/tenue', `${z}#tenue`, 'tenueliste')}
-  <div class="rahmen"><table class="tabelle mittig"><thead><tr><th class="ordnen-griff-kopf"><span class="sr">Ziehen</span></th><th>Name und Text</th><th>Vorschau</th><th></th></tr></thead><tbody data-ordnen="tenueliste">
+  <div class="rahmen"><table class="tabelle mittig"><thead><tr><th class="ordnen-griff-kopf"><span class="sr">Ziehen</span></th><th>Name und Text</th><th>Vorschau</th><th>Standard</th><th></th></tr></thead><tbody data-ordnen="tenueliste">
   ${tv.map((x, i) => html`<tr class="ordnen-zeile" data-ordnen-wert="${x.id}">
     <td class="ordnen-griff" title="Ziehen, um die Reihenfolge zu ändern" aria-hidden="true">⠿</td>
     <td><form method="post" action="/admin/tenue" class="zeilen-form tenue-form">${formFelder(kx, `${z}#tenue`)}<input type="hidden" name="aktion" value="aendern"><input type="hidden" name="id" value="${x.id}"><input name="name" value="${x.name}" required maxlength="100" aria-label="Name" class="tenue-name"><input name="text" value="${x.text}" required maxlength="255" aria-label="Text" class="tenue-text"><button class="knopf klein" type="submit">Speichern</button></form></td>
     <td class="formatiert">${new Roh(zeileAlsHtml(x.text))}</td>
+    <td>${knopfPost(kx, '/admin/tenue', x.standard ? 'ja' : 'nein', { aktion: 'standard', id: String(x.id), an: x.standard ? '0' : '1' }, `schalter${x.standard ? ' an' : ''}`, `${z}#tenue`)}</td>
     <td class="aktionen-rechts"><div class="knopfreihe">
       ${ordnenMenue(kx, '/admin/tenue', x.name, i > 0 ? { aktion: 'hoch', id: String(x.id) } : null, i < tv.length - 1 ? { aktion: 'runter', id: String(x.id) } : null, `${z}#tenue`)}
       <form method="post" action="/admin/tenue" class="inline" data-bestaetigen="Vorlage «${x.name}» löschen? Schichten behalten ihr Tenue.">${formFelder(kx, `${z}#tenue`)}<input type="hidden" name="aktion" value="loeschen"><input type="hidden" name="id" value="${x.id}"><button type="submit" class="knopf klein gefahr">Löschen</button></form>
@@ -420,6 +421,7 @@ ${liste.map((b) => html`<tr><td>${b.name}</td><td>${b.email}</td><td>${b.rolle =
       case 'hoch': await verschiebeTenueVorlage(db, leseId(b.id), 'hoch'); break;
       case 'runter': await verschiebeTenueVorlage(db, leseId(b.id), 'runter'); break;
       case 'loeschen': await loescheTenueVorlage(db, leseId(b.id)); meldung = 'Vorlage gelöscht.'; break;
+      case 'standard': await setzeStandardTenue(db, leseId(b.id), b.an === '1'); meldung = b.an === '1' ? 'Standard gesetzt. Neue Einsätze übernehmen diese Vorlage.' : 'Kein Standard mehr.'; break;
       case 'ordnen': await ordneTenueVorlagen(db, liste(b.reihenfolge).map((x) => leseId(x))); break;
       default: throw new Eingabefehler('Unbekannte Aktion.');
     }

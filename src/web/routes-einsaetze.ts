@@ -16,7 +16,7 @@ import { teilnehmerlisteCsv } from '../domain/export.js';
 import { besetzenAnsicht, besetzenPfad } from './views/besetzen.js';
 import { besetzenDaten, type BesetzenFilter, type BesetzenZeile } from '../domain/besetzen.js';
 import { raenge as ladeRaenge, rollen as ladeRollen } from '../domain/stammdaten.js';
-import { tenueVorlagen, type TenueVorlage } from '../domain/tenue.js';
+import { standardTenue, tenueVorlagen, type TenueVorlage } from '../domain/tenue.js';
 import { zeileAlsHtml } from '../domain/textformat.js';
 import { Eingabefehler, Konflikt, KANAL_TEXT, STATUS_TEXT, id as leseId, type Kanal, type Status } from '../domain/eingabe.js';
 import { einsatzLage, type ZuTunPunkt } from '../domain/einsatz-lage.js';
@@ -132,9 +132,12 @@ ${liste.length === 0 ? html`<p class="leer">Keine Einsätze.</p>` : html`
     res.send(seite(kx, archiv ? 'Archiv' : 'Einsätze', archiv ? 'archiv' : 'einsaetze', inhalt, { breit: true }));
   });
 
-  app.get('/einsaetze/neu', nurAufgebot, (_req, res) => {
+  app.get('/einsaetze/neu', nurAufgebot, async (_req, res) => {
     const kx = k(res);
-    res.send(seite(kx, 'Neuer Einsatz', 'einsaetze', html`${seitenKopf({ pfad: [{ text: 'Einsätze', href: '/einsaetze' }, { text: 'Neuer Einsatz' }], titel: 'Neuer Einsatz', angaben: ['Eine Standardschicht entsteht automatisch. Sie ist publiziert.'] })}${einsatzFormular(kx, '/einsaetze', {}, true, null)}`));
+    const st = await standardTenue(db);
+    const angaben = ['Eine Standardschicht entsteht automatisch. Sie ist publiziert.'];
+    if (st) angaben.push(`Tenue: Vorlage «${st.name}» (Standard).`);
+    res.send(seite(kx, 'Neuer Einsatz', 'einsaetze', html`${seitenKopf({ pfad: [{ text: 'Einsätze', href: '/einsaetze' }, { text: 'Neuer Einsatz' }], titel: 'Neuer Einsatz', angaben })}${einsatzFormular(kx, '/einsaetze', {}, true, null)}`));
   });
 
   app.post('/einsaetze', nurAufgebot, async (req, res) => {

@@ -182,12 +182,12 @@ export function bestaetigenFrage(a: { id: number | null; version: number | null;
  * Feld «Tenue» mit Auswahl der Tenue-Vorlagen (Wunsch Yann 20.11.2026).
  * Mit Skript kopiert app.js den Text ins Feld und leert die Auswahl. Ohne Skript ersetzt der Server das Feld durch die Vorlage.
  */
-export function tenueFeld(id: string, wert: string, vorlagen: { id: number; name: string; text: string }[]): Roh {
+export function tenueFeld(id: string, wert: string, vorlagen: { id: number; name: string; text: string; standard?: number }[]): Roh {
   const eingabe = html`<input id="${id}" name="tenue" maxlength="255" value="${wert}">`;
   if (!vorlagen.length) return html`${eingabe}<small>**fett** für Fettdruck.</small>`;
   return html`<div class="tenue-feld">${eingabe}
     <select name="tenue_vorlage" data-tenue-ziel="${id}" aria-label="Tenue-Vorlage wählen">
       <option value="">Vorlage …</option>
-      ${vorlagen.map((v) => html`<option value="${v.id}" data-text="${v.text}" title="${v.text}">${v.name}</option>`)}
+      ${vorlagen.map((v) => html`<option value="${v.id}" data-text="${v.text}" title="${v.text}">${v.name}${v.standard ? ' (Standard)' : ''}</option>`)}
     </select></div><small>Eine Vorlage ersetzt den Text. Danach kannst du ihn ändern. **fett** für Fettdruck.</small>`;
 }

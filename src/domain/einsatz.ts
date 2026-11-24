@@ -1,7 +1,7 @@
 // Einsätze: erstellen, ändern mit Vererbung, kopieren, löschen, Archiv (13.1, 13.3, 13.9, 21).
 import { alle, eine, schreibe, transaktion, type Db } from '../db/db.js';
 import { Eingabefehler, NichtGefunden, pflichtText, pruefeVersion, text } from './eingabe.js';
-import { tenueMitVorlage } from './tenue.js';
+import { standardTenue, tenueMitVorlage } from './tenue.js';
 import {
   istDatum,
   istZeit,
@@ -71,17 +71,21 @@ export async function erstelleEinsatz(db: Db, e: EinsatzNeu, benutzerId: number 
   const ende = zeitpunkt(endDatum, endZeit || '23:59', 'Ende');
   if (ende <= start) throw new Eingabefehler('Das Ende muss nach dem Start liegen.');
   return transaktion(db, async (c) => {
-    const r = await schreibe(c, 'INSERT INTO einsatz (name, ort, erstellt_am, erstellt_von) VALUES (?, ?, ?, ?)', [
+    // Wunsch Yann 24.11.2026: Einsatz und Standardschicht übernehmen den Text der Standard-Vorlage für das Tenue.
+    // Beide haben denselben Wert. So vererbt sich eine spätere Änderung am Einsatz auf die Schicht.
+    const tenue = (await standardTenue(c))?.text ?? null;
+    const r = await schreibe(c, 'INSERT INTO einsatz (name, ort, tenue, erstellt_am, erstellt_von) VALUES (?, ?, ?, ?, ?)', [
       name,
       ort,
+      tenue,
       jetztIso(),
       benutzerId,
     ]);
     const einsatzId = r.insertId;
     await schreibe(
       c,
-      'INSERT INTO schicht (einsatz_id, name, start_zeit, end_zeit, ort, publiziert, position, zeit_offen) VALUES (?, ?, ?, ?, ?, 1, 0, ?)',
-      [einsatzId, name, start, ende, ort, zeitOffen ? 1 : 0],
+      'INSERT INTO schicht (einsatz_id, name, start_zeit, end_zeit, ort, tenue, publiziert, position, zeit_offen) VALUES (?, ?, ?, ?, ?, ?, 1, 0, ?)',
+      [einsatzId, name, start, ende, ort, tenue, zeitOffen ? 1 : 0],
     );
     return einsatzId;
   });

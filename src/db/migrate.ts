@@ -144,6 +144,11 @@ const migrationen: { version: number; anweisungen: () => string[] }[] = [
       'ALTER TABLE formular_eingang ADD COLUMN formular MEDIUMTEXT NULL, ADD COLUMN eingabe TEXT NULL',
     ],
   },
+  // Version 11 (Wunsch Yann 24.11.2026): Eine Tenue-Vorlage ist der Standard. Ein neuer Einsatz übernimmt ihren Text.
+  {
+    version: 11,
+    anweisungen: () => ['ALTER TABLE tenue_vorlage ADD COLUMN standard TINYINT NOT NULL DEFAULT 0'],
+  },
 ];
 
 export async function migriere(db: Db): Promise<number> {

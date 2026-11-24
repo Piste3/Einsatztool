@@ -10,13 +10,15 @@ export interface TenueVorlage {
   name: string;
   text: string;
   reihenfolge: number;
+  /** 1 = Standard. Ein neuer Einsatz übernimmt diesen Text. Höchstens eine Vorlage ist Standard. */
+  standard: number;
 }
 
 /** Gleiche Länge wie das Feld «Tenue» in Einsatz und Schicht. */
 const MAX_TEXT = 255;
 
 export async function tenueVorlagen(db: Db): Promise<TenueVorlage[]> {
-  return alle<TenueVorlage>(db, 'SELECT id, name, text, reihenfolge FROM tenue_vorlage ORDER BY reihenfolge, id');
+  return alle<TenueVorlage>(db, 'SELECT id, name, text, reihenfolge, standard FROM tenue_vorlage ORDER BY reihenfolge, id');
 }
 
 function werte(nameRoh: unknown, textRoh: unknown): { name: string; text: string } {
@@ -47,6 +49,23 @@ export async function loescheTenueVorlage(db: Db, id: number): Promise<void> {
     const r = await schreibe(c, 'DELETE FROM tenue_vorlage WHERE id = ?', [id]);
     if (r.affectedRows === 0) throw new NichtGefunden('Vorlage nicht gefunden.');
   });
+}
+
+/**
+ * Standard-Vorlage (Wunsch Yann 24.11.2026). `an = true` macht die Vorlage zum Standard und nimmt den Standard allen anderen.
+ * `an = false` nimmt ihr den Standard. Danach gibt es keinen Standard.
+ */
+export async function setzeStandardTenue(db: Db, id: number, an: boolean): Promise<void> {
+  await transaktion(db, async (c) => {
+    if (!(await eine(c, 'SELECT id FROM tenue_vorlage WHERE id = ? FOR UPDATE', [id]))) throw new NichtGefunden('Vorlage nicht gefunden.');
+    if (an) await schreibe(c, 'UPDATE tenue_vorlage SET standard = IF(id = ?, 1, 0)', [id]);
+    else await schreibe(c, 'UPDATE tenue_vorlage SET standard = 0 WHERE id = ?', [id]);
+  });
+}
+
+/** Text der Standard-Vorlage oder null. Ein neuer Einsatz und seine Standardschicht übernehmen ihn. */
+export async function standardTenue(db: Db): Promise<TenueVorlage | null> {
+  return (await eine<TenueVorlage>(db, 'SELECT id, name, text, reihenfolge, standard FROM tenue_vorlage WHERE standard = 1 ORDER BY reihenfolge, id LIMIT 1')) ?? null;
 }
 
 /** Menü ⋮: einen Platz nach oben oder unten. */
