@@ -27,7 +27,7 @@ function initialen(name: string): string {
 }
 
 
-function kopfDaten(titel: string): Roh {
+function kopfDaten(titel: string, extraCss: string | null = null): Roh {
   return html`<meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light dark">
@@ -35,6 +35,7 @@ function kopfDaten(titel: string): Roh {
 <script src="/static/thema.js?v=${VERSION}"></script>
 <link rel="icon" type="image/png" href="/static/favicon.png?v=${VERSION}">
 <link rel="stylesheet" href="/static/style.css?v=${VERSION}">
+${extraCss ? html`<link rel="stylesheet" href="/static/${extraCss}?v=${VERSION}">` : ''}
 <script src="/static/wartung.js?v=${VERSION}" defer></script>
 <script src="/static/app.js?v=${VERSION}" defer></script>`;
 }
@@ -219,10 +220,10 @@ function zeitVor(ms: number): string {
 }
 
 /** Druckansicht ohne Seitenleiste. */
-export function druckseite(titel: string, inhalt: Roh, klasse = ''): string {
+export function druckseite(titel: string, inhalt: Roh, klasse = '', extraCss: string | null = null): string {
   return `<!doctype html>${html`<html lang="de">
 <head>
-${kopfDaten(titel)}
+${kopfDaten(titel, extraCss)}
 </head>
 <body class="druck ${klasse}">
 ${inhalt}

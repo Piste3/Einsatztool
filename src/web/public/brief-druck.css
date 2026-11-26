@@ -1,0 +1,8 @@
+/* Nur für die Druckseite des Aufgebots (Briefe).
+   Ohne Seitenrand: Das Adressfeld misst ab dem Blattrand (Fensterkuvert),
+   und der Browser hat keinen Platz für Kopf- und Fusszeile (Titel, Adresse, Seitenzahl, Datum). Wunsch Yann 26.11.2026. */
+@page { size: A4; margin: 0; }
+@page :first { margin: 0; }
+@media print {
+  .brief { height: 296mm; overflow: hidden; }
+}

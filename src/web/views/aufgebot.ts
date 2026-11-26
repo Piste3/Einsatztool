@@ -60,5 +60,5 @@ export function aufgebotSeite(liste: AufgebotDaten[], titel: string, zurueckHref
   <span>${anzahl} ${anzahl === 1 ? 'Brief' : 'Briefe'}</span>
 </div>
 ${luecken.length ? html`<div class="luecken nicht-drucken"><h2>Lücken vor dem Druck</h2>${luecken}</div>` : ''}
-${anzahl ? liste.map(briefeHtml) : html`<p class="nicht-drucken">Keine bestätigten Personen.</p>`}`, 'aufgebot');
+${anzahl ? liste.map(briefeHtml) : html`<p class="nicht-drucken">Keine bestätigten Personen.</p>`}`, 'aufgebot', 'brief-druck.css');
 }

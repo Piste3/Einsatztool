@@ -692,13 +692,12 @@ body.druck { background: var(--hg); padding: 1rem; }
   .rahmen { box-shadow: none; overflow: visible; }
   body.aufgebot { margin: 0; }
   /* Briefe ohne Seitenrand: Das Adressfeld misst ab dem Blattrand (Fensterkuvert). */
-  .brief { page: brief; box-shadow: none; margin: 0; width: 210mm; min-height: 0; break-after: page; }
+  .brief { box-shadow: none; margin: 0; width: 210mm; min-height: 0; break-after: page; }
   .brief a { color: #0000ee; text-decoration: underline; }
   .brief:last-of-type { break-after: auto; }
   a { color: #000; text-decoration: none; }
 }
 @page :first { margin-top: 12mm; }
-@page brief { size: A4; margin: 0; }
 
 /* Grosser Punkt für die Lage */
 .pille-punkt { display: inline-flex; }
