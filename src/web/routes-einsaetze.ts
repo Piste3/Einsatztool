@@ -703,23 +703,30 @@ export function einsatzReiter(einsatzId: number, aktiv: Ansicht, zahlen: { beset
   ];
 }
 
-/** Menü «Dokumente»: alles zum Drucken und Exportieren, nach Schicht gegliedert. */
-function dokumenteMenue(einsatzId: number, schichten: { id: number; name: string }[]): Roh {
-  const jeSchicht = (s: { id: number; name: string }) => [
-    html`<a href="/schichten/${s.id}/aufgebot" target="_blank" rel="noopener">Aufgebot (Briefe)</a>`,
-    html`<a href="/schichten/${s.id}/essensliste.csv">Essensliste (CSV)</a>`,
-    html`<a href="/schichten/${s.id}/ics">Kalendertermin (ICS)</a>`,
-    html`<a href="/schichten/${s.id}/termintext" target="_blank" rel="noopener">Text für Clubdesk-Termin</a>`,
-  ];
+/**
+ * Menü «Dokumente»: eine Zeile je Dokument, daneben die Wahl «Alle» oder eine Schicht (Wunsch Yann 26.11.2026: übersichtlicher).
+ * Eine Schicht heisst kurz nach ihrem Tag («Mo 23.11.»). Haben zwei Schichten denselben Tag, gilt der Name.
+ */
+function dokumenteMenue(einsatzId: number, schichten: { id: number; name: string; start_zeit: string }[]): Roh {
+  const tag = (s: { start_zeit: string }) => `${wochentagKurz(s.start_zeit)} ${datumChVonIso(s.start_zeit).slice(0, 6)}`;
+  const tageEindeutig = new Set(schichten.map(tag)).size === schichten.length;
+  const kurz = (s: { name: string; start_zeit: string }) => (tageEindeutig ? tag(s) : s.name);
+  const neuerTab = new Roh(' target="_blank" rel="noopener"');
+  const eine = schichten.length === 1;
+  const zeile = (titel: string, ganz: string | null, jeSchicht: ((id: number) => string) | null, tab: boolean) => html`<div class="dok-zeile">
+    <span class="dok-name">${titel}</span>
+    <span class="dok-wahl">${ganz ? html`<a href="${ganz}"${tab ? neuerTab : ''}>${!jeSchicht ? (tab ? 'Öffnen' : 'Herunterladen') : 'Alle'}</a>` : ''}${
+      jeSchicht && !(eine && ganz) ? schichten.map((s) => html`<a href="${jeSchicht(s.id)}" title="${s.name}"${tab ? neuerTab : ''}>${eine ? (tab ? 'Öffnen' : 'Herunterladen') : kurz(s)}</a>`) : ''}</span>
+  </div>`;
   return mehrMenue([
-    html`<div class="menue-titel">Ganzer Einsatz</div>`,
-    html`<a href="/einsaetze/${einsatzId}/teilnehmerliste" target="_blank" rel="noopener">Teilnehmerliste drucken</a>`,
-    html`<a href="/einsaetze/${einsatzId}/export.csv">Teilnehmerliste als CSV</a>`,
-    ...(schichten.length > 1 ? [
-      html`<a href="/einsaetze/${einsatzId}/aufgebot" target="_blank" rel="noopener">Aufgebot (Briefe)</a>`,
-      html`<a href="/einsaetze/${einsatzId}/ics">Kalendertermin (ICS)</a>`,
-    ] : []),
-    ...schichten.flatMap((s) => [html`<div class="menue-trenner"></div><div class="menue-titel">${schichten.length > 1 ? s.name : 'Schicht'}</div>`, ...jeSchicht(s)]),
+    html`<div class="dok-liste">
+  ${zeile('Teilnehmerliste drucken', `/einsaetze/${einsatzId}/teilnehmerliste`, null, true)}
+  ${zeile('Teilnehmerliste (CSV)', `/einsaetze/${einsatzId}/export.csv`, null, false)}
+  ${zeile('Aufgebot (Briefe)', eine ? null : `/einsaetze/${einsatzId}/aufgebot`, (id) => `/schichten/${id}/aufgebot`, true)}
+  ${zeile('Kalendertermin (ICS)', eine ? null : `/einsaetze/${einsatzId}/ics`, (id) => `/schichten/${id}/ics`, false)}
+  ${zeile('Essensliste (CSV)', null, (id) => `/schichten/${id}/essensliste.csv`, false)}
+  ${zeile('Text für Clubdesk-Termin', null, (id) => `/schichten/${id}/termintext`, true)}
+</div>`,
   ], 'Dokumente');
 }
 
