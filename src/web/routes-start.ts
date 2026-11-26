@@ -61,7 +61,7 @@ ${kx.benutzer!.rolle === 'admin' ? entraWarnung(entraAblaufVon(deps)) : ''}
     <h2 id="zu-tun-titel">Zu tun <small>${punkte.length} ${punkte.length === 1 ? 'Punkt' : 'Punkte'}</small></h2>
     ${naechster && naechsterStart ? html`<span class="unter">Nächster Einsatz: <a href="/einsaetze/${naechster.id}">${naechster.name}</a> ${tageBis(naechsterStart) === 0 ? 'heute' : `in ${tageBis(naechsterStart)} ${tageBis(naechsterStart) === 1 ? 'Tag' : 'Tagen'}`}</span>` : ''}
   </div>
-  ${punkte.length === 0 ? html`<p class="zu-tun-leer">Nichts zu tun. Alle Anmeldungen sind bearbeitet.</p>` : html`
+  ${punkte.length === 0 ? html`<p class="zu-tun-leer">Alles erledigt.</p>` : html`
   <ul class="zu-tun-liste">${punkte.slice(0, 6)}</ul>
   ${punkte.length > 6 ? html`<details class="gruppe zu-tun-mehr"><summary class="zu-tun-leer">${punkte.length - 6 === 1 ? '1 weiterer Punkt' : `${punkte.length - 6} weitere Punkte`} anzeigen</summary><ul class="zu-tun-liste">${punkte.slice(6)}</ul></details>` : ''}`}
 </section>

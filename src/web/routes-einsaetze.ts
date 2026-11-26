@@ -232,7 +232,7 @@ ${e.bemerkung_extern ? html`<p class="bemerkung"><strong>Extern:</strong> ${mehr
     : lage.vorbei
       ? html`<li class="zutun-zeile z-vorbei"><span class="zutun-symbol z-grau" aria-hidden="true">✓</span><span class="zutun-text">Alle Schichten sind vorbei.</span></li>`
       : !lage.punkte.length
-        ? html`<li class="zutun-zeile z-ok"><span class="zutun-symbol z-gruen" aria-hidden="true">✓</span><span class="zutun-text"><strong>Nichts zu tun.</strong></span></li>`
+        ? html`<li class="zutun-zeile z-ok"><span class="zutun-symbol z-gruen" aria-hidden="true">✓</span><span class="zutun-text"><strong>Alles erledigt.</strong></span></li>`
         : lage.punkte.map((p) => html`<li class="zutun-zeile">${symbol(p)}<span class="zutun-text"><strong>${p.text}</strong>${p.unter ? html` <span class="unter">${p.unter}</span>` : ''}</span>${knopf(p)}</li>`)}</ul>
 </section>`;
 
