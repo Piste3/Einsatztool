@@ -99,7 +99,7 @@ export function registriereSchichten(app: Express, deps: Abhaengigkeiten): void 
   app.post('/schichten/:sid/publizieren', nurAufgebot, async (req, res) => {
     const sid = leseId(req.params.sid);
     const an = req.body?.publiziert === '1';
-    await setzePubliziert(db, sid, an);
+    await setzePubliziert(db, sid, an, k(res).benutzer!.id);
     zurueck(req, res, `/schichten/${sid}`, an ? 'Schicht publiziert.' : 'Schicht nicht mehr publiziert.');
   });
 
@@ -121,13 +121,13 @@ ${s.anzahl_schichten <= 1 ? html`<p class="meldung fehler">Das ist die einzige S
 
   app.post('/schichten/:sid/loeschen', nurAufgebot, async (req, res) => {
     if (req.body?.bestaetigt !== '1') throw new Eingabefehler('Bestätige das Löschen mit dem Häkchen.');
-    const einsatzId = await loescheSchicht(db, leseId(req.params.sid));
+    const einsatzId = await loescheSchicht(db, leseId(req.params.sid), k(res).benutzer!.id);
     zurueck(req, res, `/einsaetze/${einsatzId}`, 'Schicht gelöscht.');
   });
 
   app.post('/schichten/:sid/fremdabteilungen', nurAufgebot, async (req, res) => {
     const sid = leseId(req.params.sid);
-    await speichereFremdabteilung(db, sid, { ...req.body, loeschen: req.body?.loeschen === '1' });
+    await speichereFremdabteilung(db, sid, { ...req.body, loeschen: req.body?.loeschen === '1' }, k(res).benutzer!.id);
     zurueck(req, res, `/schichten/${sid}`, req.body?.loeschen === '1' ? 'Fremdabteilung gelöscht.' : 'Gespeichert.');
   });
 

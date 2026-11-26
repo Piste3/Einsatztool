@@ -1,6 +1,7 @@
 // Einsätze: erstellen, ändern mit Vererbung, kopieren, löschen, Archiv (13.1, 13.3, 13.9, 21).
 import { alle, eine, schreibe, transaktion, type Db } from '../db/db.js';
 import { Eingabefehler, NichtGefunden, pflichtText, pruefeVersion, text } from './eingabe.js';
+import { einsatzStand, FELD_TEXT, protokolliere, unterschiede } from './einsatz-protokoll.js';
 import { standardTenue, tenueMitVorlage } from './tenue.js';
 import {
   istDatum,
@@ -87,6 +88,7 @@ export async function erstelleEinsatz(db: Db, e: EinsatzNeu, benutzerId: number 
       'INSERT INTO schicht (einsatz_id, name, start_zeit, end_zeit, ort, tenue, publiziert, position, zeit_offen) VALUES (?, ?, ?, ?, ?, ?, 1, 0, ?)',
       [einsatzId, name, start, ende, ort, tenue, zeitOffen ? 1 : 0],
     );
+    await protokolliere(c, einsatzId, benutzerId, [{ aktion: 'einsatz_erstellt', neu: name }]);
     return einsatzId;
   });
 }
@@ -121,7 +123,7 @@ export interface EinsatzAenderung {
  * Einsatz ändern. Regel 13.3: Ändert sich ein vererbtes Feld von A auf B,
  * ersetzt das Tool den Wert in allen Schichten mit genau A. Andere Schichten bleiben.
  */
-export async function aendereEinsatz(db: Db, id: number, a: EinsatzAenderung): Promise<void> {
+export async function aendereEinsatz(db: Db, id: number, a: EinsatzAenderung, benutzerId: number | null = null): Promise<void> {
   const tenue = await tenueMitVorlage(db, a.tenue_vorlage, a.tenue);
   const neu = {
     name: pflichtText(a.name, 'Name'),
@@ -146,6 +148,11 @@ export async function aendereEinsatz(db: Db, id: number, a: EinsatzAenderung): P
       const vorher = alt[feld];
       const nachher = neu[feld];
       if (vorher === nachher) continue;
+      // Protokoll: Jede Schicht, die den neuen Wert übernimmt, erhält einen Eintrag «vom Einsatz übernommen».
+      const betroffen = await alle<{ id: number; name: string }>(c, `SELECT id, name FROM schicht WHERE einsatz_id = ? AND ${feld} <=> ? ORDER BY start_zeit, id`, [id, vorher]);
+      await protokolliere(c, id, benutzerId, betroffen.map((s) => ({
+        aktion: 'vererbt' as const, schichtId: s.id, schichtName: s.name, feld: FELD_TEXT[feld], alt: vorher ?? '', neu: nachher ?? '',
+      })));
       // Schichten mit genau dem alten Wert übernehmen den neuen Wert. NULL gilt als gleich NULL.
       // Die Version der Schicht steigt mit: Ein offenes Schicht-Formular ist dann veraltet.
       await schreibe(c, `UPDATE schicht SET ${feld} = ?, version = version + 1 WHERE einsatz_id = ? AND ${feld} <=> ?`, [nachher, id, vorher]);
@@ -156,6 +163,8 @@ export async function aendereEinsatz(db: Db, id: number, a: EinsatzAenderung): P
          abtreten_ort = ?, tenue = ?, aufgebot_hinweis = ?, formular_mehrere = ?, version = version + 1 WHERE id = ?`,
       [neu.name, neu.ort, neu.bemerkung_intern, neu.bemerkung_extern, neu.abtreten_ort, neu.tenue, neu.aufgebot_hinweis, mehrere, id],
     );
+    const diff = unterschiede(einsatzStand(alt), einsatzStand({ ...neu, formular_mehrere: mehrere }));
+    await protokolliere(c, id, benutzerId, diff.map((u) => ({ aktion: 'einsatz_geaendert' as const, ...u })));
   });
 }
 
@@ -230,6 +239,7 @@ export async function kopiereEinsatz(
       [name, e.ort, e.bemerkung_intern, e.bemerkung_extern, jetztIso(), benutzerId, e.abtreten_ort, e.tenue, e.aufgebot_hinweis, e.formular_mehrere],
     );
     const neuId = r.insertId;
+    await protokolliere(c, neuId, benutzerId, [{ aktion: 'einsatz_kopiert', alt: e.name, neu: name }]);
     const schichten = await alle<any>(c, 'SELECT * FROM schicht WHERE einsatz_id = ? ORDER BY start_zeit, id', [id]);
     for (const s of schichten) {
       const start = lokalZuUtc(plusTage(lokalesDatum(s.start_zeit), tage), lokaleZeit(s.start_zeit));

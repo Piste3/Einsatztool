@@ -8,6 +8,7 @@ import {
 } from '../domain/einsatz.js';
 import { aendereSchicht, anzeigeZeiten, erstelleSchicht, fremdabteilungen, kopiereSchicht, ladeSchicht, passtInTabelle, schichtenVonEinsatz } from '../domain/schicht.js';
 import { bestaetigeAlle, verlaufEinsatz } from '../domain/anmeldung.js';
+import { protokollEinsatz, protokollText } from '../domain/einsatz-protokoll.js';
 import { mitRueckgaengig } from '../domain/rueckgaengig.js';
 import { logText } from './routes-schichten.js';
 import { warnungenFuerSchichten } from '../domain/warnungen.js';
@@ -459,20 +460,52 @@ ${schichten.map(schichtZeile)}
 ${verschiebenBereich()}`;
 
     // ---------- Reiter «Verlauf» ----------
+    // Wunsch Yann 26.11.2026: Der Verlauf zeigt auch Erstellen, Ändern, Publizieren und Löschen von Einsatz und Schichten.
+    // Filter `?art=anmeldungen` oder `?art=einsatz`. Ohne Filter: alles, das neueste zuerst.
     const verlaufAnsicht = async () => {
-      const log = await verlaufEinsatz(db, e.id, 300);
+      const art = req.query.art === 'anmeldungen' || req.query.art === 'einsatz' ? req.query.art : 'alle';
+      const GRENZE = 300;
+      type Zeile = { zeit: string; betrifft: Roh | string; schicht: string; text: Roh | string; benutzer: string; suche: string; einsatz: boolean };
+      const anm: Zeile[] = (await verlaufEinsatz(db, e.id, GRENZE)).map((l) => ({
+        zeit: l.zeit,
+        betrifft: l.person_id !== null ? html`<a href="/personen/${l.person_id}">${name({ rang_name: l.rang_name, name: l.person_name })}</a>` : l.person_name,
+        schicht: l.schicht_name,
+        text: logText(l),
+        benutzer: l.benutzer ?? 'Formular / System',
+        suche: `${l.person_name} ${l.schicht_name} ${l.benutzer ?? ''}`,
+        einsatz: false,
+      }));
+      const prot: Zeile[] = (await protokollEinsatz(db, e.id, GRENZE)).map((p) => {
+        const text = protokollText(p);
+        return {
+          zeit: p.zeit,
+          betrifft: p.schicht_name !== null ? 'Schicht' : 'Einsatz',
+          schicht: p.schicht_name ?? '',
+          text,
+          benutzer: p.benutzer ?? 'System',
+          suche: `${p.schicht_name ?? 'Einsatz'} ${text} ${p.benutzer ?? ''}`,
+          einsatz: true,
+        };
+      });
+      const zahl = { alle: anm.length + prot.length, anmeldungen: anm.length, einsatz: prot.length };
+      const log = (art === 'anmeldungen' ? anm : art === 'einsatz' ? prot : [...anm, ...prot])
+        .sort((a, b) => (a.zeit < b.zeit ? 1 : a.zeit > b.zeit ? -1 : 0))
+        .slice(0, GRENZE);
+      const ARTEN = [['alle', 'Alle'], ['anmeldungen', 'Anmeldungen'], ['einsatz', 'Einsatz und Schichten']] as const;
+      const chips = html`<p class="filter-chips">${ARTEN.map(([a, t]) => html`<a href="/einsaetze/${e.id}/verlauf${a === 'alle' ? '' : `?art=${a}`}"${art === a ? new Roh(' aria-current="page"') : ''}>${t} ${zahl[a]}</a>`)}</p>`;
       return html`<section aria-labelledby="verlauf-titel">
 <div class="titelzeile filterzeile"><h2 id="verlauf-titel">Verlauf</h2>${log.length ? html`<input type="search" class="suche" data-filter=".einsatz-verlauf tbody tr" placeholder="Suchen …" aria-label="Verlauf suchen">` : ''}</div>
-${!log.length ? html`<p class="leer">Noch keine Einträge im Statusprotokoll.</p>` : html`<div class="rahmen"><table class="tabelle einsatz-verlauf">
-  <thead><tr><th>Zeit</th><th>Person</th><th>Schicht</th><th>Änderung</th><th>Durch</th></tr></thead>
-  <tbody>${log.map((l) => html`<tr data-suche="${`${l.person_name} ${l.schicht_name} ${l.benutzer ?? ''}`.toLowerCase()}">
+${chips}
+${!log.length ? html`<p class="leer">Noch keine Einträge.</p>` : html`<div class="rahmen"><table class="tabelle einsatz-verlauf">
+  <thead><tr><th>Zeit</th><th>Betrifft</th><th>Schicht</th><th>Änderung</th><th>Durch</th></tr></thead>
+  <tbody>${log.map((l) => html`<tr data-suche="${l.suche.toLowerCase()}"${l.einsatz ? new Roh(' class="verlauf-einsatz"') : ''}>
     <td class="nowrap">${datumZeit(l.zeit)}</td>
-    <td>${l.person_id !== null ? html`<a href="/personen/${l.person_id}">${name({ rang_name: l.rang_name, name: l.person_name })}</a>` : l.person_name}</td>
-    <td>${l.schicht_name}</td>
-    <td>${logText(l)}</td>
-    <td class="unter">${l.benutzer ?? 'Formular / System'}</td>
+    <td>${l.betrifft}</td>
+    <td>${l.schicht}</td>
+    <td class="verlauf-text">${l.text}</td>
+    <td class="unter">${l.benutzer}</td>
   </tr>`)}</tbody>
-</table></div>${log.length >= 300 ? html`<p class="unter">Das Tool zeigt die 300 neuesten Einträge.</p>` : ''}`}
+</table></div>${log.length >= GRENZE ? html`<p class="unter">Das Tool zeigt die ${GRENZE} neuesten Einträge.</p>` : ''}`}
 </section>`;
     };
 
@@ -528,7 +561,7 @@ ${ansicht === 'uebersicht' ? html`${steckbrief}${zuTun}${schichtTabelle}`
     const sid = leseId(req.params.sid);
     const s = await ladeSchicht(db, sid);
     try {
-      await aendereSchicht(db, sid, { ...req.body, rollen: req.body.rollen ?? {} });
+      await aendereSchicht(db, sid, { ...req.body, rollen: req.body.rollen ?? {} }, k(res).benutzer!.id);
       zurueck(req, res, `/einsaetze/${s.einsatz_id}/schichten?offen=${sid}#schicht-${sid}`, 'Schicht gespeichert.');
     } catch (f) {
       if (!(f instanceof Eingabefehler)) throw f;
@@ -542,7 +575,7 @@ ${ansicht === 'uebersicht' ? html`${steckbrief}${zuTun}${schichtTabelle}`
   app.post('/einsaetze/:id/schichten', nurAufgebot, async (req, res) => {
     const einsatzId = leseId(req.params.id);
     try {
-      const sid = await erstelleSchicht(db, einsatzId, { ...req.body, end_datum: req.body?.end_datum ?? '' });
+      const sid = await erstelleSchicht(db, einsatzId, { ...req.body, end_datum: req.body?.end_datum ?? '' }, k(res).benutzer!.id);
       zurueck(req, res, `/einsaetze/${einsatzId}/schichten?offen=${sid}#schicht-${sid}`, 'Schicht hinzugefügt. Sie ist nicht publiziert.');
     } catch (f) {
       if (!(f instanceof Eingabefehler)) throw f;
@@ -552,7 +585,7 @@ ${ansicht === 'uebersicht' ? html`${steckbrief}${zuTun}${schichtTabelle}`
 
   app.post('/schichten/:sid/kopieren', nurAufgebot, async (req, res) => {
     const s = await ladeSchicht(db, leseId(req.params.sid));
-    const neu = await kopiereSchicht(db, s.id);
+    const neu = await kopiereSchicht(db, s.id, k(res).benutzer!.id);
     zurueck(req, res, `/einsaetze/${s.einsatz_id}/schichten?offen=${neu}#schicht-${neu}`, 'Schicht kopiert. Die Kopie ist nicht publiziert.');
   });
 
@@ -575,7 +608,7 @@ ${ansicht === 'uebersicht' ? html`${steckbrief}${zuTun}${schichtTabelle}`
     const kx = k(res);
     const id = leseId(req.params.id);
     try {
-      await aendereEinsatz(db, id, req.body);
+      await aendereEinsatz(db, id, req.body, kx.benutzer!.id);
       zurueck(req, res, `/einsaetze/${id}`);
     } catch (e) {
       if (!(e instanceof Eingabefehler)) throw e;

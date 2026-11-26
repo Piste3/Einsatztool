@@ -149,6 +149,28 @@ const migrationen: { version: number; anweisungen: () => string[] }[] = [
     version: 11,
     anweisungen: () => ['ALTER TABLE tenue_vorlage ADD COLUMN standard TINYINT NOT NULL DEFAULT 0'],
   },
+  // Version 12 (Wunsch Yann 26.11.2026): Protokoll für Einsatz und Schichten. Der Reiter «Verlauf» zeigt es.
+  // schicht_id hat keinen Fremdschlüssel: Der Eintrag bleibt, wenn jemand die Schicht löscht.
+  {
+    version: 12,
+    anweisungen: () => [
+      `CREATE TABLE einsatz_protokoll (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        zeit VARCHAR(30) NOT NULL,
+        einsatz_id INT NOT NULL,
+        schicht_id INT NULL,
+        schicht_name VARCHAR(255) NULL,
+        benutzer_id INT NULL,
+        aktion VARCHAR(40) NOT NULL,
+        feld VARCHAR(100) NULL,
+        alt TEXT NULL,
+        neu TEXT NULL,
+        INDEX idx_einsatz_protokoll (einsatz_id, zeit),
+        CONSTRAINT fk_einsatz_protokoll_einsatz FOREIGN KEY (einsatz_id) REFERENCES einsatz(id) ON DELETE CASCADE,
+        CONSTRAINT fk_einsatz_protokoll_benutzer FOREIGN KEY (benutzer_id) REFERENCES benutzer(id)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin`,
+    ],
+  },
 ];
 
 export async function migriere(db: Db): Promise<number> {

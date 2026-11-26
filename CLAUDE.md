@@ -304,3 +304,7 @@ Diese Liste ergänze ich beim Bauen. Jede Annahme aus Teil B des Konzepts steht 
 - 26.11.2026 (Vorlage Yann, Kopfzeile): Logo 28 mm ab 8 mm von oben, Absender direkt darunter. Titel «Ansprechperson» fett in 9,5 pt, ohne Leerzeile. Die Ansprechperson beginnt auf gleicher Höhe wie die Adresse (55 mm). Ort und Datum stehen unter dem Fenster (ab 100 mm).
 - 26.11.2026 (Wunsch Yann): Brief: «Bei allfälligen Fragen stehen wir dir gerne zur Verfügung.» Der Brief kommt von der Aufgebotsstelle, nicht von einer Person. Der Clubdesk-Text mit `{absender}` behält «stehe ich».
 - 26.11.2026 (Wunsch Yann): Leere Liste «Zu tun» (Einsatz und Cockpit) zeigt «Alles erledigt.» statt «Nichts zu tun.».
+- 26.11.2026 (Wunsch Yann): Der Reiter «Verlauf» zeigt auch Änderungen an Einsatz und Schichten. Tabelle `einsatz_protokoll` (Migration 12), Regeln in `src/domain/einsatz-protokoll.ts`. Test T53.
+- 26.11.2026: Ins Protokoll kommen: Einsatz erstellt, kopiert und geändert (je Feld alt → neu), Schicht erstellt, kopiert, geändert (auch Rollenbedarf), publiziert, nicht mehr publiziert, gelöscht, Fremdabteilungen. Eine vererbte Änderung erhält je Schicht «vom Einsatz übernommen».
+- 26.11.2026: Das Protokoll speichert lesbare Werte (Datum, Name des Rangs). Ein Eintrag einer gelöschten Schicht bleibt. Löschen des Einsatzes löscht sein Protokoll. Speichern ohne Änderung schreibt nichts.
+- 26.11.2026: Filter im Verlauf: Alle, Anmeldungen, Einsatz und Schichten (`?art=anmeldungen`, `?art=einsatz`). Die Tabelle zeigt die 300 neuesten Einträge.

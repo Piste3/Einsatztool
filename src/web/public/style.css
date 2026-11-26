@@ -1339,3 +1339,6 @@ body.handy .frage-fenster { margin: auto; width: calc(100vw - 1.5rem); border-ra
 /* Cockpit: benötigte Rollen je Schicht (Wunsch Yann 26.11.2026) */
 .tabelle .rolle-spalte { text-align: center; white-space: nowrap; }
 .tabelle th.rolle-spalte abbr { text-decoration: none; cursor: help; }
+/* Verlauf: Änderungen an Einsatz und Schichten (26.11.2026). Lange Werte brechen um. */
+.einsatz-verlauf .verlauf-text { overflow-wrap: anywhere; max-width: 42rem; }
+.einsatz-verlauf tr.verlauf-einsatz td:nth-child(2) { color: var(--grau); }

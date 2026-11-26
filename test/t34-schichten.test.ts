@@ -101,7 +101,8 @@ test('T34 Reiter Schichten im Web: Zeilen, Speichern, Konflikt in der Zeile, neu
     assert.equal((await hole(`/einsaetze/${s.einsatzId}/schichten/neu`)).headers.get('location'), `/einsaetze/${s.einsatzId}/schichten#neue-schicht`);
 
     // Verlauf: leer, aber die Seite lädt.
-    assert.match(await (await hole(`/einsaetze/${s.einsatzId}/verlauf`)).text(), /Noch keine Einträge im Statusprotokoll\./);
+    // Seit 26.11.2026 zeigt der Verlauf auch Änderungen an Schichten (T53).
+    assert.match(await (await hole(`/einsaetze/${s.einsatzId}/verlauf`)).text(), /Schicht erstellt/);
   } finally {
     await app.stopp();
     await t.ende();

@@ -1,6 +1,7 @@
 // Schichten: hinzufügen, ändern, publizieren, löschen, Fremdabteilungen (13.2, 13.4, 5.10).
 import { alle, eine, schreibe, transaktion, type Db } from '../db/db.js';
 import { Eingabefehler, NichtGefunden, ganzzahl, pflichtText, pruefeVersion, text } from './eingabe.js';
+import { protokolliere, schichtStand, unterschiede } from './einsatz-protokoll.js';
 import { tenueMitVorlage } from './tenue.js';
 import { zeitpunkt, ladeEinsatz } from './einsatz.js';
 import { jetztIso, lokalesDatum, lokaleZeit, plusTage } from './zeit.js';
@@ -116,7 +117,7 @@ function endDatumAus(e: SchichtEingabe): unknown {
  * Regel 13.2.2 und Entscheid Yann: Eine neue Schicht übernimmt Ort, Ort Abtreten, Tenue und
  * Hinweis vom Einsatz. Eine neue zusätzliche Schicht ist nicht publiziert.
  */
-export async function erstelleSchicht(db: Db, einsatzId: number, e: SchichtEingabe): Promise<number> {
+export async function erstelleSchicht(db: Db, einsatzId: number, e: SchichtEingabe, benutzerId: number | null = null): Promise<number> {
   const name = pflichtText(e.name, 'Name');
   const leer = (w: unknown) => typeof w !== 'string' || !w.trim();
   const offen = leer(e.start_zeit) || leer(e.end_zeit);
@@ -139,12 +140,13 @@ export async function erstelleSchicht(db: Db, einsatzId: number, e: SchichtEinga
       ],
     );
     await speichereRollen(c, r.insertId, e.rollen);
+    await protokolliere(c, einsatzId, benutzerId, [{ aktion: 'schicht_erstellt', schichtId: r.insertId, schichtName: name }]);
     return r.insertId;
   });
 }
 
 /** Schicht ändern, inklusive Rollenbedarf. Der Ort gilt nur für diese Schicht (13.3.3). */
-export async function aendereSchicht(db: Db, id: number, e: SchichtEingabe): Promise<void> {
+export async function aendereSchicht(db: Db, id: number, e: SchichtEingabe, benutzerId: number | null = null): Promise<void> {
   const name = pflichtText(e.name, 'Name');
   // Leere Zeit = offen (00:00 bzw. 23:59), wie beim neuen Einsatz.
   const leer = (w: unknown) => typeof w !== 'string' || !w.trim();
@@ -160,6 +162,7 @@ export async function aendereSchicht(db: Db, id: number, e: SchichtEingabe): Pro
       alt.version,
       'Ein anderer Benutzer hat diese Schicht inzwischen geändert. Das Tool hat nichts gespeichert. Deine Eingaben stehen unten. Prüfe die aktuellen Werte in einem neuen Tab. Speichere dann erneut, wenn deine Werte gelten sollen.',
     );
+    const vorher = await schichtStand(c, id);
     const minRang = await pruefeRang(c, e.min_rang_id);
     const tenue = await tenueMitVorlage(c, e.tenue_vorlage, e.tenue);
     const r = await schreibe(
@@ -177,6 +180,12 @@ export async function aendereSchicht(db: Db, id: number, e: SchichtEingabe): Pro
     );
     if (r.affectedRows === 0) throw new NichtGefunden('Schicht nicht gefunden.');
     await speichereRollen(c, id, e.rollen);
+    const nachher = await schichtStand(c, id);
+    if (vorher && nachher) {
+      await protokolliere(c, nachher.einsatzId, benutzerId, unterschiede(vorher.stand, nachher.stand).map((u) => ({
+        aktion: 'schicht_geaendert' as const, schichtId: id, schichtName: nachher.name, ...u,
+      })));
+    }
   });
 }
 
@@ -184,7 +193,7 @@ export async function aendereSchicht(db: Db, id: number, e: SchichtEingabe): Pro
  * Schicht kopieren (Reiter «Schichten», Vorschlag Yann 20.11.2026): gleiche Angaben, gleicher Tag,
  * Rollenbedarf dazu. Die Kopie ist nicht publiziert und hat keine Einträge und keine Fremdabteilungen.
  */
-export async function kopiereSchicht(db: Db, id: number): Promise<number> {
+export async function kopiereSchicht(db: Db, id: number, benutzerId: number | null = null): Promise<number> {
   return transaktion(db, async (c) => {
     const s = await eine<Schicht>(c, 'SELECT * FROM schicht WHERE id = ?', [id]);
     if (!s) throw new NichtGefunden('Schicht nicht gefunden.');
@@ -201,6 +210,7 @@ export async function kopiereSchicht(db: Db, id: number): Promise<number> {
       ],
     );
     await schreibe(c, 'INSERT INTO schicht_rolle (schicht_id, rolle, anzahl) SELECT ?, rolle, anzahl FROM schicht_rolle WHERE schicht_id = ?', [r.insertId, id]);
+    await protokolliere(c, s.einsatz_id, benutzerId, [{ aktion: 'schicht_kopiert', schichtId: r.insertId, schichtName: name, alt: s.name }]);
     return r.insertId;
   });
 }
@@ -226,10 +236,15 @@ export function anzeigeZeiten(s: { start_zeit: string; end_zeit: string; zeit_of
   return { beginn: beginn === OFFEN_BEGINN ? '' : beginn, ende: ende === OFFEN_ENDE ? '' : ende };
 }
 
-export async function setzePubliziert(db: Db, id: number, publiziert: boolean): Promise<void> {
+export async function setzePubliziert(db: Db, id: number, publiziert: boolean, benutzerId: number | null = null): Promise<void> {
   await transaktion(db, async (c) => {
-    const r = await schreibe(c, 'UPDATE schicht SET publiziert = ? WHERE id = ?', [publiziert ? 1 : 0, id]);
-    if (r.affectedRows === 0) throw new NichtGefunden('Schicht nicht gefunden.');
+    const s = await eine<{ einsatz_id: number; name: string; publiziert: number }>(c, 'SELECT einsatz_id, name, publiziert FROM schicht WHERE id = ? FOR UPDATE', [id]);
+    if (!s) throw new NichtGefunden('Schicht nicht gefunden.');
+    await schreibe(c, 'UPDATE schicht SET publiziert = ? WHERE id = ?', [publiziert ? 1 : 0, id]);
+    // Nur ein echter Wechsel kommt ins Protokoll.
+    if ((Number(s.publiziert) === 1) !== publiziert) {
+      await protokolliere(c, s.einsatz_id, benutzerId, [{ aktion: publiziert ? 'publiziert' : 'nicht_publiziert', schichtId: id, schichtName: s.name }]);
+    }
   });
 }
 
@@ -242,13 +257,17 @@ export async function anzahlAnmeldungenSchicht(db: Db, id: number): Promise<numb
  * Regel 13.2.4: Löschen verlangt eine Bestätigung (die Route zeigt die Zahl der Anmeldungen).
  * Ein Einsatz behält mindestens eine Schicht.
  */
-export async function loescheSchicht(db: Db, id: number): Promise<number> {
+export async function loescheSchicht(db: Db, id: number, benutzerId: number | null = null): Promise<number> {
   return transaktion(db, async (c) => {
     const s = await ladeSchicht(c, id);
     if (s.anzahl_schichten <= 1) {
       throw new Eingabefehler('Ein Einsatz hat mindestens eine Schicht. Lösche stattdessen den Einsatz.');
     }
+    const n = await anzahlAnmeldungenSchicht(c, id);
     await schreibe(c, 'DELETE FROM schicht WHERE id = ?', [id]);
+    await protokolliere(c, s.einsatz_id, benutzerId, [{
+      aktion: 'schicht_geloescht', schichtId: id, schichtName: s.name, neu: n ? `${n} ${n === 1 ? 'Eintrag' : 'Einträge'}` : null,
+    }]);
     return s.einsatz_id;
   });
 }
@@ -275,12 +294,18 @@ export async function speichereFremdabteilung(
   db: Db,
   schichtId: number,
   e: { id?: unknown; name?: unknown; anzahl?: unknown; bemerkung?: unknown; loeschen?: boolean },
+  benutzerId: number | null = null,
 ): Promise<void> {
   await transaktion(db, async (c) => {
-    await ladeSchicht(c, schichtId);
+    const s = await ladeSchicht(c, schichtId);
     const fid = ganzzahl(e.id, 'ID', 1, 2_147_483_647);
+    const fa = (f: { name: string; anzahl: number; bemerkung: string | null }) => `${f.name}, ${f.anzahl}${f.bemerkung ? `, ${f.bemerkung}` : ''}`;
+    const alt = fid ? await eine<Fremdabteilung>(c, 'SELECT * FROM fremdabteilung WHERE id = ? AND schicht_id = ?', [fid, schichtId]) : undefined;
+    const protokoll = (aktion: 'fremdabteilung_erfasst' | 'fremdabteilung_geaendert' | 'fremdabteilung_geloescht', a: string | null, n: string | null) =>
+      protokolliere(c, s.einsatz_id, benutzerId, [{ aktion, schichtId, schichtName: s.name, alt: a, neu: n }]);
     if (fid && e.loeschen) {
       await schreibe(c, 'DELETE FROM fremdabteilung WHERE id = ? AND schicht_id = ?', [fid, schichtId]);
+      if (alt) await protokoll('fremdabteilung_geloescht', fa(alt), null);
       return;
     }
     const name = pflichtText(e.name, 'Name');
@@ -291,10 +316,13 @@ export async function speichereFremdabteilung(
       await schreibe(c, 'UPDATE fremdabteilung SET name = ?, anzahl = ?, bemerkung = ? WHERE id = ? AND schicht_id = ?', [
         name, anzahl, bemerkung, fid, schichtId,
       ]);
+      const neu = fa({ name, anzahl, bemerkung });
+      if (alt && fa(alt) !== neu) await protokoll('fremdabteilung_geaendert', fa(alt), neu);
     } else {
       await schreibe(c, 'INSERT INTO fremdabteilung (schicht_id, name, anzahl, bemerkung) VALUES (?, ?, ?, ?)', [
         schichtId, name, anzahl, bemerkung,
       ]);
+      await protokoll('fremdabteilung_erfasst', null, fa({ name, anzahl, bemerkung }));
     }
   });
 }
