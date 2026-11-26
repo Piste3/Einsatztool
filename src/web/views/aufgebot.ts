@@ -25,7 +25,7 @@ function briefeHtml(d: AufgebotDaten): Roh[] {
     <div class="absender"><strong>${FEST.absender[0]}</strong><br>${FEST.absender.slice(1).map((z, i) => html`${i ? html`<br>` : ''}${z}`)}</div>
   </div>
   <div class="brief-adresszeile">
-    <div class="ansprechperson"><small>${FEST.ansprechpersonTitel}</small><br>${FEST.ansprechperson.map((z, i) => html`${i ? html`<br>` : ''}${z}`)}</div>
+    <div class="ansprechperson"><strong class="ap-titel">${FEST.ansprechpersonTitel}</strong>${FEST.ansprechperson.map((z, i) => html`${i ? html`<br>` : ''}${z}`)}</div>
     <div class="empfaenger">
       ${b.rang ? html`${b.rang}<br>` : ''}${b.name}<br>
       ${b.strasse ? html`${b.strasse}<br>` : ''}${b.adresszusatz ? html`${b.adresszusatz}<br>` : ''}${b.plzOrt ?? ''}
