@@ -86,7 +86,7 @@ test('T39 im Web: Bereich «Personen verschieben», Route, Fenster «Bestätigen
     assert.match(seite, new RegExp(`data-bestaetigen="${aid}" data-version="\\d+" data-name="Nina Baumann &lt;b&gt;"`));
     // Dokumente, die sich im Browser öffnen, gehen in einem neuen Tab auf.
     assert.match(seite, /href="\/einsaetze\/\d+\/teilnehmerliste" target="_blank" rel="noopener"/);
-    assert.match(seite, /href="\/schichten\/\d+\/aufgebot" target="_blank" rel="noopener"/);
+    assert.match(seite, /href="\/schichten\/\d+\/aufgebot"[^>]* target="_blank" rel="noopener"/);
 
     // Rückmeldungen und Besetzen haben dasselbe Fenster.
     assert.match(await hole('/rueckmeldungen'), new RegExp(`data-bestaetigen="${aid}"`));
