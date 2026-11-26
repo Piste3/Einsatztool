@@ -45,6 +45,8 @@ export interface AufgebotDaten {
   einsatzleitung: string[];
   tenue: string | null;
   briefe: Brief[];
+  /** Bestätigte Personen ohne Brief, weil ihr Rang kein Aufgebot erhält (Wunsch Yann 26.11.2026). */
+  ohneBrief: { personId: number; name: string }[];
   luecken: Warnung[];
   schichtId: number;
   einsatzId: number;
@@ -59,12 +61,18 @@ function zeitOrt(iso: string, ort: string | null): string {
  * Daten für die Briefe einer Schicht. Nur Einträge mit «bestaetigt».
  * Entscheid Yann: Unbekannte Einträge erhalten einen Brief mit «Adresse fehlt». Gelöschte Personen keinen.
  */
-export async function aufgebotDaten(db: Db, schichtId: number, nurPerson: number | null = null, heute = new Date()): Promise<AufgebotDaten> {
+export async function aufgebotDaten(
+  db: Db,
+  schichtId: number,
+  nurPerson: number | null = null,
+  heute = new Date(),
+  optionen: { alleRaenge?: boolean } = {},
+): Promise<AufgebotDaten> {
   const s = await ladeSchicht(db, schichtId);
   const eintraege = await alle<any>(
     db,
     `SELECT a.id, a.person_id, a.name_text, a.rolle, p.vorname, p.nachname, p.strasse, p.adresszusatz, p.plz, p.ort,
-            p.telefon, p.telefon_privat, p.geloescht_am, r.name AS rang, r.reihenfolge
+            p.telefon, p.telefon_privat, p.geloescht_am, r.name AS rang, r.reihenfolge, r.aufgebot AS rang_aufgebot
        FROM anmeldung a LEFT JOIN person p ON p.clubdesk_id = a.person_id LEFT JOIN rang r ON r.id = p.rang_id
       WHERE a.schicht_id = ? AND a.status = 'bestaetigt'
       ORDER BY (r.reihenfolge IS NULL), r.reihenfolge DESC, p.nachname, p.vorname, a.name_text`,
@@ -81,8 +89,17 @@ export async function aufgebotDaten(db: Db, schichtId: number, nurPerson: number
       return `${e.rang ? `${e.rang} ` : ''}${name}${tel ? ` (${tel})` : ''}`;
     });
 
+  // Wunsch Yann 26.11.2026: Ein Rang mit ausgeschaltetem «Aufgebot» erhält keinen Brief.
+  // Personen ohne Rang und unbekannte Einträge erhalten weiter einen Brief.
+  // Ein Brief für eine bestimmte Person geht immer. «alleRaenge» druckt trotzdem alle Briefe.
+  const ohneAufgebot = (e: any) => nurPerson === null && !optionen.alleRaenge && e.person_id !== null && e.rang_aufgebot !== null && Number(e.rang_aufgebot) === 0;
+  const ohneBrief = aktiv
+    .filter(ohneAufgebot)
+    .map((e) => ({ personId: Number(e.person_id), name: `${e.rang ? `${e.rang} ` : ''}${`${e.vorname ?? ''} ${e.nachname ?? ''}`.trim()}` }));
+
   const briefe: Brief[] = aktiv
     .filter((e) => nurPerson === null || e.person_id === nurPerson)
+    .filter((e) => !ohneAufgebot(e))
     .map((e) => {
       const bekannt = e.person_id !== null;
       const plzOrt = bekannt ? [e.plz, e.ort].filter(Boolean).join(' ') || null : null;
@@ -117,6 +134,7 @@ export async function aufgebotDaten(db: Db, schichtId: number, nurPerson: number
     einsatzleitung: el,
     tenue: s.tenue,
     briefe,
+    ohneBrief,
     luecken,
     schichtId: s.id,
     einsatzId: s.einsatz_id,

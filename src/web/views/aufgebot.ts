@@ -49,9 +49,11 @@ function briefeHtml(d: AufgebotDaten): Roh[] {
 }
 
 /** Druckseite mit den Briefen einer oder mehrerer Schichten (ganzer Einsatz). */
-export function aufgebotSeite(liste: AufgebotDaten[], titel: string, zurueckHref: string): string {
+export function aufgebotSeite(liste: AufgebotDaten[], titel: string, zurueckHref: string, alleHref: string | null = null): string {
   const anzahl = liste.reduce((n, d) => n + d.briefe.length, 0);
   const mehrere = liste.length > 1;
+  // Wunsch Yann 26.11.2026: Personen ohne Brief (Rang ohne Aufgebot) erhalten auf Wunsch einzeln einen Brief.
+  const ohneBrief = liste.flatMap((d) => d.ohneBrief.map((p) => ({ ...p, schichtId: d.schichtId })));
   const luecken = liste.filter((d) => d.luecken.length).map((d) => html`${mehrere ? html`<h3>${d.titel}</h3>` : ''}${warnungen(d.luecken)}`);
   return druckseite(titel, html`
 <div class="druck-steuerung nicht-drucken">
@@ -59,6 +61,11 @@ export function aufgebotSeite(liste: AufgebotDaten[], titel: string, zurueckHref
   <button type="button" class="knopf haupt" data-drucken>Drucken</button>
   <span>${anzahl} ${anzahl === 1 ? 'Brief' : 'Briefe'}</span>
 </div>
+${ohneBrief.length ? html`<div class="ohne-brief nicht-drucken"><h2>Ohne Brief (Rang ohne Aufgebot)</h2>
+  <p class="unter">Diese Personen sind bestätigt. Ihr Rang erhält kein Aufgebot (Admin › Einstellungen › Ränge). Ein Klick erstellt den Brief für eine Person.</p>
+  <ul>${ohneBrief.map((p) => html`<li>${p.name} – <a href="/schichten/${p.schichtId}/aufgebot?person=${p.personId}" target="_blank" rel="noopener">Brief erstellen</a>${mehrere ? html` <span class="unter">(${liste.find((d) => d.schichtId === p.schichtId)!.titel})</span>` : ''}</li>`)}</ul>
+  ${alleHref ? html`<p><a href="${alleHref}">Alle Briefe drucken, auch diese Personen</a></p>` : ''}
+</div>` : ''}
 ${luecken.length ? html`<div class="luecken nicht-drucken"><h2>Lücken vor dem Druck</h2>${luecken}</div>` : ''}
 ${anzahl ? liste.map(briefeHtml) : html`<p class="nicht-drucken">Keine bestätigten Personen.</p>`}`, 'aufgebot', 'brief-druck.css');
 }

@@ -8,7 +8,7 @@ import { erstelleVorschau, letzteImporte, wendeImportAn, type Vorschau } from '.
 import { ladeImportdatei, loescheImportdatei, speichereImportdatei } from '../domain/importdatei.js';
 import { bestaetigungenOhneAdresse, mailsMitFehler } from '../domain/bestaetigung.js';
 import {
-  benenneRangUm, benutzerListe, legeRangAn, legeRolleAn, loescheRang, loescheRolle, raenge, rollen, setzeBenutzerAktiv, setzeRolleZaehlt,
+  benenneRangUm, benutzerListe, legeRangAn, legeRolleAn, loescheRang, loescheRolle, raenge, rollen, setzeBenutzerAktiv, setzeRangAufgebot, setzeRolleZaehlt,
   ordneRaenge, ordneRollen, verschiebeRang, verschiebeRolle,
 } from '../domain/stammdaten.js';
 import { Eingabefehler, Konflikt, id as leseId, liste } from '../domain/eingabe.js';
@@ -245,12 +245,13 @@ ${liste.map((b) => html`<tr><td>${b.name}</td><td>${b.email}</td><td>${b.rolle =
     res.send(einstellungenSeite(deps, kx, 'stammdaten', html`
 <section class="abschnitt" id="raenge">
   <h2>Ränge</h2>
-  <p class="unter">Der oberste Rang ist der höchste. Zieh einen Rang am Griff ⠿ an die richtige Stelle. Auf dem Handy: ⋮ antippen. Ein neuer Rang kommt ans Ende (tiefster Rang). Nur ein Rang ohne Personen und ohne Schichten lässt sich löschen. Der Import ordnet den Rang über den Namen zu.</p>
+  <p class="unter">Der oberste Rang ist der höchste. Zieh einen Rang am Griff ⠿ an die richtige Stelle. Auf dem Handy: ⋮ antippen. Ein neuer Rang kommt ans Ende (tiefster Rang). Nur ein Rang ohne Personen und ohne Schichten lässt sich löschen. Der Import ordnet den Rang über den Namen zu. «Aufgebot» aus: Personen mit diesem Rang erhalten beim Drucken der Aufgebote keinen Brief.</p>
   ${ordnenForm(kx, '/admin/raenge', z, 'ranglisten')}
-  <div class="rahmen"><table class="tabelle mittig"><thead><tr><th class="ordnen-griff-kopf"><span class="sr">Ziehen</span></th><th>Rang</th><th>Personen</th><th>Schichten</th><th></th></tr></thead><tbody data-ordnen="ranglisten">
+  <div class="rahmen"><table class="tabelle mittig"><thead><tr><th class="ordnen-griff-kopf"><span class="sr">Ziehen</span></th><th>Rang</th><th>Aufgebot</th><th>Personen</th><th>Schichten</th><th></th></tr></thead><tbody data-ordnen="ranglisten">
   ${r.map((x, i) => html`<tr class="ordnen-zeile" data-ordnen-wert="${x.id}">
     <td class="ordnen-griff" title="Ziehen, um die Reihenfolge zu ändern" aria-hidden="true">⠿</td>
     <td><form method="post" action="/admin/raenge" class="zeilen-form">${formFelder(kx, z)}<input type="hidden" name="aktion" value="umbenennen"><input type="hidden" name="id" value="${x.id}"><input name="name" value="${x.name}" required maxlength="100" aria-label="Name"><button class="knopf klein" type="submit">Umbenennen</button></form></td>
+    <td>${knopfPost(kx, '/admin/raenge', x.aufgebot ? 'ja' : 'nein', { aktion: 'aufgebot', id: String(x.id), aufgebot: x.aufgebot ? '0' : '1' }, `schalter${x.aufgebot ? ' an' : ''}`, z)}</td>
     <td>${x.personen}</td><td>${x.schichten}</td>
     <td class="aktionen-rechts"><div class="knopfreihe">
       ${ordnenMenue(kx, '/admin/raenge', x.name, i > 0 ? { aktion: 'hoeher', id: String(x.id) } : null, i < r.length - 1 ? { aktion: 'tiefer', id: String(x.id) } : null, z)}
@@ -388,6 +389,7 @@ ${liste.map((b) => html`<tr><td>${b.name}</td><td>${b.email}</td><td>${b.rolle =
     switch (b.aktion) {
       case 'anlegen': await legeRangAn(db, b.name); break;
       case 'umbenennen': await benenneRangUm(db, leseId(b.id), b.name); break;
+      case 'aufgebot': await setzeRangAufgebot(db, leseId(b.id), b.aufgebot === '1'); break;
       case 'hoeher': await verschiebeRang(db, leseId(b.id), 'hoeher'); break;
       case 'tiefer': await verschiebeRang(db, leseId(b.id), 'tiefer'); break;
       case 'loeschen': await loescheRang(db, leseId(b.id)); break;

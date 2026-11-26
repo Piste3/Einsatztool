@@ -171,6 +171,11 @@ const migrationen: { version: number; anweisungen: () => string[] }[] = [
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin`,
     ],
   },
+  // Version 13 (Wunsch Yann 26.11.2026): Je Rang ein Schalter «Aufgebot». Aus = keine Briefe für Personen mit diesem Rang.
+  {
+    version: 13,
+    anweisungen: () => ['ALTER TABLE rang ADD COLUMN aufgebot TINYINT NOT NULL DEFAULT 1'],
+  },
 ];
 
 export async function migriere(db: Db): Promise<number> {

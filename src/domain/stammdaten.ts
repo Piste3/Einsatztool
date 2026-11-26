@@ -8,6 +8,8 @@ export interface Rang {
   id: number;
   name: string;
   reihenfolge: number;
+  /** 1 = Personen mit diesem Rang erhalten ein Aufgebot (Brief). Vorgabe 1. */
+  aufgebot: number;
   personen: number;
   schichten: number;
 }
@@ -16,7 +18,7 @@ export interface Rang {
 export async function raenge(db: Db): Promise<Rang[]> {
   return alle<Rang>(
     db,
-    `SELECT r.id, r.name, r.reihenfolge,
+    `SELECT r.id, r.name, r.reihenfolge, r.aufgebot,
             (SELECT COUNT(*) FROM person p WHERE p.rang_id = r.id) AS personen,
             (SELECT COUNT(*) FROM schicht s WHERE s.min_rang_id = r.id) AS schichten
        FROM rang r ORDER BY r.reihenfolge DESC`,
@@ -55,6 +57,14 @@ export async function verschiebeRang(db: Db, id: number, richtung: 'hoeher' | 't
 }
 
 /** Regel 14.5.3: Umbenennen. Die Zuordnung zu Personen und Schichten bleibt. */
+/** Wunsch Yann 26.11.2026: Schalter «Aufgebot» je Rang. Aus = keine Briefe für Personen mit diesem Rang. */
+export async function setzeRangAufgebot(db: Db, id: number, aufgebot: boolean): Promise<void> {
+  await transaktion(db, async (c) => {
+    const r = await schreibe(c, 'UPDATE rang SET aufgebot = ? WHERE id = ?', [aufgebot ? 1 : 0, id]);
+    if (r.affectedRows === 0) throw new NichtGefunden('Rang nicht gefunden.');
+  });
+}
+
 export async function benenneRangUm(db: Db, id: number, nameRoh: unknown): Promise<void> {
   const name = pflichtText(nameRoh, 'Name', 100);
   await transaktion(db, async (c) => {

@@ -214,8 +214,9 @@ ${seitenKopf({ pfad: schichtPfad(s, 'Termintext'), titel: 'Text für den Clubdes
   // Regel 20: Druckansicht des Aufgebots. Ein Brief je bestätigter Person, je Brief eine A4-Seite.
   app.get('/schichten/:sid/aufgebot', nurAufgebot, async (req, res) => {
     const nur = typeof req.query.person === 'string' && /^\d+$/.test(req.query.person) ? Number(req.query.person) : null;
-    const d = await aufgebotDaten(db, leseId(req.params.sid), nur);
-    res.send(aufgebotSeite([d], d.titel, `/schichten/${d.schichtId}`));
+    const alle = req.query.alle === '1';
+    const d = await aufgebotDaten(db, leseId(req.params.sid), nur, new Date(), { alleRaenge: alle });
+    res.send(aufgebotSeite([d], d.titel, `/schichten/${d.schichtId}`, `/schichten/${d.schichtId}/aufgebot?alle=1`));
   });
 }
 

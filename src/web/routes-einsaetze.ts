@@ -691,8 +691,9 @@ ${seitenKopf({ pfad: [{ text: 'Einsätze', href: '/einsaetze' }, { text: e.name,
   app.get('/einsaetze/:id/aufgebot', nurAufgebot, async (req, res) => {
     const e = await ladeEinsatz(db, leseId(req.params.id));
     const liste = [];
-    for (const s of await schichtenVonEinsatz(db, e.id)) liste.push(await aufgebotDaten(db, s.id));
-    res.send(aufgebotSeite(liste, `Einsatzaufgebot - ${e.name}`, `/einsaetze/${e.id}`));
+    const alle = req.query.alle === '1';
+    for (const s of await schichtenVonEinsatz(db, e.id)) liste.push(await aufgebotDaten(db, s.id, null, new Date(), { alleRaenge: alle }));
+    res.send(aufgebotSeite(liste, `Einsatzaufgebot - ${e.name}`, `/einsaetze/${e.id}`, `/einsaetze/${e.id}/aufgebot?alle=1`));
   });
 
   // Wunsch Yann 26.11.2026: Eine ICS-Datei mit einem Termin je Schicht. Regel 17.3 gilt wie bei der Schicht.
