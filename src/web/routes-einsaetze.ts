@@ -23,6 +23,7 @@ import { raenge as ladeRaenge, rollen as ladeRollen } from '../domain/stammdaten
 import { standardTenue, tenueVorlagen, type TenueVorlage } from '../domain/tenue.js';
 import { zeileAlsHtml } from '../domain/textformat.js';
 import { Eingabefehler, Konflikt, KANAL_TEXT, STATUS_TEXT, id as leseId, type Kanal, type Status } from '../domain/eingabe.js';
+import { rolleKurz } from '../domain/stammdaten.js';
 import { einsatzLage, type ZuTunPunkt } from '../domain/einsatz-lage.js';
 const EINSATZLEITUNG = 'Einsatzleitung';
 import { filterFuerListe } from '../domain/filter.js';
@@ -42,10 +43,6 @@ import { nachRangTiefZuerst } from '../domain/listen.js';
 
 /** Häkchen «mehrere Schichten»: Formular-Eingabe nach einem Fehler, sonst Wert aus der Datenbank (Vorgabe ja). */
 // Kürzel der üblichen Rollen in der Spalte «Wer» (Wunsch Yann 23.11.2026). Andere Rollen zeigen den vollen Namen.
-const ROLLE_KURZ: Record<string, string> = { Einsatzleitung: 'EL', Busfahrer: 'BF', Sektorchef: 'SC' };
-function rolleKurz(name: string): string | null {
-  return ROLLE_KURZ[name] ?? null;
-}
 
 function mehrereGewaehlt(e: Partial<Record<string, unknown>>): boolean {
   if (e.formular_mehrere_feld !== undefined) return e.formular_mehrere === '1';

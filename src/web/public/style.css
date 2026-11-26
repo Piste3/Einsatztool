@@ -1335,3 +1335,7 @@ body.handy .frage-fenster { margin: auto; width: calc(100vw - 1.5rem); border-ra
 /* Warnung zum Entra-Schlüssel (Wunsch Yann 23.11.2026): Text links, Knopf rechts. */
 .entra-warnung { display: flex; flex-wrap: wrap; gap: .6rem; align-items: center; justify-content: space-between; }
 .anleitung li { margin-bottom: .45rem; }
+
+/* Cockpit: benötigte Rollen je Schicht (Wunsch Yann 26.11.2026) */
+.tabelle .rolle-spalte { text-align: center; white-space: nowrap; }
+.tabelle th.rolle-spalte abbr { text-decoration: none; cursor: help; }

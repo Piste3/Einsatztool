@@ -126,6 +126,9 @@ test('T32 Einsatzansicht: Steckbrief, Schichten-Tabelle, Kacheln bei mehreren Sc
     await t.db.query("INSERT INTO schicht_rolle (schicht_id, rolle, anzahl) VALUES (?, 'Einsatzleitung', 1)", [s3]);
     const cockpit2 = await hole('/');
     assert.match(cockpit2, /<span class="wert">0<\/span><span class="titel">Schichten mit Warnungen/);
+    // Benötigte Rollen als Spalte mit Kürzel, Ist / Soll bestätigt (Wunsch Yann 26.11.2026).
+    assert.match(cockpit2, /<th class="rolle-spalte"><abbr title="Einsatzleitung">EL<\/abbr><\/th>/);
+    assert.match(cockpit2, /<span class="pille rot" title="Einsatzleitung: 0 von 1 bestätigt">0\/1<\/span>/);
 
     // Alte Links führen auf «Besetzen». Filter «Neu»: nur Personen mit unbestätigtem Eintrag.
     const alt = await fetch(`${app.url}/einsaetze/${s.einsatzId}?personen=offen`, { headers: { cookie }, redirect: 'manual' });

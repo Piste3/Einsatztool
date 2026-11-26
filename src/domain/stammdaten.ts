@@ -225,3 +225,9 @@ export async function ordneRollen(db: Db, namen: string[]): Promise<void> {
     for (let i = 0; i < namen.length; i++) await schreibe(c, 'UPDATE rolle SET reihenfolge = ? WHERE name = ?', [i + 1, namen[i]]);
   });
 }
+
+/** Kürzel bekannter Rollen (Wunsch Yann 23.11.2026). Andere Rollen zeigen den vollen Namen. */
+export const ROLLE_KURZ: Record<string, string> = { Einsatzleitung: 'EL', Busfahrer: 'BF', Sektorchef: 'SC' };
+export function rolleKurz(name: string): string | null {
+  return ROLLE_KURZ[name] ?? null;
+}

@@ -9,6 +9,7 @@ import { k } from './kontext.js';
 import { seite, seitenKopf } from './views/layout.js';
 import { istSoll, knopfPost, punktMarke, publiziertMarke, zeitraum } from './views/teile.js';
 import { jetztIso } from '../domain/zeit.js';
+import { rolleKurz } from '../domain/stammdaten.js';
 import { entraAblaufVon, entraWarnung } from './routes-konfiguration.js';
 
 const WOCHENTAG = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
@@ -75,25 +76,33 @@ ${kx.benutzer!.rolle === 'admin' ? entraWarnung(entraAblaufVon(deps)) : ''}
 <h2 id="einsaetze">Anstehende Einsätze</h2>
 ${u.einsaetze.length === 0 ? html`<p class="leer">Keine kommenden Einsätze. <a href="/einsaetze/neu">Einsatz erstellen</a></p>` : ''}
 <div class="karten">
-${u.einsaetze.map((e) => html`
+${u.einsaetze.map((e) => {
+  // Benötigte Rollen je Einsatz als eigene Spalten (Wunsch Yann 26.11.2026). Kürzel im Kopf, Ist / Soll bestätigt.
+  const rollenNamen = [...new Set(e.schichten.flatMap((s) => s.zahlen.rollen.map((r) => r.rolle)))];
+  return html`
   <section class="karte ohne-rand einsatz-karte">
     <div class="karte-kopf">
       <h3><a href="/einsaetze/${e.id}">${e.name}</a>${e.ort ? html` <small>· ${e.ort}</small>` : ''}</h3>
       ${e.unbestaetigt > 0 ? knopfPost(kx, `/einsaetze/${e.id}/alle-bestaetigen`, `Alle ${e.unbestaetigt} bestätigen`, {}, 'knopf klein', '/') : ''}
     </div>
     <div class="rahmen-innen"><table class="tabelle kompakt">
-      <thead><tr><th>Schicht</th><th>Zeit</th><th>Ist / Soll</th><th>Unbestätigt</th><th>Warnungen</th></tr></thead>
+      <thead><tr><th>Schicht</th><th>Zeit</th><th>Ist / Soll</th>${rollenNamen.map((n) => html`<th class="rolle-spalte">${rolleKurz(n) ? html`<abbr title="${n}">${rolleKurz(n)}</abbr>` : n}</th>`)}<th>Unbestätigt</th><th>Warnungen</th></tr></thead>
       <tbody>
       ${e.schichten.map((s) => html`<tr class="${s.end_zeit <= jetzt ? 'vergangen' : ''}">
         <td><a href="/schichten/${s.id}">${s.name}</a>${s.publiziert ? '' : html` ${publiziertMarke(false)}`}</td>
         <td>${zeitraum(s.start_zeit, s.end_zeit)}</td>
         <td>${istSoll(s.zahlen.teilnehmende, s.soll_anzahl)}</td>
+        ${rollenNamen.map((n) => {
+          const r = s.zahlen.rollen.find((x) => x.rolle === n);
+          return html`<td class="rolle-spalte">${r && r.soll > 0 ? html`<span class="pille ${r.ist >= r.soll ? 'gruen' : 'rot'}" title="${n}: ${r.ist} von ${r.soll} bestätigt">${r.ist}/${r.soll}</span>` : html`<span class="unter">–</span>`}</td>`;
+        })}
         <td>${s.zahlen.unbestaetigt ? html`<span class="pille orange">${s.zahlen.unbestaetigt}</span>` : '0'}</td>
         <td>${s.warnungen ? html`<span class="pille warn">⚠ ${s.warnungen}</span>` : '–'}</td>
       </tr>`)}
       </tbody>
     </table></div>
-  </section>`)}
+  </section>`;
+})}
 </div>`;
     res.send(seite(kx, 'Cockpit', 'start', inhalt));
   });
