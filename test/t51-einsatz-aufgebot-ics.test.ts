@@ -24,6 +24,9 @@ test('T51 Ganzer Einsatz: ein Brief je Person und Schicht, eine ICS-Datei mit ei
     assert.equal((brief.match(/<article class="brief">/g) ?? []).length, 2);
     assert.ok(brief.includes('Einsatzaufgebot - Herbstmesse - Dienstag'));
     assert.ok(brief.includes('2 Briefe'));
+    // Die Tabelle ist vollständig, auch ohne Einsatzleitung und Tenue (leere Zelle).
+    assert.ok(brief.includes('<tr><th>Einsatzleitung</th><td></td></tr>'));
+    assert.ok(brief.includes('<tr><th>Tenue</th>'));
 
     const erst = await fetch(`${app.url}/einsaetze/${s.einsatzId}/ics`, { headers: { cookie } });
     assert.ok((erst.headers.get('content-type') ?? '').startsWith('text/calendar'));

@@ -7,7 +7,8 @@ import { START_ID } from '../wartung.js';
 import { druckseite } from './layout.js';
 import { warnungen } from './teile.js';
 
-const zeile = (titel: string, wert: string | null) => (wert ? html`<tr><th>${titel}</th><td>${wert}</td></tr>` : '');
+// Wunsch Yann 26.11.2026: Die Tabelle ist immer vollständig. Ein fehlender Wert ergibt eine leere Zelle.
+const zeile = (titel: string, wert: string | Roh | Roh[] | null) => html`<tr><th>${titel}</th><td>${wert ?? ''}</td></tr>`;
 
 /** Die Aufgebotsadresse im Text erscheint als mailto-Link (wie in der Vorlage). */
 function mitMail(text: string): Roh[] {
@@ -37,8 +38,8 @@ function briefeHtml(d: AufgebotDaten): Roh[] {
     ${zeile('Antreten', d.antreten)}
     ${zeile('Abtreten', d.abtreten)}
     ${d.hinweis ? html`<tr><th>Hinweis</th><td>${mehrzeilig(d.hinweis)}</td></tr>` : ''}
-    ${d.einsatzleitung.length ? html`<tr><th>Einsatzleitung</th><td>${d.einsatzleitung.map((z, i) => html`${i ? html`<br>` : ''}${z}`)}</td></tr>` : ''}
-    ${d.tenue ? html`<tr><th>Tenue</th><td>${new Roh(zeileAlsHtml(d.tenue))}</td></tr>` : ''}
+    ${zeile('Einsatzleitung', d.einsatzleitung.map((z, i) => html`${i ? html`<br>` : ''}${z}`))}
+    ${zeile('Tenue', d.tenue ? new Roh(zeileAlsHtml(d.tenue)) : null)}
   </table>
   ${FEST.schluss.map((z) => html`<p>${mitMail(z)}</p>`)}
   <p class="gruss">${FEST.gruss}</p>
