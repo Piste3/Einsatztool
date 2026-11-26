@@ -254,7 +254,9 @@ export async function startUebersicht(db: Db): Promise<StartUebersicht> {
     }
     const z = zahlen.get(s.id)!;
     const w = warnungen.get(s.id)!;
-    const anzahlW = w.schicht.length + [...w.anmeldungen.values()].reduce((n, l) => n + l.length, 0);
+    // Nur Warnungen bei Einträgen, wie die Einsatz-Übersicht (Wunsch Yann 26.11.2026).
+    // Fehlender Rollenbedarf und Clubdesk-Abgleich zeigen die Schichten-Tabelle im Einsatz.
+    const anzahlW = [...w.anmeldungen.values()].reduce((n, l) => n + l.length, 0);
     const e = einsaetze.get(s.einsatz_id)!;
     e.schichten.push({ id: s.id, name: s.name, start_zeit: s.start_zeit, end_zeit: s.end_zeit, soll_anzahl: s.soll_anzahl, publiziert: s.publiziert, zahlen: z, warnungen: anzahlW });
     e.unbestaetigt += z.unbestaetigt;

@@ -121,6 +121,11 @@ test('T32 Einsatzansicht: Steckbrief, Schichten-Tabelle, Kacheln bei mehreren Sc
     const zuTun = cockpit.slice(cockpit.indexOf('zu-tun-titel'), cockpit.indexOf('zahl-karten'));
     assert.match(zuTun, /Stadtlauf: 1 Anmeldung bestätigen/);
     assert.doesNotMatch(zuTun, /fehlt|fehlen|Warnung/);
+    // Fehlender Rollenbedarf zählt im Cockpit nicht als Warnung, gleich wie im Einsatz (26.11.2026).
+    const s3 = await erstelleSchicht(t.db, s.einsatzId, { name: 'Nacht', start_datum: tag, start_zeit: '23:00', end_datum: tag, end_zeit: '23:30', soll_anzahl: '1' });
+    await t.db.query("INSERT INTO schicht_rolle (schicht_id, rolle, anzahl) VALUES (?, 'Einsatzleitung', 1)", [s3]);
+    const cockpit2 = await hole('/');
+    assert.match(cockpit2, /<span class="wert">0<\/span><span class="titel">Schichten mit Warnungen/);
 
     // Alte Links führen auf «Besetzen». Filter «Neu»: nur Personen mit unbestätigtem Eintrag.
     const alt = await fetch(`${app.url}/einsaetze/${s.einsatzId}?personen=offen`, { headers: { cookie }, redirect: 'manual' });

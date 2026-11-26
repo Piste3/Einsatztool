@@ -297,3 +297,4 @@ Diese Liste ergänze ich beim Bauen. Jede Annahme aus Teil B des Konzepts steht 
 - 26.11.2026 (Rückmeldung Yann «Rand zu gross, Brief zu klein»): Schrift im Brief 11 pt, Betreff 12 pt, Logo 32 mm. Das Adressfeld bleibt 120 mm von links und 55 mm von oben. Druck mit «Ränder: Standard» und «Skalierung 100 %».
 - 26.11.2026 (Wunsch Yann): Telefonnummern erscheinen ohne Bindestrich («+41-77 411 07 51» → «+41 77 411 07 51», `nummerAnzeige()` in `src/domain/personen.ts`). Das gilt für Brief, Clubdesk-Text, Listen und Anruf-Links. Clubdesk bleibt unverändert (Test T25).
 - 26.11.2026 (Wunsch Yann): «Zu tun» im Einsatz zeigt keine fehlenden Personen mehr. Die Schichten-Tabelle darunter zeigt Ist / Soll genügend.
+- 26.11.2026 (Wunsch Yann): Cockpit zählt bei «Schichten mit Warnungen» und in der Spalte «Warnungen» nur Warnungen bei Einträgen, gleich wie die Einsatz-Übersicht. Fehlender Rollenbedarf und Clubdesk-Abgleich zählen dort nicht.
