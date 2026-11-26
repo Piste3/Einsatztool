@@ -299,3 +299,5 @@ Diese Liste ergänze ich beim Bauen. Jede Annahme aus Teil B des Konzepts steht 
 - 26.11.2026 (Wunsch Yann): «Zu tun» im Einsatz zeigt keine fehlenden Personen mehr. Die Schichten-Tabelle darunter zeigt Ist / Soll genügend.
 - 26.11.2026 (Wunsch Yann): Cockpit zählt bei «Schichten mit Warnungen» und in der Spalte «Warnungen» nur Warnungen bei Einträgen, gleich wie die Einsatz-Übersicht. Fehlender Rollenbedarf und Clubdesk-Abgleich zählen dort nicht.
 - 26.11.2026 (Wunsch Yann): Cockpit, Tabelle je Einsatz: eine Spalte je benötigter Rolle (Rollen aller Schichten des Einsatzes). Kopf mit Kürzel (EL, SC, BF, sonst voller Name), Zelle «Ist/Soll» bestätigt als Pille grün oder rot, ohne Bedarf «–». `ROLLE_KURZ` liegt neu in `src/domain/stammdaten.ts`.
+- 26.11.2026 (Wunsch Yann): Reiter «Formular»: Knopf «Löschen» je Eingang. Er öffnet die Rückfrage im Fenster (`GET /formular/eingang/:id/loeschen`, ohne Skript eigene Seite) mit Häkchen.
+- 26.11.2026: `loescheEingang()` löscht den Eingang, seine Momentaufnahme und die Einträge, die er angelegt hat (`neu = 1`), mit Statusprotokoll. Einträge, die schon vorher bestanden, bleiben. Kein Rückgängig (Test T52).
