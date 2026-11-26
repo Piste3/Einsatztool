@@ -655,11 +655,11 @@ body.druck { background: var(--hg); padding: 1rem; }
 .brief a { color: #0000ee; text-decoration: underline; }
 .brief-warnung { position: absolute; top: 6mm; right: 20mm; background: #c62f2f; color: #fff; padding: .2rem .6rem; border-radius: 4px; font-weight: 700; }
 .brief-logo { display: block; width: 26mm; height: 26mm; margin-bottom: 4mm; }
-.brief-adresszeile { display: flex; justify-content: space-between; margin-top: 6mm; min-height: 45mm; }
+.brief-adresszeile { margin-top: 6mm; min-height: 36mm; }
 .brief .ansprechperson small { font-size: 7.5pt; font-weight: 700; color: #000; }
-.brief .empfaenger, .brief p.brief-datum { width: 85mm; margin-left: auto; }
-.brief .empfaenger { margin-top: 3mm; }
-.brief p.brief-datum { margin-top: 0; margin-bottom: 10mm; }
+/* Adressfeld für Fensterkuverts C5 und C4 mit Fenster rechts: 120 mm von links, 55 mm von oben, ab Blattrand. */
+.brief .empfaenger { position: absolute; left: 120mm; top: 55mm; width: 75mm; max-height: 35mm; overflow: hidden; }
+.brief p.brief-datum { margin: 0 0 10mm 95mm; }
 .brief-titel { font-size: 10.5pt; font-weight: 700; margin: 0 0 4mm; }
 .brief-tabelle { border-collapse: collapse; margin: 0 0 6mm; }
 .brief-tabelle th { text-align: left; font-weight: 700; padding: .6mm 6mm .6mm 0; vertical-align: top; white-space: nowrap; width: 22mm; }
@@ -680,12 +680,14 @@ body.druck { background: var(--hg); padding: 1rem; }
   .tabelle thead th { background: #eee !important; color: #000 !important; position: static; }
   .rahmen { box-shadow: none; overflow: visible; }
   body.aufgebot { margin: 0; }
-  .brief { box-shadow: none; margin: 0; width: auto; min-height: 0; padding: 3mm 8mm 0 13mm; break-after: page; }
+  /* Briefe ohne Seitenrand: Das Adressfeld misst ab dem Blattrand (Fensterkuvert). */
+  .brief { page: brief; box-shadow: none; margin: 0; width: 210mm; min-height: 0; break-after: page; }
   .brief a { color: #0000ee; text-decoration: underline; }
   .brief:last-of-type { break-after: auto; }
   a { color: #000; text-decoration: none; }
 }
 @page :first { margin-top: 12mm; }
+@page brief { size: A4; margin: 0; }
 
 /* Grosser Punkt für die Lage */
 .pille-punkt { display: inline-flex; }
