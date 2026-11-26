@@ -661,7 +661,7 @@ body.druck { background: var(--hg); padding: 1rem; }
 .brief p { margin: 0 0 4mm; }
 .brief a { color: #0000ee; text-decoration: underline; }
 .brief-warnung { position: absolute; top: 6mm; right: 20mm; background: #c62f2f; color: #fff; padding: .2rem .6rem; border-radius: 4px; font-weight: 700; }
-.brief-logo { display: block; width: 26mm; height: 26mm; margin-bottom: 4mm; }
+.brief-logo { display: block; width: 30mm; height: auto; margin-bottom: 4mm; }
 .brief-adresszeile { margin-top: 6mm; min-height: 36mm; }
 .brief .ansprechperson small { font-size: 7.5pt; font-weight: 700; color: #000; }
 /* Adressfeld für Fensterkuverts C5 und C4 mit Fenster rechts: 120 mm von links, 55 mm von oben, ab Blattrand. */

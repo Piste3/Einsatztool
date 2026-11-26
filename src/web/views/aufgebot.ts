@@ -21,7 +21,7 @@ function briefeHtml(d: AufgebotDaten): Roh[] {
 <article class="brief">
   ${b.adresseFehlt ? html`<p class="brief-warnung nicht-drucken">Adresse fehlt</p>` : ''}
   <div class="brief-kopf">
-    <img class="brief-logo" src="/static/logo.png?v=${START_ID}" alt="Logo Kadetten-Korps Basel">
+    <img class="brief-logo" src="/static/brief-logo.png?v=${START_ID}" alt="Logo Kadetten-Korps Basel" width="991" height="832">
     <div class="absender"><strong>${FEST.absender[0]}</strong><br>${FEST.absender.slice(1).map((z, i) => html`${i ? html`<br>` : ''}${z}`)}</div>
   </div>
   <div class="brief-adresszeile">

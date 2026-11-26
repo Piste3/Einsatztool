@@ -91,6 +91,7 @@ Siehe Abschnitt 3 des Auftrags. Kurz: Startseite «Cockpit» mit «Zu tun», Ist
 
 Seit 19.11.2026 (Entscheid Yann): Aussehen und Bedienung folgen dem Handbuch des KKB-Einsatzplaners (nur als Vorbild). Funktionen bleiben gleich. Kein fremdes Logo.
 
+- Brief (Aufgebot): eigenes Logo `src/web/public/brief-logo.png` (schwarz-weiss, Vorlage Yann 26.11.2026), 30 mm breit.
 - Logo: das KKB-Logo (`src/web/public/logo.png`, auch als `favicon.png`), rund und aussen durchsichtig (Wunsch Yann, 20.11.2026). Der Kreis innen ist weiss, damit es im dunklen Modus sichtbar bleibt. Untertitel «Kadetten-Korps Basel». Das öffentliche Formular bleibt ohne Logo.
 
 - Helle Navigation links mit Symbolen, unten Benutzer, Darstellung (wie System, Hell, Dunkel) und Abmelden.
