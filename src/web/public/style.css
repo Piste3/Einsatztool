@@ -562,7 +562,11 @@ textarea { width: 100%; }
 .bemerkung { white-space: normal; }
 .bemerkung.intern { background: var(--flaeche); border: 1px solid var(--linie); border-left: 3px solid var(--orange-punkt); padding: .5rem .8rem; border-radius: var(--radius-klein); font-size: .9rem; }
 p.bemerkung:not(.intern) { border-left: 3px solid var(--linie-stark); padding: .1rem .8rem; font-size: .9rem; }
-.wa { font-size: .9em; text-decoration: none; }
+.wa { text-decoration: none; display: inline-flex; vertical-align: -0.2em; }
+.wa .symbol { width: 1.15em; height: 1.15em; }
+/* WhatsApp-Symbol: Markenfarbe, in hell und dunkel gleich gut sichtbar. */
+.symbol-wa { color: #25d366; }
+.wa:hover .symbol-wa, .handy-wa:hover .symbol-wa { color: #1da851; }
 .telefon a { white-space: nowrap; font-weight: 400; }
 .schritte { padding-left: 1.2rem; }
 /* Update: Liste der neuen Commits */

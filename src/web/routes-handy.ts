@@ -37,7 +37,7 @@ function anrufen(p: { telefon: string | null; telefon_privat: string | null }, n
   // WhatsApp öffnet den Chat mit dieser Nummer direkt (Wunsch Yann 23.11.2026).
   const wa = whatsappNummer(n);
   return html`<span class="handy-kontakt"><a class="handy-tel" href="tel:${telLink(n)}" title="${name} anrufen: ${n}" aria-label="${name} anrufen">${symbol('telefon')}</a>${wa
-    ? html`<a class="handy-tel handy-wa" href="https://wa.me/${wa}" rel="noopener noreferrer" target="_blank" title="WhatsApp-Chat mit ${name}" aria-label="WhatsApp-Chat mit ${name}">${symbol('chat')}</a>`
+    ? html`<a class="handy-tel handy-wa" href="https://wa.me/${wa}" rel="noopener noreferrer" target="_blank" title="WhatsApp-Chat mit ${name}" aria-label="WhatsApp-Chat mit ${name}">${symbol('whatsapp', 'symbol-wa')}</a>`
     : ''}</span>`;
 }
 
@@ -247,7 +247,7 @@ ${!liste.length ? html`<p class="leer">${leer}</p>` : gewaehlt ? listeEine(gewae
     res.send(handySeite(kx, name, 'personen', html`
 <section class="handy-person">
   ${p.geloescht_am ? html`<p class="meldung hinweis">Die Personendaten sind gelöscht.</p>` : ''}
-  ${nummer ? html`<p class="hp-knoepfe"><a class="knopf" href="tel:${telLink(nummer)}">${symbol('telefon')} Anrufen</a>${wa ? html`<a class="knopf" href="https://wa.me/${wa}" rel="noopener noreferrer" target="_blank">${symbol('chat')} WhatsApp</a>` : ''}</p>` : ''}
+  ${nummer ? html`<p class="hp-knoepfe"><a class="knopf" href="tel:${telLink(nummer)}">${symbol('telefon')} Anrufen</a>${wa ? html`<a class="knopf" href="https://wa.me/${wa}" rel="noopener noreferrer" target="_blank">${symbol('whatsapp', 'symbol-wa')} WhatsApp</a>` : ''}</p>` : ''}
   ${p.essenseinschraenkung ? html`<p class="unter">Essen: ${p.essenseinschraenkung}</p>` : ''}
   ${zaehler.length ? html`<p class="hp-zahlen">${zaehler}</p>` : ''}
 </section>

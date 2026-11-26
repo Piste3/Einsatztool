@@ -1,5 +1,6 @@
 // Wiederverwendbare Bausteine der Oberfläche.
 import { html, Roh } from '../html.js';
+import { symbol } from './symbole.js';
 import { STATUS_TEXT, KANAL_TEXT, STATUS, KANAELE, type Kanal, type Status } from '../../domain/eingabe.js';
 import { hauptnummer, nummerAnzeige, telLink, telefonText, whatsappNummer } from '../../domain/personen.js';
 import { sollFarbe } from '../../domain/zaehlung.js';
@@ -79,7 +80,7 @@ export function telefon(p: { telefon: string | null; telefon_privat: string | nu
   if (!nummern.length) return html``;
   return html`<span class="telefon">${nummern.map((n, i) => {
     const wa = whatsappNummer(n);
-    return html`${i > 0 ? ' / ' : ''}<a href="tel:${telLink(n)}">${nummerAnzeige(n)}</a>${wa ? html` <a class="wa" href="https://wa.me/${wa}" title="WhatsApp-Chat" rel="noopener noreferrer" target="_blank">💬</a>` : ''}`;
+    return html`${i > 0 ? ' / ' : ''}<a href="tel:${telLink(n)}">${nummerAnzeige(n)}</a>${wa ? html` <a class="wa" href="https://wa.me/${wa}" title="WhatsApp-Chat" aria-label="WhatsApp-Chat" rel="noopener noreferrer" target="_blank">${symbol('whatsapp', 'symbol-wa')}</a>` : ''}`;
   })}</span>`;
 }
 
