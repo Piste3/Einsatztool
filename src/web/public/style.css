@@ -915,14 +915,16 @@ body.druck { background: var(--hg); padding: 1rem; }
 .schicht-info { display: flex; flex-wrap: wrap; gap: .5rem 1rem; align-items: center; justify-content: space-between; padding: .5rem .8rem; border: 1px solid var(--linie); border-radius: 10px; background: var(--flaeche-2); font-size: .88rem; }
 .besetzen .filterzeile { align-items: center; }
 .besetzen .filterzeile .filter-chips { margin: .3rem 0; }
+.besetzen-filtergruppe { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem .8rem; }
+.besetzen-filtergruppe .filter-chips { margin: 0; padding-left: .8rem; border-left: 1px solid var(--linie-stark); }
+.besetzen-wechsel { display: inline-flex; border: 1px solid var(--linie-stark); border-radius: 10px; padding: 3px; gap: 3px; background: var(--flaeche-2); }
+.besetzen-wechsel .wechsel { display: flex; flex-direction: column; padding: .3rem .9rem; border-radius: 7px; color: var(--gedämpft); line-height: 1.25; }
+.besetzen-wechsel .wechsel:hover { text-decoration: none; background: var(--grau-hg); color: var(--text); }
+.besetzen-wechsel .wechsel-titel { font-size: .88rem; font-weight: 600; }
+.besetzen-wechsel .wechsel-unter { font-size: .72rem; }
+.besetzen-wechsel .wechsel[aria-current="page"] { background: var(--flaeche); color: var(--text); box-shadow: 0 0 0 1px var(--text); }
 .besetzen-filter a.f-neu[aria-current="page"] { border-color: var(--orange-punkt); box-shadow: inset 0 0 0 1px var(--orange-punkt); }
 .besetzen-eintragen { padding: .5rem .7rem; border: 1px dashed var(--linie-stark); border-radius: 10px; }
-.besetzen-eintragen-alle .zeilen-form { margin: 0; }
-.schicht-wahl { display: flex; flex-wrap: wrap; gap: .4rem; align-items: center; border: 0; margin: .45rem 0 0; padding: 0; }
-.schicht-wahl legend { float: left; margin-right: .4rem; font-size: .78rem; color: var(--gedämpft); }
-.schicht-wahl-feld { display: inline-flex; align-items: center; gap: .4rem; border: 1px solid var(--linie-stark); border-radius: 8px; padding: .3rem .7rem; background: var(--flaeche); font-size: .85rem; cursor: pointer; }
-.schicht-wahl-feld:hover { background: var(--grau-hg); }
-.schicht-wahl-feld:has(input:checked) { border-color: var(--text); box-shadow: inset 0 0 0 1px var(--text); }
 .besetzen-tabelle td { vertical-align: middle; }
 .besetzen-tabelle th.waehlen, .besetzen-tabelle td.waehlen { width: 2rem; }
 .besetzen-tabelle th.mitte, .besetzen-tabelle td.mitte { text-align: center; }
@@ -1354,3 +1356,4 @@ body.handy .frage-fenster { margin: auto; width: calc(100vw - 1.5rem); border-ra
 /* Verlauf: Änderungen an Einsatz und Schichten (26.11.2026). Lange Werte brechen um. */
 .einsatz-verlauf .verlauf-text { overflow-wrap: anywhere; max-width: 42rem; }
 .einsatz-verlauf tr.verlauf-einsatz td:nth-child(2) { color: var(--grau); }
+@media (max-width: 700px) { .besetzen-filtergruppe .filter-chips { border-left: 0; padding-left: 0; } }

@@ -88,9 +88,17 @@ ${sw ? warnungen(sw.schicht) : ''}
 ${gewaehlt.bemerkung_intern ? html`<p class="bemerkung intern"><strong>Intern:</strong> ${gewaehlt.bemerkung_intern}</p>` : ''}` : '';
 
   // ---------- Filter ----------
-  const filterChips = html`<p class="filter-chips besetzen-filter">${BESETZEN_FILTER
+  // Wunsch Yann 26.11.2026: Der Wechsel zwischen «Neu + Bestätigt» (eingetragen) und «Nicht gefragt»
+  // (Personen hinzufügen) steht als grosser Umschalter vorne. Die übrigen Filter folgen klein.
+  const aktuell = (f: BesetzenFilter) => (filter === f ? new Roh(' aria-current="page"') : '');
+  const wechsel = html`<span class="besetzen-wechsel" role="group" aria-label="Eingetragene Personen oder Personen hinzufügen">
+  <a class="wechsel f-an" href="${pfad('an')}"${aktuell('an')}><span class="wechsel-titel">${BESETZEN_FILTER_TEXT.an} <strong>${zahl.an}</strong></span><span class="wechsel-unter">Eingetragene Personen</span></a>
+  <a class="wechsel f-nicht" href="${pfad('nicht')}"${aktuell('nicht')}><span class="wechsel-titel">${BESETZEN_FILTER_TEXT.nicht} <strong>${zahl.nicht}</strong></span><span class="wechsel-unter">＋ Personen hinzufügen</span></a>
+</span>`;
+  const filterChips = html`<span class="besetzen-filtergruppe">${wechsel}<span class="filter-chips besetzen-filter">${BESETZEN_FILTER
+    .filter((f) => f !== 'an' && f !== 'nicht')
     .filter((f) => f !== 'warnung' || zahl.warnung > 0 || filter === 'warnung')
-    .map((f) => html`<a class="f-${f}" href="${pfad(f)}"${filter === f ? new Roh(' aria-current="page"') : ''}>${BESETZEN_FILTER_TEXT[f]} ${zahl[f]}</a>`)}</p>`;
+    .map((f) => html`<a class="f-${f}" href="${pfad(f)}"${aktuell(f)}>${BESETZEN_FILTER_TEXT[f]} ${zahl[f]}</a>`)}</span></span>`;
   const hinweis: Record<BesetzenFilter, string> = {
     an: 'Angemeldet oder bestätigt.',
     neu: 'Angemeldet, noch nicht bestätigt.',
@@ -107,35 +115,16 @@ ${gewaehlt.bemerkung_intern ? html`<p class="bemerkung intern"><strong>Intern:</
     ? knopfPost(kx, gewaehlt ? `/schichten/${gewaehlt.id}/alle-bestaetigen` : `/einsaetze/${einsatzId}/alle-bestaetigen`, zahl.neu === 1 ? 'Bestätigen' : `Alle ${zahl.neu} bestätigen`, {}, 'knopf haupt klein', hier)
     : '';
 
-  // ---------- Person eintragen ----------
-  // Eine Schicht: direkt in diese Schicht. Alle Schichten: Schichten wählen (Wunsch Yann 26.11.2026).
+  // ---------- Person eintragen (eine Schicht) ----------
   const eintragen = async () => {
+    if (!gewaehlt) return '';
     const personen = await personenListe(db);
-    const personFeld = html`<label class="wachsen">Person eintragen <input name="person" list="personen-liste" required placeholder="Name tippen …" autocomplete="off"></label>
-  <datalist id="personen-liste">${personen.map((p) => html`<option value="${personAuswahlText(p)}"></option>`)}</datalist>`;
-    // Eine leere Rolle lässt eine vorhandene Rolle stehen (Route).
-    const felder = async () => html`<label>Status ${statusAuswahl('status', 'angemeldet')}</label>
-  <label>Rolle ${rolleAuswahl('rolle', await ladeRollen(db), null)}</label>`;
-    if (gewaehlt) {
-      return html`<form method="post" action="/schichten/${gewaehlt.id}/anmeldungen" class="zeilen-form besetzen-eintragen">
+    return html`<form method="post" action="/schichten/${gewaehlt.id}/anmeldungen" class="zeilen-form besetzen-eintragen">
   ${formFelder(kx, hier)}<input type="hidden" name="kanal" value="telefon">
-  ${personFeld}
+  <label class="wachsen">Person eintragen <input name="person" list="personen-liste" required placeholder="Name tippen …" autocomplete="off"></label>
+  <datalist id="personen-liste">${personen.map((p) => html`<option value="${personAuswahlText(p)}"></option>`)}</datalist>
   <label>Status ${statusAuswahl('status', 'angemeldet')}</label>
   <button type="submit" class="knopf">Eintragen</button>
-</form>`;
-    }
-    return html`<form method="post" action="/einsaetze/${einsatzId}/anmeldungen" class="besetzen-eintragen besetzen-eintragen-alle">
-  ${formFelder(kx, hier)}<input type="hidden" name="kanal" value="telefon">
-  <div class="zeilen-form">
-  ${personFeld}
-  ${await felder()}
-  <button type="submit" class="knopf">Eintragen</button>
-  </div>
-  <fieldset class="schicht-wahl">
-    <legend>In Schichten</legend>
-    ${schichten.map((s) => html`<label class="schicht-wahl-feld"><input type="checkbox" name="schichten" value="${s.id}">
-      <span><strong>${s.name}</strong> <span class="unter">${wochentagKurz(s.start_zeit)} ${datumChVonIso(s.start_zeit).slice(0, 6)}${s.zeit_offen ? '' : ` ${lokaleZeit(s.start_zeit)}`}</span></span></label>`)}
-  </fieldset>
 </form>`;
   };
 

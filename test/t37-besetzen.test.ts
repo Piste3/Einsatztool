@@ -70,7 +70,9 @@ test('T37 Besetzen im Web: Antwort-Knopf legt Eintrag an, alte Adressen, Dokumen
 
     // Ohne Einträge zeigt die Seite «Nicht gefragt» mit Telefon und Antwort-Knöpfen. Der Name ist maskiert.
     const leer = await (await hole(pfad)).text();
-    assert.match(leer, /aria-current="page">Nicht gefragt 1/);
+    // Wunsch Yann 26.11.2026: Umschalter «Neu + Bestätigt» / «Nicht gefragt» mit Hinweis «Personen hinzufügen».
+    assert.match(leer, /class="besetzen-wechsel"/);
+    assert.match(leer, /aria-current="page"><span class="wechsel-titel">Nicht gefragt <strong>1<\/strong><\/span><span class="wechsel-unter">＋ Personen hinzufügen/);
     assert.match(leer, /Baumann &lt;b&gt;/);
     assert.doesNotMatch(leer, /Baumann <b>/);
     assert.match(leer, /href="tel:/);
@@ -92,7 +94,7 @@ test('T37 Besetzen im Web: Antwort-Knopf legt Eintrag an, alte Adressen, Dokumen
 
     // Danach: Vorgabe «Neu + Bestätigt» mit «Bestätigen» in der Zeile.
     const neu = await (await hole(pfad)).text();
-    assert.match(neu, /aria-current="page">Neu \+ Bestätigt 1/);
+    assert.match(neu, /aria-current="page"><span class="wechsel-titel">Neu \+ Bestätigt <strong>1<\/strong>/);
     assert.match(neu, new RegExp(`action="/anmeldungen/${a.id}"[\\s\\S]*?value="bestaetigt"`));
 
     // Alte Adressen führen auf «Besetzen».
