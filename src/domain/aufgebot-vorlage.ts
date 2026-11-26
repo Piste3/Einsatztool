@@ -1,25 +1,28 @@
 // Aufgebot: ein Brief je bestätigter Person und Schicht (20).
+// Layout nach der Briefvorlage von Yann (26.11.2026): Logo, Absender, Ansprechperson, Empfänger, Ort und Datum, Betreff.
 // Der feste Text liegt hier im Code. Änderungen laufen über einen Commit.
 import { alle, type Db } from '../db/db.js';
 import { ladeSchicht } from './schicht.js';
 import { hauptnummer } from './personen.js';
-import { datumCh, datumChVonIso, lokalesDatum, lokaleZeit, wochentag } from './zeit.js';
+import { datumCh, datumLangVonIso, lokalesDatum, lokaleZeit, wochentag } from './zeit.js';
 import type { Warnung } from './warnungen.js';
 
 export const FEST = {
   absender: ['KADETTEN-KORPS BASEL', 'Rüchligweg 55', '4125 Riehen'],
-  ansprechperson: ['Ansprechperson', 'Aufgebotsstelle', 'aufgebot@kkb.ch'],
+  ansprechpersonTitel: 'Ansprechperson',
+  ansprechperson: ['Aufgebotsstelle', 'aufgebot@kkb.ch'],
+  /** Diese Adresse erscheint im Brief als mailto-Link. */
+  mail: 'aufgebot@kkb.ch',
   ortDatum: 'Riehen, den',
   einleitung: [
-    'Du hast dich für folgenden Einsatz angemeldet. Schon im Voraus herzlichen Dank!',
-    'Nachstehend findest du alle nötigen Informationen:',
+    'Du hast dich für folgenden Einsatz angemeldet. Schon im Voraus herzlichen Dank! Nachstehend findest du alle nötigen Informationen:',
   ],
   schluss: [
     'Deine Teilnahme ist definitiv. Falls Du am Einsatz nicht teilnehmen kannst, musst du dich umgehend per Mail an aufgebot@kkb.ch wenden. Bei krankheitsbedingten Absagen weniger als drei Tage vor dem Einsatz, melde dich bitte direkt telefonisch bei der Einsatzleitung.',
-    'Bei allfäligen Fragen stehe ich dir gerne zur Verfügung.',
+    'Bei allfälligen Fragen stehe ich dir gerne zur Verfügung.',
   ],
   gruss: 'Freundliche Grüsse',
-  unterschrift: ['KADETTEN-KORPS BASEL', 'Aufgebotstelle'],
+  unterschrift: ['KADETTEN-KORPS BASEL', 'Aufgebotsstelle'],
 };
 
 export interface Brief {
@@ -48,7 +51,8 @@ export interface AufgebotDaten {
 }
 
 function zeitOrt(iso: string, ort: string | null): string {
-  return `${wochentag(iso)}, ${datumChVonIso(iso)} ${lokaleZeit(iso)}${ort ? `, ${ort}` : ''}`;
+  // z. B. «Samstag, 14. November 2026, 06:45 Uhr, Innenhof Kaserne Basel»
+  return `${wochentag(iso)}, ${datumLangVonIso(iso)}, ${lokaleZeit(iso)} Uhr${ort ? `, ${ort}` : ''}`;
 }
 
 /**
@@ -74,7 +78,7 @@ export async function aufgebotDaten(db: Db, schichtId: number, nurPerson: number
     .map((e) => {
       const name = e.person_id ? `${e.vorname ?? ''} ${e.nachname ?? ''}`.trim() : e.name_text;
       const tel = hauptnummer(e);
-      return `EL: ${e.rang ? `${e.rang} ` : ''}${name}${tel ? ` (${tel})` : ''}`;
+      return `${e.rang ? `${e.rang} ` : ''}${name}${tel ? ` (${tel})` : ''}`;
     });
 
   const briefe: Brief[] = aktiv

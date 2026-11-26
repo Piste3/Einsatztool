@@ -649,18 +649,24 @@ body.druck { background: var(--hg); padding: 1rem; }
 .luecken { background: var(--orange-hg); border-radius: var(--radius); padding: .6rem 1rem; margin-bottom: 1rem; }
 .luecken h2 { margin-top: 0; }
 
-/* Aufgebot: ein Brief je A4-Seite, Adresse rechts für das Fensterkuvert */
-.brief { background: #fff; color: #000; width: 210mm; min-height: 297mm; padding: 20mm 20mm 20mm 25mm; margin: 0 auto 1rem; box-shadow: var(--schatten); font-size: 11pt; position: relative; }
+/* Aufgebot: ein Brief je A4-Seite nach der Briefvorlage (26.11.2026), Adresse rechts für das Fensterkuvert */
+.brief { background: #fff; color: #000; width: 210mm; min-height: 297mm; padding: 15mm 20mm 20mm 25mm; margin: 0 auto 1rem; box-shadow: var(--schatten); font-family: Arial, Helvetica, sans-serif; font-size: 10.5pt; line-height: 1.3; position: relative; }
+.brief p { margin: 0 0 4mm; }
+.brief a { color: #0000ee; text-decoration: underline; }
 .brief-warnung { position: absolute; top: 6mm; right: 20mm; background: #c62f2f; color: #fff; padding: .2rem .6rem; border-radius: 4px; font-weight: 700; }
-.brief-kopf .absender { font-weight: 700; }
-.brief-adresszeile { display: flex; justify-content: space-between; margin-top: 12mm; min-height: 40mm; }
-.brief .empfaenger { width: 85mm; margin-top: 8mm; }
-.brief-datum { text-align: right; margin: 6mm 0; }
-.brief-titel { font-size: 13pt; margin: 6mm 0 4mm; }
-.brief-tabelle { border-collapse: collapse; margin: 4mm 0; }
-.brief-tabelle th { text-align: left; font-weight: 400; padding: 1mm 8mm 1mm 0; vertical-align: top; white-space: nowrap; }
-.brief-tabelle td { padding: 1mm 0; }
-.unterschrift { margin-top: 8mm; }
+.brief-logo { display: block; width: 26mm; height: 26mm; margin-bottom: 4mm; }
+.brief-adresszeile { display: flex; justify-content: space-between; margin-top: 6mm; min-height: 45mm; }
+.brief .ansprechperson small { font-size: 7.5pt; font-weight: 700; color: #000; }
+.brief .empfaenger, .brief p.brief-datum { width: 85mm; margin-left: auto; }
+.brief .empfaenger { margin-top: 3mm; }
+.brief p.brief-datum { margin-top: 0; margin-bottom: 10mm; }
+.brief-titel { font-size: 10.5pt; font-weight: 700; margin: 0 0 4mm; }
+.brief-tabelle { border-collapse: collapse; margin: 0 0 6mm; }
+.brief-tabelle th { text-align: left; font-weight: 700; padding: .6mm 6mm .6mm 0; vertical-align: top; white-space: nowrap; width: 22mm; }
+.brief-tabelle td { padding: .6mm 0; vertical-align: top; }
+.brief-tabelle tr.abstand td { height: 4mm; padding: 0; }
+.brief .gruss { margin-top: 8mm; }
+.brief .unterschrift { margin-top: 14mm; }
 
 @media print {
   :root:not(.nie), :root[data-theme="dark"] { color-scheme: light; --text: #000; --gedämpft: #444; --linie: #ccc; --flaeche: #fff; --flaeche-2: #fff; --hg: #fff; --grau-hg: #f2f2f2; }
@@ -674,7 +680,8 @@ body.druck { background: var(--hg); padding: 1rem; }
   .tabelle thead th { background: #eee !important; color: #000 !important; position: static; }
   .rahmen { box-shadow: none; overflow: visible; }
   body.aufgebot { margin: 0; }
-  .brief { box-shadow: none; margin: 0; width: auto; min-height: 0; padding: 8mm 8mm 0 13mm; break-after: page; }
+  .brief { box-shadow: none; margin: 0; width: auto; min-height: 0; padding: 3mm 8mm 0 13mm; break-after: page; }
+  .brief a { color: #0000ee; text-decoration: underline; }
   .brief:last-of-type { break-after: auto; }
   a { color: #000; text-decoration: none; }
 }

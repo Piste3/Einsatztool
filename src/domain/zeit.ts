@@ -86,6 +86,14 @@ export function datumCh(datum: string): string {
   return m ? `${m[3]}.${m[2]}.${m[1]}` : '';
 }
 
+const MONATE_LANG = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
+
+/** Langes Datum der lokalen Zeit, z. B. «14. November 2026». */
+export function datumLangVonIso(iso: string): string {
+  const [j, m, t] = lokalesDatum(iso).split('-').map(Number);
+  return `${t}. ${MONATE_LANG[m - 1]} ${j}`;
+}
+
 /** TT.MM.JJJJ der lokalen Zeit. */
 export function datumChVonIso(iso: string): string {
   return datumCh(lokalesDatum(iso));

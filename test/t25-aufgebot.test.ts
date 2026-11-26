@@ -5,7 +5,7 @@ import { einsatz, inTagen, neueDatenbank, person, rang } from './hilfe.js';
 import { aufgebotDaten } from '../src/domain/aufgebot-vorlage.js';
 import { setzeAnmeldung } from '../src/domain/anmeldung.js';
 import { ladeSchicht } from '../src/domain/schicht.js';
-import { lokaleZeit, datumChVonIso } from '../src/domain/zeit.js';
+import { lokaleZeit, datumLangVonIso, wochentag } from '../src/domain/zeit.js';
 import { schreibe } from '../src/db/db.js';
 
 test('T25 Brief: Antreten/Abtreten aus der Schicht, Einsatzleitung mit Rang, Name, Telefon; leere Felder entfallen', async () => {
@@ -21,12 +21,12 @@ test('T25 Brief: Antreten/Abtreten aus der Schicht, Einsatzleitung mit Rang, Nam
 
     const sch = await ladeSchicht(t.db, s.schichtId);
     const a = await aufgebotDaten(t.db, s.schichtId);
-    assert.ok(a.antreten.includes(datumChVonIso(sch.start_zeit)));
+    assert.ok(a.antreten.startsWith(`${wochentag(sch.start_zeit)}, ${datumLangVonIso(sch.start_zeit)}, ${lokaleZeit(sch.start_zeit)} Uhr`));
     assert.ok(a.antreten.includes(lokaleZeit(sch.start_zeit)));
     assert.ok(a.antreten.endsWith('Marktplatz'));
-    assert.ok(a.abtreten.includes(lokaleZeit(sch.end_zeit)));
+    assert.ok(a.abtreten.includes(`${lokaleZeit(sch.end_zeit)} Uhr`));
     assert.ok(a.abtreten.endsWith('Marktplatz'));
-    assert.deepEqual(a.einsatzleitung, ['EL: Kpl Eva Leiterin (079 111 22 33)']);
+    assert.deepEqual(a.einsatzleitung, ['Kpl Eva Leiterin (079 111 22 33)']);
     assert.equal(a.tenue, null);
     assert.equal(a.hinweis, null);
     assert.equal(a.briefe.length, 2);

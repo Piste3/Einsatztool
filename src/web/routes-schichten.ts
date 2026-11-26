@@ -27,6 +27,7 @@ import { alterAm, datumChVonIso, lokalesDatum, lokaleZeit } from '../domain/zeit
 import { html, mehrzeilig, Roh } from './html.js';
 import { k, aktuellerPfad } from './kontext.js';
 import { druckseite, formFelder, mehrMenue, seite, seitenKopf, type PfadTeil } from './views/layout.js';
+import { START_ID } from './wartung.js';
 import {
   abgleichPunkt, datumZeit, istSoll, kanalAuswahl, karte, knopfPost, rolleAuswahl, statusAuswahl, statusText, telefon, warnungen, zeitraum,
 } from './views/teile.js';
@@ -216,15 +217,21 @@ ${seitenKopf({ pfad: schichtPfad(s, 'Termintext'), titel: 'Text für den Clubdes
     const nur = typeof req.query.person === 'string' && /^\d+$/.test(req.query.person) ? Number(req.query.person) : null;
     const d = await aufgebotDaten(db, leseId(req.params.sid), nur);
     const zeile = (titel: string, wert: string | null) => (wert ? html`<tr><th>${titel}</th><td>${wert}</td></tr>` : '');
-    const tenueZeile = d.tenue ? html`<tr><th>Tenue</th><td>${new Roh(zeileAlsHtml(d.tenue))}</td></tr>` : '';
+    const abstand = html`<tr class="abstand"><td colspan="2"></td></tr>`;
+    // Die Aufgebotsadresse im Text erscheint als mailto-Link (wie in der Vorlage).
+    const mitMail = (text: string) => {
+      const teile = text.split(FEST.mail);
+      return teile.map((t, i) => html`${i ? html`<a href="mailto:${FEST.mail}">${FEST.mail}</a>` : ''}${t}`);
+    };
     const briefe = d.briefe.map((b) => html`
 <article class="brief">
   ${b.adresseFehlt ? html`<p class="brief-warnung nicht-drucken">Adresse fehlt</p>` : ''}
   <div class="brief-kopf">
-    <div class="absender">${FEST.absender.map((z) => html`${z}<br>`)}</div>
+    <img class="brief-logo" src="/static/logo.png?v=${START_ID}" alt="Logo Kadetten-Korps Basel">
+    <div class="absender"><strong>${FEST.absender[0]}</strong><br>${FEST.absender.slice(1).map((z, i) => html`${i ? html`<br>` : ''}${z}`)}</div>
   </div>
   <div class="brief-adresszeile">
-    <div class="ansprechperson">${FEST.ansprechperson.map((z) => html`${z}<br>`)}</div>
+    <div class="ansprechperson"><small>${FEST.ansprechpersonTitel}</small><br>${FEST.ansprechperson.map((z, i) => html`${i ? html`<br>` : ''}${z}`)}</div>
     <div class="empfaenger">
       ${b.rang ? html`${b.rang}<br>` : ''}${b.name}<br>
       ${b.strasse ? html`${b.strasse}<br>` : ''}${b.adresszusatz ? html`${b.adresszusatz}<br>` : ''}${b.plzOrt ?? ''}
@@ -237,18 +244,18 @@ ${seitenKopf({ pfad: schichtPfad(s, 'Termintext'), titel: 'Text für den Clubdes
     ${zeile('Antreten', d.antreten)}
     ${zeile('Abtreten', d.abtreten)}
     ${d.hinweis ? html`<tr><th></th><td>${mehrzeilig(d.hinweis)}</td></tr>` : ''}
-    ${d.einsatzleitung.length ? html`<tr><th>Einsatzleitung</th><td>${d.einsatzleitung.map((z, i) => html`${i ? html`<br>` : ''}${z}`)}</td></tr>` : ''}
-    ${tenueZeile}
+    ${d.einsatzleitung.length ? html`${abstand}<tr><th>Einsatzleitung</th><td>${d.einsatzleitung.map((z, i) => html`${i ? html`<br>` : ''}${z}`)}</td></tr>` : ''}
+    ${d.tenue ? html`${abstand}<tr><th>Tenue</th><td>${new Roh(zeileAlsHtml(d.tenue))}</td></tr>` : ''}
   </table>
-  ${FEST.schluss.map((z) => html`<p>${z}</p>`)}
-  <p>${FEST.gruss}</p>
-  <p class="unterschrift">${FEST.unterschrift.map((z) => html`${z}<br>`)}</p>
+  ${FEST.schluss.map((z) => html`<p>${mitMail(z)}</p>`)}
+  <p class="gruss">${FEST.gruss}</p>
+  <p class="unterschrift"><strong>${FEST.unterschrift[0]}</strong><br>${FEST.unterschrift.slice(1).map((z, i) => html`${i ? html`<br>` : ''}${z}`)}</p>
 </article>`);
     res.send(druckseite(d.titel, html`
 <div class="druck-steuerung nicht-drucken">
   <a href="/schichten/${d.schichtId}">← Zurück</a>
   <button type="button" class="knopf haupt" data-drucken>Drucken</button>
-  <span>${d.briefe.length} Briefe</span>
+  <span>${d.briefe.length} ${d.briefe.length === 1 ? 'Brief' : 'Briefe'}</span>
 </div>
 ${d.luecken.length ? html`<div class="luecken nicht-drucken"><h2>Lücken vor dem Druck</h2>${warnungen(d.luecken)}</div>` : ''}
 ${d.briefe.length ? briefe : html`<p class="nicht-drucken">Keine bestätigten Personen.</p>`}`, 'aufgebot'));
