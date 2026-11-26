@@ -308,3 +308,4 @@ Diese Liste ergänze ich beim Bauen. Jede Annahme aus Teil B des Konzepts steht 
 - 26.11.2026: Ins Protokoll kommen: Einsatz erstellt, kopiert und geändert (je Feld alt → neu), Schicht erstellt, kopiert, geändert (auch Rollenbedarf), publiziert, nicht mehr publiziert, gelöscht, Fremdabteilungen. Eine vererbte Änderung erhält je Schicht «vom Einsatz übernommen».
 - 26.11.2026: Das Protokoll speichert lesbare Werte (Datum, Name des Rangs). Ein Eintrag einer gelöschten Schicht bleibt. Löschen des Einsatzes löscht sein Protokoll. Speichern ohne Änderung schreibt nichts.
 - 26.11.2026: Filter im Verlauf: Alle, Anmeldungen, Einsatz und Schichten (`?art=anmeldungen`, `?art=einsatz`). Die Tabelle zeigt die 300 neuesten Einträge.
+- 26.11.2026 (Wunsch Yann): Neben jeder Telefonnummer steht ein WhatsApp-Symbol statt 💬 (`symbol('whatsapp')` in `src/web/views/symbole.ts`, eigene Zeichnung, grün mit weissem Hörer). Gilt auch für die Handyversion. Der Link bleibt `wa.me`.

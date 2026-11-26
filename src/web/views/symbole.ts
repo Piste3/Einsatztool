@@ -6,6 +6,8 @@ const PFADE = {
   zurueck: '<path d="M15 5l-7 7 7 7"/>',
   mehr: '<circle cx="5" cy="12" r="1.2"/><circle cx="12" cy="12" r="1.2"/><circle cx="19" cy="12" r="1.2"/>',
   chat: '<path d="M4 19.5l1.4-4A8 8 0 1 1 8.5 18.6z"/>',
+  // WhatsApp: gefüllte grüne Sprechblase mit weissem Hörer (eigene Zeichnung).
+  whatsapp: '<path fill="currentColor" stroke="currentColor" stroke-width="1.2" d="M3 21l1.5-4.6A9 9 0 1 1 7.7 19.7z"/><path fill="#fff" stroke="none" d="M8.6 6.9c.3-.3.8-.3 1 .1l1.1 1.8c.2.3.1.7-.1.9l-.6.6c.5 1.2 1.5 2.2 2.7 2.8l.6-.6c.2-.2.6-.3.9-.1l1.8 1.1c.4.2.4.7.1 1l-.8.8c-.6.6-1.5.7-2.3.4-2.2-.9-4-2.7-4.9-4.9-.3-.8-.2-1.7.4-2.3z"/>',
   cockpit: '<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>',
   kalender: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>',
   posteingang: '<path d="M3 13h5l2 3h4l2-3h5"/><path d="M5 5h14l2 8v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-6z"/>',
