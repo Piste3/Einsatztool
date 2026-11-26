@@ -657,24 +657,24 @@ body.druck { background: var(--hg); padding: 1rem; }
 .luecken h2 { margin-top: 0; }
 
 /* Aufgebot: ein Brief je A4-Seite nach der Briefvorlage (26.11.2026), Adresse rechts für das Fensterkuvert */
-.brief { background: #fff; color: #000; width: 210mm; min-height: 297mm; padding: 15mm 20mm 20mm 25mm; margin: 0 auto 1rem; box-shadow: var(--schatten); font-family: Arial, Helvetica, sans-serif; font-size: 10.5pt; line-height: 1.3; position: relative; }
-.brief p { margin: 0 0 4mm; }
+.brief { background: #fff; color: #000; width: 210mm; min-height: 297mm; padding: 15mm 20mm 20mm 25mm; margin: 0 auto 1rem; box-shadow: var(--schatten); font-family: Arial, Helvetica, sans-serif; font-size: 11pt; line-height: 1.35; position: relative; }
+.brief p { margin: 0 0 4.5mm; }
 .brief a { color: #0000ee; text-decoration: underline; }
 .brief-warnung { position: absolute; top: 6mm; right: 20mm; background: #c62f2f; color: #fff; padding: .2rem .6rem; border-radius: 4px; font-weight: 700; }
-.brief-logo { display: block; width: 30mm; height: auto; margin-bottom: 4mm; }
+.brief-logo { display: block; width: 32mm; height: auto; margin-bottom: 4mm; }
 .brief-adresszeile { margin-top: 6mm; min-height: 36mm; }
 .brief .ansprechperson small { font-size: 7.5pt; font-weight: 700; color: #000; }
 /* Adressfeld für Fensterkuverts C5 und C4 mit Fenster rechts: 120 mm von links, 55 mm von oben, ab Blattrand. */
 .brief .empfaenger { position: absolute; left: 120mm; top: 55mm; width: 75mm; max-height: 35mm; overflow: hidden; }
 .brief p.brief-datum { margin: 0 0 10mm 95mm; }
-.brief-titel { font-size: 10.5pt; font-weight: 700; margin: 0 0 4mm; }
+.brief-titel { font-size: 12pt; font-weight: 700; margin: 0 0 4mm; }
 /* Arial für den ganzen Brief, auch Tabelle, Titel und Links (Wunsch Yann 26.11.2026) */
 .brief, .brief * { font-family: Arial, Helvetica, "Liberation Sans", sans-serif; }
 .brief th, .brief td, .brief small { font-size: inherit; }
 .brief .ansprechperson small { font-size: 7.5pt; }
 /* Angaben als Tabelle mit Linien (Wunsch Yann 26.11.2026) */
 .brief-tabelle { border-collapse: collapse; width: 100%; margin: 0 0 6mm; }
-.brief-tabelle th, .brief-tabelle td { border: .3mm solid #000; padding: 1.5mm 2.5mm; height: 5.5mm; vertical-align: top; text-align: left; }
+.brief-tabelle th, .brief-tabelle td { border: .3mm solid #000; padding: 2mm 3mm; height: 6mm; vertical-align: top; text-align: left; }
 .brief-tabelle th { font-weight: 700; white-space: nowrap; width: 30mm; background: #eee; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
 .brief .gruss { margin-top: 8mm; }
 .brief .unterschrift { margin-top: 14mm; }
