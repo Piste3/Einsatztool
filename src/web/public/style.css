@@ -661,6 +661,10 @@ body.druck { background: var(--hg); padding: 1rem; }
 .brief .empfaenger { position: absolute; left: 120mm; top: 55mm; width: 75mm; max-height: 35mm; overflow: hidden; }
 .brief p.brief-datum { margin: 0 0 10mm 95mm; }
 .brief-titel { font-size: 10.5pt; font-weight: 700; margin: 0 0 4mm; }
+/* Arial für den ganzen Brief, auch Tabelle, Titel und Links (Wunsch Yann 26.11.2026) */
+.brief, .brief * { font-family: Arial, Helvetica, "Liberation Sans", sans-serif; }
+.brief th, .brief td, .brief small { font-size: inherit; }
+.brief .ansprechperson small { font-size: 7.5pt; }
 /* Angaben als Tabelle mit Linien (Wunsch Yann 26.11.2026) */
 .brief-tabelle { border-collapse: collapse; width: 100%; margin: 0 0 6mm; }
 .brief-tabelle th, .brief-tabelle td { border: .3mm solid #000; padding: 1.5mm 2.5mm; vertical-align: top; text-align: left; }
