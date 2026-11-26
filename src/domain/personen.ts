@@ -46,13 +46,19 @@ export function normalisiereName(name: string): string {
 }
 
 /** Telefon für die Anzeige: Mobil zuerst, dann Privat, getrennt durch « / » (16.1). */
+/** Nummer für die Anzeige: Bindestriche werden Leerzeichen (Wunsch Yann 26.11.2026, «+41-77 411 07 51» → «+41 77 411 07 51»). */
+export function nummerAnzeige(nummer: string): string {
+  return nummer.replace(/-/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
 export function telefonText(p: { telefon: string | null; telefon_privat: string | null }): string {
-  return [p.telefon, p.telefon_privat].filter((t) => t && t.trim()).join(' / ');
+  return [p.telefon, p.telefon_privat].filter((t): t is string => !!t && !!t.trim()).map(nummerAnzeige).join(' / ');
 }
 
 /** Hauptnummer: Mobil, sonst Privat. */
 export function hauptnummer(p: { telefon: string | null; telefon_privat: string | null }): string | null {
-  return p.telefon?.trim() || p.telefon_privat?.trim() || null;
+  const n = p.telefon?.trim() || p.telefon_privat?.trim();
+  return n ? nummerAnzeige(n) : null;
 }
 
 /** Nummer für wa.me: nur Ziffern, Schweizer Nummern mit 41. */

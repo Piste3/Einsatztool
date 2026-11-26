@@ -3,6 +3,7 @@
 // z. B. {ort}, füllt das Tool je Schicht aus. Ohne gespeicherte Vorlage gilt die Standardvorlage.
 // Regel: Eine Zeile mit Bausteinen, die alle leer sind, entfällt (wie «Leere Felder entfallen», 17.1).
 // Ausnahme (Wunsch Yann 24.11.2026): Die Zeile mit der Einsatzleitung bleibt immer, der Wert ist dann leer.
+import { hauptnummer } from './personen.js';
 import { alle, type Db } from '../db/db.js';
 import { ladeSchicht, type SchichtMitEinsatz } from './schicht.js';
 import { terminTitel } from './ics.js';
@@ -120,7 +121,7 @@ export async function bausteinwerte(db: Db, s: SchichtMitEinsatz, o: ClubdeskOpt
     einsatzleitung: el.map(elName).filter(Boolean).join(', '),
     einsatzleitung_telefon: el
       .map((e) => {
-        const tel = e.telefon || e.telefon_privat;
+        const tel = hauptnummer(e);
         return elName(e) && tel ? `${elName(e)} (${tel})` : elName(e);
       })
       .filter(Boolean)

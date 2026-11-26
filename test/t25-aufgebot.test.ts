@@ -36,3 +36,16 @@ test('T25 Brief: Antreten/Abtreten aus der Schicht, Einsatzleitung mit Rang, Nam
     await t.ende();
   }
 });
+
+test('T25 Telefon im Brief ohne Bindestrich (Wunsch Yann 26.11.2026)', async () => {
+  const t = await neueDatenbank();
+  try {
+    await person(t.db, 1, { vorname: 'Eva', nachname: 'Leiterin', telefon: '+41-77 411 07 51' });
+    const s = await einsatz(t.db, 'Stadtlauf', inTagen(14, 7), inTagen(14, 15), 'Marktplatz');
+    await setzeAnmeldung(t.db, { schichtId: s.schichtId, personId: 1, status: 'bestaetigt', kanal: 'telefon', rolle: 'Einsatzleitung' }, null);
+    const a = await aufgebotDaten(t.db, s.schichtId);
+    assert.deepEqual(a.einsatzleitung, ['Eva Leiterin (+41 77 411 07 51)']);
+  } finally {
+    await t.ende();
+  }
+});
