@@ -208,6 +208,27 @@ export async function sammelstatus(
 }
 
 /**
+ * Eine Person in mehrere Schichten eines Einsatzes eintragen (Besetzen › Alle Schichten, Wunsch Yann 26.11.2026).
+ * Je Schicht gilt Regel 13.5.4: Ein vorhandener Eintrag ändert sich. Alles in einer Transaktion.
+ */
+export async function traegeEinInSchichten(
+  db: Db,
+  einsatzId: number,
+  schichtIds: number[],
+  n: Omit<NeueAnmeldung, 'schichtId'>,
+  benutzerId: number | null,
+): Promise<number> {
+  const ids = [...new Set(schichtIds)];
+  if (!ids.length) throw new Eingabefehler('Wähle mindestens eine Schicht.');
+  return transaktion(db, async (c) => {
+    const gueltig = await alle<{ id: number }>(c, 'SELECT id FROM schicht WHERE einsatz_id = ? AND id IN (?)', [einsatzId, ids]);
+    if (gueltig.length !== ids.length) throw new Eingabefehler('Eine Schicht gehört nicht zu diesem Einsatz.');
+    for (const schichtId of ids) await setzeAnmeldung(c, { ...n, schichtId }, benutzerId);
+    return ids.length;
+  });
+}
+
+/**
  * Alle Einträge mit «angemeldet» in den Schichten bestätigen. Ändert nur den Status.
  */
 export async function bestaetigeAlle(db: Db, schichtIds: number[], benutzerId: number | null): Promise<number> {

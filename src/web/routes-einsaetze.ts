@@ -7,7 +7,7 @@ import {
   type Einsatz,
 } from '../domain/einsatz.js';
 import { aendereSchicht, anzeigeZeiten, erstelleSchicht, fremdabteilungen, kopiereSchicht, ladeSchicht, passtInTabelle, schichtenVonEinsatz } from '../domain/schicht.js';
-import { bestaetigeAlle, verlaufEinsatz } from '../domain/anmeldung.js';
+import { bestaetigeAlle, traegeEinInSchichten, verlaufEinsatz } from '../domain/anmeldung.js';
 import { protokollEinsatz, protokollText } from '../domain/einsatz-protokoll.js';
 import { mitRueckgaengig } from '../domain/rueckgaengig.js';
 import { logText } from './routes-schichten.js';
@@ -23,7 +23,7 @@ import { besetzenDaten, type BesetzenFilter, type BesetzenZeile } from '../domai
 import { raenge as ladeRaenge, rollen as ladeRollen } from '../domain/stammdaten.js';
 import { standardTenue, tenueVorlagen, type TenueVorlage } from '../domain/tenue.js';
 import { zeileAlsHtml } from '../domain/textformat.js';
-import { Eingabefehler, Konflikt, KANAL_TEXT, STATUS_TEXT, id as leseId, type Kanal, type Status } from '../domain/eingabe.js';
+import { Eingabefehler, Konflikt, KANAL_TEXT, STATUS_TEXT, id as leseId, liste, type Kanal, type Status } from '../domain/eingabe.js';
 import { rolleKurz } from '../domain/stammdaten.js';
 import { einsatzLage, type ZuTunPunkt } from '../domain/einsatz-lage.js';
 const EINSATZLEITUNG = 'Einsatzleitung';
@@ -39,7 +39,7 @@ import { datumChVonIso, jetztIso, lokalesDatum, lokaleZeit, wochentagKurz } from
 
 /** Name der Rolle für die Einsatzleitung (wie im Aufgebot, Regel 20.3). */
 
-import { telefonText, hauptnummer } from '../domain/personen.js';
+import { telefonText, hauptnummer, idAusAuswahl } from '../domain/personen.js';
 import { nachRangTiefZuerst } from '../domain/listen.js';
 
 /** Häkchen «mehrere Schichten»: Formular-Eingabe nach einem Fehler, sonst Wert aus der Datenbank (Vorgabe ja). */
@@ -661,6 +661,18 @@ ${seitenKopf({ pfad: [{ text: 'Einsätze', href: '/einsaetze' }, { text: e.name,
     if (req.body?.bestaetigt !== '1') throw new Eingabefehler('Bestätige das Löschen mit dem Häkchen.');
     await loescheEinsatz(db, id);
     zurueck(req, res, '/einsaetze', 'Einsatz gelöscht.');
+  });
+
+  // Besetzen › Alle Schichten: eine Person in gewählte Schichten eintragen (Wunsch Yann 26.11.2026).
+  app.post('/einsaetze/:id/anmeldungen', nurAufgebot, async (req, res) => {
+    const id = leseId(req.params.id);
+    const personId = idAusAuswahl(req.body?.person);
+    if (!personId) throw new Eingabefehler('Wähle eine Person aus der Liste.');
+    const schichtIds = liste(req.body?.schichten).map((x) => leseId(x, 'Schicht'));
+    const rolle = typeof req.body?.rolle === 'string' && req.body.rolle.trim() !== '' ? req.body.rolle : undefined;
+    const { ergebnis: n, schluessel } = await mitRueckgaengig(db, k(res).benutzer!.id, () =>
+      traegeEinInSchichten(db, id, schichtIds, { personId, status: req.body?.status, kanal: req.body?.kanal ?? 'telefon', rolle }, k(res).benutzer!.id));
+    zurueck(req, res, besetzenPfad(id, 'alle'), n === 1 ? 'In 1 Schicht eingetragen.' : `In ${n} Schichten eingetragen.`, 'ok', schluessel);
   });
 
   app.post('/einsaetze/:id/alle-bestaetigen', nurAufgebot, async (req, res) => {

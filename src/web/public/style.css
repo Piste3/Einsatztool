@@ -911,6 +911,12 @@ body.druck { background: var(--hg); padding: 1rem; }
 .besetzen .filterzeile .filter-chips { margin: .3rem 0; }
 .besetzen-filter a.f-neu[aria-current="page"] { border-color: var(--orange-punkt); box-shadow: inset 0 0 0 1px var(--orange-punkt); }
 .besetzen-eintragen { padding: .5rem .7rem; border: 1px dashed var(--linie-stark); border-radius: 10px; }
+.besetzen-eintragen-alle .zeilen-form { margin: 0; }
+.schicht-wahl { display: flex; flex-wrap: wrap; gap: .4rem; align-items: center; border: 0; margin: .45rem 0 0; padding: 0; }
+.schicht-wahl legend { float: left; margin-right: .4rem; font-size: .78rem; color: var(--gedämpft); }
+.schicht-wahl-feld { display: inline-flex; align-items: center; gap: .4rem; border: 1px solid var(--linie-stark); border-radius: 8px; padding: .3rem .7rem; background: var(--flaeche); font-size: .85rem; cursor: pointer; }
+.schicht-wahl-feld:hover { background: var(--grau-hg); }
+.schicht-wahl-feld:has(input:checked) { border-color: var(--text); box-shadow: inset 0 0 0 1px var(--text); }
 .besetzen-tabelle td { vertical-align: middle; }
 .besetzen-tabelle th.waehlen, .besetzen-tabelle td.waehlen { width: 2rem; }
 .besetzen-tabelle th.mitte, .besetzen-tabelle td.mitte { text-align: center; }

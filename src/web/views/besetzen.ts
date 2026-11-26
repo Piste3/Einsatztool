@@ -107,16 +107,35 @@ ${gewaehlt.bemerkung_intern ? html`<p class="bemerkung intern"><strong>Intern:</
     ? knopfPost(kx, gewaehlt ? `/schichten/${gewaehlt.id}/alle-bestaetigen` : `/einsaetze/${einsatzId}/alle-bestaetigen`, zahl.neu === 1 ? 'Bestätigen' : `Alle ${zahl.neu} bestätigen`, {}, 'knopf haupt klein', hier)
     : '';
 
-  // ---------- Person eintragen (eine Schicht) ----------
+  // ---------- Person eintragen ----------
+  // Eine Schicht: direkt in diese Schicht. Alle Schichten: Schichten wählen (Wunsch Yann 26.11.2026).
   const eintragen = async () => {
-    if (!gewaehlt) return '';
     const personen = await personenListe(db);
-    return html`<form method="post" action="/schichten/${gewaehlt.id}/anmeldungen" class="zeilen-form besetzen-eintragen">
+    const personFeld = html`<label class="wachsen">Person eintragen <input name="person" list="personen-liste" required placeholder="Name tippen …" autocomplete="off"></label>
+  <datalist id="personen-liste">${personen.map((p) => html`<option value="${personAuswahlText(p)}"></option>`)}</datalist>`;
+    // Eine leere Rolle lässt eine vorhandene Rolle stehen (Route).
+    const felder = async () => html`<label>Status ${statusAuswahl('status', 'angemeldet')}</label>
+  <label>Rolle ${rolleAuswahl('rolle', await ladeRollen(db), null)}</label>`;
+    if (gewaehlt) {
+      return html`<form method="post" action="/schichten/${gewaehlt.id}/anmeldungen" class="zeilen-form besetzen-eintragen">
   ${formFelder(kx, hier)}<input type="hidden" name="kanal" value="telefon">
-  <label class="wachsen">Person eintragen <input name="person" list="personen-liste" required placeholder="Name tippen …" autocomplete="off"></label>
-  <datalist id="personen-liste">${personen.map((p) => html`<option value="${personAuswahlText(p)}"></option>`)}</datalist>
+  ${personFeld}
   <label>Status ${statusAuswahl('status', 'angemeldet')}</label>
   <button type="submit" class="knopf">Eintragen</button>
+</form>`;
+    }
+    return html`<form method="post" action="/einsaetze/${einsatzId}/anmeldungen" class="besetzen-eintragen besetzen-eintragen-alle">
+  ${formFelder(kx, hier)}<input type="hidden" name="kanal" value="telefon">
+  <div class="zeilen-form">
+  ${personFeld}
+  ${await felder()}
+  <button type="submit" class="knopf">Eintragen</button>
+  </div>
+  <fieldset class="schicht-wahl">
+    <legend>In Schichten</legend>
+    ${schichten.map((s) => html`<label class="schicht-wahl-feld"><input type="checkbox" name="schichten" value="${s.id}">
+      <span><strong>${s.name}</strong> <span class="unter">${wochentagKurz(s.start_zeit)} ${datumChVonIso(s.start_zeit).slice(0, 6)}${s.zeit_offen ? '' : ` ${lokaleZeit(s.start_zeit)}`}</span></span></label>`)}
+  </fieldset>
 </form>`;
   };
 
