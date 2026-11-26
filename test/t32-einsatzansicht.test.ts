@@ -29,7 +29,7 @@ test('T32 Zu tun: nur wichtige Punkte, eine Zeile je Art, keine Doppel (Wunsch Y
   assert.equal(ohneSoll.punkte[1].text, 'Kein Soll festgelegt.');
   assert.equal(ohneSoll.unbestaetigt, 1);
 
-  // Bild von Yann: Rollenbedarf steht in der Schichten-Tabelle, nicht in «Zu tun». Einsatzleitung nur einmal.
+  // Bild von Yann: Rollenbedarf und fehlende Personen stehen in der Schichten-Tabelle, nicht in «Zu tun» (26.11.2026).
   const bild = einsatzLage({
     jetzt,
     schichten: [{ id: 9, name: 'Messe', end_zeit: '2026-11-21T22:00:00.000Z', soll_anzahl: 5 }],
@@ -37,7 +37,6 @@ test('T32 Zu tun: nur wichtige Punkte, eine Zeile je Art, keine Doppel (Wunsch Y
     mitEinsatzleitung: new Set(),
   });
   assert.deepEqual(bild.punkte.map((p) => [p.art, p.text, p.unter]), [
-    ['fehlt', '5 Personen fehlen.', '0 von 5 bestätigt.'],
     ['einsatzleitung', 'Keine Einsatzleitung eingeteilt.', undefined],
   ]);
 
@@ -51,13 +50,10 @@ test('T32 Zu tun: nur wichtige Punkte, eine Zeile je Art, keine Doppel (Wunsch Y
     zahlen: new Map([[2, zahlen({ teilnehmende: 4, unbestaetigt: 2, unsicher: 1 })], [3, zahlen({ teilnehmende: 5, unbestaetigt: 1, nachricht: 2 })]]),
     mitEinsatzleitung: new Set([2]),
   });
-  assert.deepEqual(zwei.punkte.map((p) => p.art), ['fehlt', 'einsatzleitung', 'unbestaetigt']);
-  assert.equal(zwei.punkte[0].text, '7 Personen fehlen.');
-  assert.equal(zwei.punkte[0].unter, 'Tagschicht 4 von 10, Abendschicht 5 von 6 bestätigt.');
-  assert.equal(zwei.punkte[0].schichtId, null);
-  assert.equal(zwei.punkte[1].text, 'Keine Einsatzleitung eingeteilt: Abendschicht.');
-  assert.equal(zwei.punkte[1].schichtId, 3);
-  assert.equal(zwei.punkte[2].text, '3 Anmeldungen warten auf Bestätigung.');
+  assert.deepEqual(zwei.punkte.map((p) => p.art), ['einsatzleitung', 'unbestaetigt']);
+  assert.equal(zwei.punkte[0].text, 'Keine Einsatzleitung eingeteilt: Abendschicht.');
+  assert.equal(zwei.punkte[0].schichtId, 3);
+  assert.equal(zwei.punkte[1].text, '3 Anmeldungen warten auf Bestätigung.');
 
   // Alles besetzt und bestätigt: leere Liste. Vergangene Schichten zählen nicht.
   const fertig = einsatzLage({
@@ -118,7 +114,7 @@ test('T32 Einsatzansicht: Steckbrief, Schichten-Tabelle, Kacheln bei mehreren Sc
     assert.match(anm2, /<small class="rolle">Einsatzleitung<\/small>/);
     const zwei = await hole(`/einsaetze/${s.einsatzId}`);
     assert.match(zwei, /<dt>Einsatzleitung<\/dt><dd><span class="rang">Kad<\/span> Nina Baumann/);
-    assert.match(zwei, /Abend: 1 Person fehlt\./);
+    assert.doesNotMatch(zwei, /Person fehlt|Personen fehlen/);
     assert.match(zwei, /Keine Einsatzleitung eingeteilt: Stadtlauf\./);
     // Cockpit: «Zu tun» nur mit sofortigem Handeln (Wunsch Yann 23.11.2026). Keine fehlenden Personen, keine Warnungen.
     const cockpit = await hole('/');

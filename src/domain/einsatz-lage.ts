@@ -1,11 +1,12 @@
 // Lage eines Einsatzes: Liste «Zu tun» für die Übersicht (Konzept Einsatzansicht, Yann 19.11.2026).
 // Nur Anzeige. Die Liste sperrt keine Aktion (Warnen statt verbieten).
 // Seit 23.11.2026 (Wunsch Yann): nur wichtige Punkte, höchstens eine Zeile je Art.
+// Seit 26.11.2026 (Wunsch Yann) auch keine fehlenden Personen: Die Schichten-Tabelle zeigt sie.
 // Unsichere Personen, offene Nachrichten, Warnungen bei Einträgen, Rollenbedarf und Clubdesk-Abgleich
 // stehen nicht mehr hier. Sie zeigen sich in «Besetzen» und in der Schichten-Tabelle.
 import type { SchichtZahlen } from './zaehlung.js';
 
-export type ZuTunArt = 'zeit_offen' | 'fehlt' | 'einsatzleitung' | 'unbestaetigt' | 'kein_soll';
+export type ZuTunArt = 'zeit_offen' | 'einsatzleitung' | 'unbestaetigt' | 'kein_soll';
 
 export interface ZuTunPunkt {
   art: ZuTunArt;
@@ -34,10 +35,6 @@ export interface Lage {
   unbestaetigt: number;
 }
 
-function mehrzahl(n: number, eins: string, viele: string): string {
-  return `${n} ${n === 1 ? eins : viele}`;
-}
-
 /**
  * Liste «Zu tun»: nur kommende Schichten, nur Punkte mit Handlungsbedarf, keine Nullen.
  * Jede Art erscheint höchstens einmal. Bei mehreren Schichten nennt die Zeile die Schichten.
@@ -57,21 +54,6 @@ export function einsatzLage(e: LageEingabe): Lage {
 
   // Einsatzleitung fehlt. Den übrigen Rollenbedarf zeigt die Schichten-Tabelle (Wunsch Yann 23.11.2026).
   const ohneEl = e.mitEinsatzleitung ? kommend.filter((s) => !e.mitEinsatzleitung!.has(s.id)) : [];
-
-  // Personen fehlen: eine Zeile für alle Schichten.
-  const fehlt = kommend.filter((s) => s.soll_anzahl !== null && s.soll_anzahl > 0 && e.zahlen.get(s.id)!.teilnehmende < s.soll_anzahl);
-  if (fehlt.length) {
-    const summe = fehlt.reduce((n, s) => n + s.soll_anzahl! - e.zahlen.get(s.id)!.teilnehmende, 0);
-    const bestaetigt = fehlt.map((s) => `${mehrere && fehlt.length > 1 ? `${s.name} ` : ''}${e.zahlen.get(s.id)!.teilnehmende} von ${s.soll_anzahl}`).join(', ');
-    const einzeln = fehlt.length === 1;
-    punkte.push({
-      art: 'fehlt',
-      schichtId: einzeln ? fehlt[0].id : null,
-      anzahl: summe,
-      text: `${einzeln && mehrere ? `${fehlt[0].name}: ` : ''}${mehrzahl(summe, 'Person fehlt', 'Personen fehlen')}.`,
-      unter: `${bestaetigt} bestätigt.`,
-    });
-  }
 
   if (ohneEl.length) {
     punkte.push({ art: 'einsatzleitung', schichtId: ohneEl[0].id, anzahl: 0, text: mehrere ? `Keine Einsatzleitung eingeteilt: ${namen(ohneEl)}.` : 'Keine Einsatzleitung eingeteilt.' });

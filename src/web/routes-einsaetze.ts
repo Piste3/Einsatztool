@@ -214,14 +214,13 @@ ${e.bemerkung_extern ? html`<p class="bemerkung"><strong>Extern:</strong> ${mehr
 
     // ---------- Zu tun ----------
     const symbol = (p: ZuTunPunkt) => {
-      const farbe = p.art === 'fehlt' || p.art === 'einsatzleitung' ? 'rot' : 'orange';
+      const farbe = p.art === 'einsatzleitung' ? 'rot' : 'orange';
       const text = p.anzahl > 0 ? String(p.anzahl) : '!';
       return html`<span class="zutun-symbol z-${farbe}" aria-hidden="true">${text}</span>`;
     };
     const knopf = (p: ZuTunPunkt) => {
       const besetzen = (filter: BesetzenFilter) => besetzenPfad(e.id, schichten.length > 1 ? (p.schichtId ?? 'alle') : null, filter);
       switch (p.art) {
-        case 'fehlt': return html`<a class="knopf klein" href="${besetzen('nicht')}">Anfragen ›</a>`;
         case 'kein_soll': return html`<a class="knopf klein" href="/einsaetze/${e.id}/schichten">Soll setzen</a>`;
         case 'unbestaetigt': return html`<span class="knopfreihe"><a class="knopf klein" href="${besetzenPfad(e.id, schichten.length > 1 ? 'alle' : null, 'neu')}">Ansehen ›</a>${knopfPost(kx, `/einsaetze/${e.id}/alle-bestaetigen`, lage.unbestaetigt === 1 ? 'Bestätigen' : `Alle ${lage.unbestaetigt} bestätigen`, {}, 'knopf klein', hier)}</span>`;
         case 'einsatzleitung': return html`<a class="knopf klein" href="${besetzen('alle')}">Eintragen ›</a>`;
@@ -236,7 +235,7 @@ ${e.bemerkung_extern ? html`<p class="bemerkung"><strong>Extern:</strong> ${mehr
     : lage.vorbei
       ? html`<li class="zutun-zeile z-vorbei"><span class="zutun-symbol z-grau" aria-hidden="true">✓</span><span class="zutun-text">Alle Schichten sind vorbei.</span></li>`
       : !lage.punkte.length
-        ? html`<li class="zutun-zeile z-ok"><span class="zutun-symbol z-gruen" aria-hidden="true">✓</span><span class="zutun-text"><strong>Nichts zu tun.</strong> Alle kommenden Schichten sind besetzt und bestätigt.</span></li>`
+        ? html`<li class="zutun-zeile z-ok"><span class="zutun-symbol z-gruen" aria-hidden="true">✓</span><span class="zutun-text"><strong>Nichts zu tun.</strong></span></li>`
         : lage.punkte.map((p) => html`<li class="zutun-zeile">${symbol(p)}<span class="zutun-text"><strong>${p.text}</strong>${p.unter ? html` <span class="unter">${p.unter}</span>` : ''}</span>${knopf(p)}</li>`)}</ul>
 </section>`;
 
