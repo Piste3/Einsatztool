@@ -19,7 +19,7 @@ export const FEST = {
   ],
   schluss: [
     'Deine Teilnahme ist definitiv. Falls Du am Einsatz nicht teilnehmen kannst, musst du dich umgehend per Mail an aufgebot@kkb.ch wenden. Bei krankheitsbedingten Absagen weniger als drei Tage vor dem Einsatz, melde dich bitte direkt telefonisch bei der Einsatzleitung.',
-    'Bei allfälligen Fragen stehe ich dir gerne zur Verfügung.',
+    'Bei allfälligen Fragen stehen wir dir gerne zur Verfügung.',
   ],
   gruss: 'Freundliche Grüsse',
   unterschrift: ['KADETTEN-KORPS BASEL', 'Aufgebotsstelle'],
