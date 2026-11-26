@@ -52,6 +52,7 @@ async function start(): Promise<void> {
     stunde: konfig.bestaetigungStunde,
     lauf: async () => {
       const r = await bestaetigungslauf(db, konfig.mailFrom);
+      if (r.aus) return { ok: true, meldung: 'Bestätigungsmails sind ausgeschaltet. Der Lauf hat nichts gesendet.' };
       return { ok: true, meldung: `${r.mails} Mails für ${r.eintraege} Einträge in der Warteschlange. ${r.ohneAdresse} ohne Adresse.` };
     },
   };

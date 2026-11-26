@@ -6,7 +6,10 @@ import type { Abhaengigkeiten } from './app.js';
 import { nurAdmin, zurueck } from './app.js';
 import { erstelleVorschau, letzteImporte, wendeImportAn, type Vorschau } from '../domain/import-clubdesk.js';
 import { ladeImportdatei, loescheImportdatei, speichereImportdatei } from '../domain/importdatei.js';
-import { bestaetigungenOhneAdresse, mailsMitFehler } from '../domain/bestaetigung.js';
+import {
+  bestaetigungenOhneAdresse, bestaetigungslauf, bestaetigungsmailsAktiv, gesendeteMails, MAX_VERSUCHE, sendeMailErneut, setzeBestaetigungsmails,
+  ungesendeteMails, wartendeMails, type MailZeile,
+} from '../domain/bestaetigung.js';
 import {
   benenneRangUm, benutzerListe, legeRangAn, legeRolleAn, loescheRang, loescheRolle, raenge, rollen, setzeBenutzerAktiv, setzeRangAufgebot, setzeRolleZaehlt,
   ordneRaenge, ordneRollen, verschiebeRang, verschiebeRolle,
@@ -174,8 +177,11 @@ ${z.unzugeordnet ? html`<p><a class="knopf" href="/anmeldungen/unbekannt">Unbeka
     const kx = k(res);
     const lauf = await letzterLauf(db, 'tagesexport');
     const best = await letzterLauf(db, 'bestaetigungsmail');
-    const fehler = await mailsMitFehler(db);
     const ohne = await bestaetigungenOhneAdresse(db);
+    const aktiv = await bestaetigungsmailsAktiv(db);
+    const wartend = await wartendeMails(db);
+    const ungesendet = await ungesendeteMails(db);
+    const gesendet = await gesendeteMails(db);
     const backup = join(konfig.exportDir, 'backup');
     const kopien = existsSync(backup) ? readdirSync(backup).filter((n) => n.endsWith('.sql')).sort().reverse() : [];
     const feed = feedStand();
@@ -188,15 +194,7 @@ ${seitenKopf({ titel: 'Export und Mails' })}
   ${knopfPost(kx, '/admin/export/jetzt', 'Export jetzt auslösen', {}, 'knopf haupt', '/admin/export')}
   ${kopien.length ? html`<details class="aufklapp"><summary>Lokale Datenbankkopien (${kopien.length})</summary><ul>${kopien.map((n) => html`<li>${n} (${Math.round(statSync(join(backup, n)).size / 1024)} KB)</li>`)}</ul></details>` : ''}
 </section>
-<section class="abschnitt">
-  <h2>Bestätigungsmails</h2>
-  <p>Täglich um ${konfig.bestaetigungStunde}:00 Uhr, gesammelt je Person.${konfig.smtp.host ? '' : ' SMTP ist nicht eingerichtet: Mails bleiben in der Warteschlange.'}</p>
-  ${best ? html`<p class="unter">Letzter Lauf ${datumZeit(best.zeit)}: ${best.meldung ?? ''}</p>` : ''}
-  ${knopfPost(kx, '/admin/export/bestaetigungen', 'Bestätigungen jetzt senden', {}, 'knopf', '/admin/export')}
-  ${ohne.length ? html`<h3>Bestätigt ohne Mail-Adresse (${ohne.length})</h3><ul>${ohne.map((a) => html`<li><a href="/schichten/${a.schicht_id}">${a.einsatz} – ${a.schicht}</a> · ${zeitraum(a.start_zeit, a.start_zeit)} · ${a.name_text}</li>`)}</ul>` : ''}
-  ${fehler.length ? html`<h3>Mails mit Fehler (${fehler.length})</h3><div class="rahmen"><table class="tabelle"><thead><tr><th>An</th><th>Betreff</th><th>Versuche</th><th>Fehler</th></tr></thead><tbody>
-    ${fehler.map((m) => html`<tr><td>${m.an}</td><td>${m.betreff}</td><td>${m.versuche}</td><td class="fehler-text">${m.fehler ?? ''}</td></tr>`)}</tbody></table></div>` : ''}
-</section>
+${bestaetigungsAbschnitt(kx, { aktiv, smtp: Boolean(konfig.smtp.host), stunde: konfig.bestaetigungStunde, best, ohne, wartend, ungesendet, gesendet })}
 <section class="abschnitt">
   <h2>Clubdesk-Kalender</h2>
   <p>${konfig.clubdeskIcalUrl ? (feed.geladenAm ? `Feed geladen ${datumZeit(feed.geladenAm)}, ${feed.termine?.length ?? 0} Termine.` : 'Feed noch nicht geladen.') : 'CLUBDESK_ICAL_URL fehlt in der Konfiguration.'}
@@ -212,6 +210,35 @@ ${seitenKopf({ titel: 'Export und Mails' })}
   app.post('/admin/export/bestaetigungen', nurAdmin, async (req, res) => {
     const r = await deps.bestaetigungenJetzt();
     zurueck(req, res, '/admin/export', r.meldung, r.ok ? 'ok' : 'fehler');
+  });
+
+  // Schalter «Bestätigungsmails» (Wunsch Yann 26.11.2026).
+  app.post('/admin/export/bestaetigungsmails', nurAdmin, async (req, res) => {
+    const aktiv = req.body?.aktiv === '1';
+    const nachsenden = req.body?.nachsenden !== '0';
+    const r = await setzeBestaetigungsmails(db, aktiv, k(res).benutzer!.id, nachsenden);
+    const text = !aktiv
+      ? 'Bestätigungsmails ausgeschaltet. Der Tageslauf sendet nichts.'
+      : nachsenden
+        ? 'Bestätigungsmails eingeschaltet. Wartende Mails gehen im nächsten Tageslauf weg.'
+        : `Bestätigungsmails eingeschaltet. ${r.verworfen} wartende Einträge erhalten keine Mail.`;
+    zurueck(req, res, '/admin/export', text, 'ok');
+  });
+
+  // Eine Mail von Hand senden: für eine wartende Person (schluessel) oder eine Mail der Warteschlange (id).
+  app.post('/admin/export/mail-senden', nurAdmin, async (req, res) => {
+    const smtp = konfig.smtp.host ? '' : ' SMTP ist nicht eingerichtet: Die Mail bleibt in der Warteschlange.';
+    if (req.body?.id !== undefined) {
+      const ok = await sendeMailErneut(db, leseId(req.body.id));
+      if (!ok) throw new Eingabefehler('Diese Mail ist schon gesendet oder fehlt.');
+      zurueck(req, res, '/admin/export', `Mail wird gesendet.${smtp}`, smtp ? 'hinweis' : 'ok');
+      return;
+    }
+    const schluessel = String(req.body?.schluessel ?? '');
+    if (!/^(p:\d{1,10}|m:[^\s]{3,255})$/.test(schluessel)) throw new Eingabefehler('Ungültige Angabe.');
+    const r = await bestaetigungslauf(db, konfig.mailFrom, schluessel);
+    if (!r.mails) throw new Eingabefehler('Für diese Person wartet keine Bestätigung mehr.');
+    zurueck(req, res, '/admin/export', `Bestätigungsmail für ${r.eintraege} Schichten wird gesendet.${smtp}`, smtp ? 'hinweis' : 'ok');
   });
 
   // ---------- Benutzer ----------
@@ -486,4 +513,71 @@ ${z.schritte.length ? html`<ol class="schritte kompakt">${z.schritte.map((s) => 
     if (!deps.updater.installiere()) throw new Eingabefehler('Ein Update läuft schon.');
     res.redirect(303, '/admin/update');
   });
+}
+
+/** Zustand einer Mail in der Warteschlange, lesbar. */
+function mailZustand(m: MailZeile): string {
+  if (m.fehler?.startsWith('Verworfen')) return 'Verworfen';
+  if (m.versuche >= MAX_VERSUCHE) return `Aufgegeben nach ${m.versuche} Versuchen`;
+  if (m.fehler) return `Fehler (${m.versuche} Versuche), neuer Versuch folgt`;
+  return 'Wird gesendet';
+}
+
+/** Abschnitt «Bestätigungsmails» auf /admin/export: Schalter, Warteschlange, Senden von Hand. */
+function bestaetigungsAbschnitt(
+  kx: Parameters<typeof formFelder>[0],
+  d: {
+    aktiv: boolean; smtp: boolean; stunde: number; best: { zeit: string; meldung: string | null } | null | undefined;
+    ohne: Awaited<ReturnType<typeof bestaetigungenOhneAdresse>>;
+    wartend: Awaited<ReturnType<typeof wartendeMails>>; ungesendet: MailZeile[]; gesendet: MailZeile[];
+  },
+): Roh {
+  const z = '/admin/export';
+  const schaltForm = (aktiv: boolean, nachsenden: boolean, text: string, klasse: string, frage?: string) => html`<form method="post" action="${z}/bestaetigungsmails" class="inline"${frage ? html` data-bestaetigen="${frage}"` : ''}>
+    ${formFelder(kx, z)}<input type="hidden" name="aktiv" value="${aktiv ? '1' : '0'}"><input type="hidden" name="nachsenden" value="${nachsenden ? '1' : '0'}">
+    <button type="submit" class="${klasse}">${text}</button></form>`;
+  const sendenKnopf = (felder: Record<string, string>, text: string) => knopfPost(kx, `${z}/mail-senden`, text, felder, 'knopf klein', z);
+  return html`<section class="abschnitt" id="bestaetigungsmails">
+  <h2>Bestätigungsmails</h2>
+  <div class="knopfreihe">
+    ${d.aktiv
+      ? schaltForm(false, true, 'ein', 'schalter an')
+      : d.wartend.length
+        ? html`${schaltForm(true, true, 'Einschalten und nachsenden', 'knopf haupt')}
+          ${schaltForm(true, false, 'Einschalten ohne Nachsenden', 'knopf', `${d.wartend.length} wartende Mails verwerfen? Diese Personen erhalten keine Bestätigungsmail.`)}`
+        : schaltForm(true, true, 'aus', 'schalter')}
+    <span>${d.aktiv ? `Täglich um ${d.stunde}:00 Uhr, gesammelt je Person.` : 'Ausgeschaltet.'}</span>
+  </div>
+  ${d.aktiv ? '' : html`<p class="meldung hinweis">Bestätigungsmails sind ausgeschaltet. Der Tageslauf sendet nichts. Bestätigte Einträge warten. Beim Einschalten wählst du: nachsenden oder verwerfen. «Jetzt senden» in der Warteschlange geht trotzdem.</p>`}
+  ${d.smtp ? '' : html`<p class="meldung hinweis">SMTP ist nicht eingerichtet: Mails bleiben in der Warteschlange.</p>`}
+  ${d.best ? html`<p class="unter">Letzter Lauf ${datumZeit(d.best.zeit)}: ${d.best.meldung ?? ''}</p>` : ''}
+  ${d.aktiv ? knopfPost(kx, `${z}/bestaetigungen`, 'Bestätigungen jetzt senden', {}, 'knopf', z) : ''}
+
+  <h3>Warteschlange</h3>
+  <p class="unter">Wartet auf den Tageslauf: bestätigte Einträge ohne Mail, eine Mail je Person. «Jetzt senden» schickt die Mail sofort.</p>
+  ${d.wartend.length
+    ? html`<div class="rahmen"><table class="tabelle"><thead><tr><th>Person</th><th>An</th><th>Schichten</th><th></th></tr></thead><tbody>
+      ${d.wartend.map((w) => html`<tr><td>${w.name}</td><td>${w.an}</td>
+        <td>${w.schichten.map((s, i) => html`${i ? html`<br>` : ''}<a href="/schichten/${s.schicht_id}">${s.einsatz} – ${s.schicht}</a> · ${zeitraum(s.start_zeit, s.start_zeit)}`)}</td>
+        <td class="aktionen-rechts">${sendenKnopf({ schluessel: w.schluessel }, 'Jetzt senden')}</td></tr>`)}
+      </tbody></table></div>`
+    : html`<p class="leer">Keine wartenden Mails.</p>`}
+  ${d.ungesendet.length
+    ? html`<h3>Angelegt, noch nicht gesendet (${d.ungesendet.length})</h3>
+      <div class="rahmen"><table class="tabelle"><thead><tr><th>Angelegt</th><th>An</th><th>Zustand</th><th>Text</th><th></th></tr></thead><tbody>
+      ${d.ungesendet.map((m) => html`<tr><td>${datumZeit(m.erstellt_am)}</td><td>${m.an}</td>
+        <td>${mailZustand(m)}${m.fehler && !m.fehler.startsWith('Verworfen') ? html`<br><span class="fehler-text">${m.fehler}</span>` : ''}</td>
+        <td><details class="aufklapp"><summary>${m.betreff}</summary><pre>${m.text}</pre></details></td>
+        <td class="aktionen-rechts">${sendenKnopf({ id: String(m.id) }, m.fehler || m.versuche ? 'Erneut senden' : 'Jetzt senden')}</td></tr>`)}
+      </tbody></table></div>`
+    : ''}
+  ${d.gesendet.length
+    ? html`<details class="aufklapp"><summary>Zuletzt gesendet (${d.gesendet.length})</summary>
+      <div class="rahmen"><table class="tabelle"><thead><tr><th>Gesendet</th><th>An</th><th>Text</th></tr></thead><tbody>
+      ${d.gesendet.map((m) => html`<tr><td>${datumZeit(m.gesendet_am!)}</td><td>${m.an}</td>
+        <td><details class="aufklapp"><summary>${m.betreff}</summary><pre>${m.text}</pre></details></td></tr>`)}
+      </tbody></table></div></details>`
+    : ''}
+  ${d.ohne.length ? html`<h3>Bestätigt ohne Mail-Adresse (${d.ohne.length})</h3><ul>${d.ohne.map((a) => html`<li><a href="/schichten/${a.schicht_id}">${a.einsatz} – ${a.schicht}</a> · ${zeitraum(a.start_zeit, a.start_zeit)} · ${a.name_text}</li>`)}</ul>` : ''}
+</section>`;
 }

@@ -176,6 +176,22 @@ const migrationen: { version: number; anweisungen: () => string[] }[] = [
     version: 13,
     anweisungen: () => ['ALTER TABLE rang ADD COLUMN aufgebot TINYINT NOT NULL DEFAULT 1'],
   },
+  // Version 14 (Wunsch Yann 26.11.2026): Einstellungen im Tool, z. B. Schalter «Bestätigungsmails».
+  // Ohne Zeile gilt die Vorgabe im Code.
+  {
+    version: 14,
+    anweisungen: () => [
+      `CREATE TABLE einstellung (
+        schluessel VARCHAR(50) NOT NULL PRIMARY KEY,
+        wert TEXT NOT NULL,
+        geaendert_am VARCHAR(30) NOT NULL,
+        geaendert_von INT,
+        CONSTRAINT fk_einstellung_benutzer FOREIGN KEY (geaendert_von) REFERENCES benutzer(id)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin`,
+      // Von Hand ausgelöste Mails gehen auch bei ausgeschalteten Bestätigungsmails weg.
+      'ALTER TABLE mail_queue ADD COLUMN manuell TINYINT NOT NULL DEFAULT 0',
+    ],
+  },
 ];
 
 export async function migriere(db: Db): Promise<number> {

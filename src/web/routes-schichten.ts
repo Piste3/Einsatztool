@@ -55,6 +55,7 @@ const AKTION_TEXT: Record<string, string> = {
   wiederhergestellt: 'Eintrag wiederhergestellt',
   bestaetigungsmail: 'Bestätigungsmail',
   mail_ohne_adresse: 'Keine Mail-Adresse',
+  mail_verworfen: 'Bestätigungsmail verworfen',
   personendaten_geloescht: 'Personendaten gelöscht',
   verschoben: 'Verschoben',
 };
@@ -74,7 +75,7 @@ export function verlaufListe(eintraege: { zeit: string; aktion: string; alt_wert
 /** Aktion und Werte eines Eintrags im Statusprotokoll, z. B. «Status angemeldet → bestätigt». */
 export function logText(l: { aktion: string; alt_wert: string | null; neu_wert: string | null }): Roh {
   return html`<strong>${AKTION_TEXT[l.aktion] ?? l.aktion}</strong>${
-    l.aktion === 'erstellt' || l.aktion === 'wiederhergestellt' || l.aktion === 'bestaetigungsmail' || l.aktion === 'mail_ohne_adresse' || l.aktion === 'personendaten_geloescht'
+    l.aktion === 'erstellt' || l.aktion === 'wiederhergestellt' || l.aktion === 'bestaetigungsmail' || l.aktion === 'mail_ohne_adresse' || l.aktion === 'mail_verworfen' || l.aktion === 'personendaten_geloescht'
       ? html` ${wertText(l.aktion, l.neu_wert)}`
       : html` ${wertText(l.aktion, l.alt_wert)} → ${wertText(l.aktion, l.neu_wert)}`
   }`;
