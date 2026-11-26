@@ -13,6 +13,10 @@ import { logText } from './routes-schichten.js';
 import { warnungenFuerSchichten } from '../domain/warnungen.js';
 import { sollFarbe, zahlenFuerSchichten } from '../domain/zaehlung.js';
 import { teilnehmerlisteCsv } from '../domain/export.js';
+import { aufgebotDaten } from '../domain/aufgebot-vorlage.js';
+import { erzeugeIcsMehrere, icsVermerk, vermerkeIcsExport } from '../domain/ics.js';
+import { clubdeskText } from '../domain/clubdesk-text.js';
+import { aufgebotSeite } from './views/aufgebot.js';
 import { besetzenAnsicht, besetzenPfad } from './views/besetzen.js';
 import { besetzenDaten, type BesetzenFilter, type BesetzenZeile } from '../domain/besetzen.js';
 import { raenge as ladeRaenge, rollen as ladeRollen } from '../domain/stammdaten.js';
@@ -642,6 +646,43 @@ ${seitenKopf({ pfad: [{ text: 'Einsätze', href: '/einsaetze' }, { text: e.name,
     sendeCsv(res, `teilnehmer-${dateiTeil(e.name)}.csv`, await teilnehmerlisteCsv(db, e.id));
   });
 
+  // Wunsch Yann 26.11.2026: Aufgebot für den ganzen Einsatz. Die Briefe aller Schichten in einer Druckseite.
+  app.get('/einsaetze/:id/aufgebot', nurAufgebot, async (req, res) => {
+    const e = await ladeEinsatz(db, leseId(req.params.id));
+    const liste = [];
+    for (const s of await schichtenVonEinsatz(db, e.id)) liste.push(await aufgebotDaten(db, s.id));
+    res.send(aufgebotSeite(liste, `Einsatzaufgebot - ${e.name}`, `/einsaetze/${e.id}`));
+  });
+
+  // Wunsch Yann 26.11.2026: Eine ICS-Datei mit einem Termin je Schicht. Regel 17.3 gilt wie bei der Schicht.
+  app.get('/einsaetze/:id/ics', nurAufgebot, async (req, res) => {
+    const kx = k(res);
+    const e = await ladeEinsatz(db, leseId(req.params.id));
+    const schichten = [];
+    for (const s of await schichtenVonEinsatz(db, e.id)) schichten.push(await ladeSchicht(db, s.id));
+    const vermerke = [];
+    for (const s of schichten) {
+      const v = await icsVermerk(db, s.id);
+      if (v) vermerke.push({ s, v });
+    }
+    if (vermerke.length && req.query.trotzdem !== '1') {
+      res.send(seite(kx, 'ICS-Export', 'einsaetze', html`
+${seitenKopf({ pfad: [{ text: 'Einsätze', href: '/einsaetze' }, { text: e.name, href: `/einsaetze/${e.id}` }, { text: 'ICS-Export' }], titel: 'ICS-Export' })}
+<div class="meldung hinweis" data-code="W_ICS_DUPLIKAT">⚠ Diese Schichten wurden schon exportiert. Clubdesk erhält sonst doppelte Termine.
+<ul>${vermerke.map(({ s, v }) => html`<li>${s.name}: ${datumZeit(v.exportiert_am)}${v.benutzer ? ` durch ${v.benutzer}` : ''}</li>`)}</ul></div>
+<p class="knopfreihe"><a class="knopf" href="/einsaetze/${e.id}/ics?trotzdem=1">Trotzdem laden</a> <a class="knopf" href="/einsaetze/${e.id}">Abbrechen</a></p>`));
+      return;
+    }
+    const liste = [];
+    for (const s of schichten) {
+      await vermerkeIcsExport(db, s.id, kx.benutzer!.id);
+      liste.push({ schicht: s, termin: await clubdeskText(db, s.id, { baseUrl: deps.konfig.baseUrl, aufgebotMail: deps.konfig.mailFrom, benutzer: kx.benutzer }) });
+    }
+    res.setHeader('Content-Type', 'text/calendar; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${dateiTeil(e.name)}.ics"`);
+    res.send(erzeugeIcsMehrere(liste));
+  });
+
   app.get('/einsaetze/:id/teilnehmerliste', nurAufgebot, async (req, res) => {
     const e = await ladeEinsatz(db, leseId(req.params.id));
     res.send(await teilnehmerlisteDruck(deps, e, req.query.umfang === 'beide'));
@@ -674,6 +715,10 @@ function dokumenteMenue(einsatzId: number, schichten: { id: number; name: string
     html`<div class="menue-titel">Ganzer Einsatz</div>`,
     html`<a href="/einsaetze/${einsatzId}/teilnehmerliste" target="_blank" rel="noopener">Teilnehmerliste drucken</a>`,
     html`<a href="/einsaetze/${einsatzId}/export.csv">Teilnehmerliste als CSV</a>`,
+    ...(schichten.length > 1 ? [
+      html`<a href="/einsaetze/${einsatzId}/aufgebot" target="_blank" rel="noopener">Aufgebot (Briefe)</a>`,
+      html`<a href="/einsaetze/${einsatzId}/ics">Kalendertermin (ICS)</a>`,
+    ] : []),
     ...schichten.flatMap((s) => [html`<div class="menue-trenner"></div><div class="menue-titel">${schichten.length > 1 ? s.name : 'Schicht'}</div>`, ...jeSchicht(s)]),
   ], 'Dokumente');
 }

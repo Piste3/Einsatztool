@@ -67,22 +67,26 @@ export function icsZeit(iso: string): string {
 
 /** termin: Titel und Text aus der Vorlage «Clubdesk-Termin». Ohne Angabe gilt Regel 17.1. */
 export function erzeugeIcs(s: TerminSchicht, jetzt = jetztIso(), termin?: { titel: string; text: string }): string {
-  const zeilen = [
-    'BEGIN:VCALENDAR',
-    'VERSION:2.0',
-    'PRODID:-//Verkehrskadetten//Einsatzplaner//DE',
-    'CALSCALE:GREGORIAN',
-    'METHOD:PUBLISH',
-    'BEGIN:VEVENT',
-    `UID:schicht-${s.id}-${randomBytes(6).toString('hex')}@einsatzplaner`,
-    `DTSTAMP:${icsZeit(jetzt)}`,
-    `DTSTART:${icsZeit(s.start_zeit)}`,
-    `DTEND:${icsZeit(s.end_zeit)}`,
-    `SUMMARY:${maskiereIcs(termin?.titel || terminTitel(s))}`,
-  ];
-  if (s.ort) zeilen.push(`LOCATION:${maskiereIcs(s.ort)}`);
-  zeilen.push(`DESCRIPTION:${maskiereIcs(termin ? termin.text : terminText(s))}`);
-  zeilen.push('END:VEVENT', 'END:VCALENDAR');
+  return erzeugeIcsMehrere([{ schicht: s, termin }], jetzt);
+}
+
+/** Eine ICS-Datei mit einem Termin je Schicht (ganzer Einsatz, Wunsch Yann 26.11.2026). */
+export function erzeugeIcsMehrere(liste: { schicht: TerminSchicht; termin?: { titel: string; text: string } }[], jetzt = jetztIso()): string {
+  const zeilen = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Verkehrskadetten//Einsatzplaner//DE', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH'];
+  for (const { schicht: s, termin } of liste) {
+    zeilen.push(
+      'BEGIN:VEVENT',
+      `UID:schicht-${s.id}-${randomBytes(6).toString('hex')}@einsatzplaner`,
+      `DTSTAMP:${icsZeit(jetzt)}`,
+      `DTSTART:${icsZeit(s.start_zeit)}`,
+      `DTEND:${icsZeit(s.end_zeit)}`,
+      `SUMMARY:${maskiereIcs(termin?.titel || terminTitel(s))}`,
+    );
+    if (s.ort) zeilen.push(`LOCATION:${maskiereIcs(s.ort)}`);
+    zeilen.push(`DESCRIPTION:${maskiereIcs(termin ? termin.text : terminText(s))}`);
+    zeilen.push('END:VEVENT');
+  }
+  zeilen.push('END:VCALENDAR');
   return zeilen.map(falte).join('\r\n') + '\r\n';
 }
 

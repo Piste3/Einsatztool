@@ -30,7 +30,7 @@ test('Alle Seiten antworten ohne Fehler', async () => {
       `/einsaetze/${s.einsatzId}/besetzen?filter=nicht&unpassend=1`, `/einsaetze/${s.einsatzId}/anmeldungen`, `/einsaetze/${s.einsatzId}/schichten`, `/einsaetze/${s.einsatzId}/verlauf`,
       `/schichten/${s.schichtId}`, `/schichten/${s.schichtId}/bearbeiten`, `/schichten/${s.schichtId}/loeschen`,
       `/schichten/${s.schichtId}/anrufliste`, `/schichten/${s.schichtId}/anrufliste?alle=1`, `/schichten/${s.schichtId}/ics`,
-      `/schichten/${s.schichtId}/termintext`, `/schichten/${s.schichtId}/aufgebot`, `/schichten/${s.schichtId}/essensliste.csv`,
+      `/schichten/${s.schichtId}/termintext`, `/schichten/${s.schichtId}/aufgebot`, `/einsaetze/${s.einsatzId}/aufgebot`, `/einsaetze/${s.einsatzId}/ics`, `/schichten/${s.schichtId}/essensliste.csv`,
       `/anmeldungen/${aid}/loeschen`, '/anmeldungen/unbekannt', '/personen', '/personen/1', '/rueckmeldungen', `/rueckmeldungen/eintrag?schicht=${s.schichtId}&person=1&zurueck=/rueckmeldungen`,
       '/admin/import', '/admin/export', '/admin/benutzer', '/admin/raenge', '/admin/rollen', '/admin/einstellungen', '/admin/einstellungen/vorlagen', '/admin/einstellungen/mail', '/admin/einstellungen/login', '/admin/einstellungen/clubdesk', '/admin/einstellungen/server', '/admin/einstellungen/protokoll', '/admin/konfiguration', '/admin/update',
       '/anmeldung', '/health',
